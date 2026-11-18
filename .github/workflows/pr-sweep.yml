@@ -1,0 +1,80 @@
+name: PR sweep weekly report
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Every Monday at 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: pr-sweep-weekly
+  cancel-in-progress: true
+
+jobs:
+  pr-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TRACKING_ISSUE: ${{ secrets.PR_SWEEP_TRACKING_ISSUE }}
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+
+      - name: Run PR sweep (live)
+        id: sweep
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run python scripts/pr_sweep.py --live --json --since 30d > "$RUNNER_TEMP/sweep-report.json"
+          cat "$RUNNER_TEMP/sweep-report.json"
+
+      - name: Validate report is non-empty
+        run: |
+          python3 -c "
+import json, sys
+with open('$RUNNER_TEMP/sweep-report.json') as f:
+    data = json.load(f)
+total = data.get('total_pull_requests', 0)
+counts = data.get('counts', {})
+if total == 0:
+    print('::error::Sweep report has zero total pull requests — run may be broken')
+    sys.exit(1)
+if sum(counts.values()) == 0:
+    print('::error::Sweep report has zero bucket counts — run may be broken')
+    sys.exit(1)
+print(f'Report valid: {total} PRs across {len(counts)} buckets')
+"
+
+      - name: Post or update tracking issue comment
+        if: env.TRACKING_ISSUE != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPORT=$(cat "$RUNNER_TEMP/sweep-report.json")
+          # Extract the table from the JSON for a readable comment
+          TABLE=$(uv run python scripts/pr_sweep.py --live --since 30d 2>/dev/null || echo "_Failed to render table_")
+          BODY="## Weekly PR Sweep Report
+
+\`\`\`
+$TABLE
+\`\`\`
+
+*Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
+          gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$BODY"

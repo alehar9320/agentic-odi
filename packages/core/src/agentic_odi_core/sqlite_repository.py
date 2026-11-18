@@ -28,6 +28,7 @@ from agentic_odi_core.models import (
     Strategy,
     Study,
 )
+from agentic_odi_core.paths import default_odi_db_path
 from agentic_odi_core.repository import (
     V2MOM_ID,
     Repository,
@@ -64,7 +65,7 @@ class SQLiteRepository(Repository):
         device_id: str | None = None,
     ) -> None:
         if db_path is None:
-            db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+            db_path = str(default_odi_db_path())
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
         self.db_path = db_path

@@ -408,9 +408,17 @@ python3 scripts/pr_ai_merge.py --managed            # list owned labels
 
 The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
 applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
-combined status of the head commit is `success` (CI green), `ready-for-merge`
-is present (no merge conflicts), and hygiene passes (open, non-draft, targets
-`main`). It is removed when any gate fails.
+head commit's check suite is complete and green, `ready-for-merge` is present
+(no merge conflicts), and hygiene passes (open, non-draft, targets `main`). It
+is removed when any gate fails.
+
+"Green" is `compute_ci_state()` in `scripts/pr_ai_authorize.py`: `CI green` and
+`PR guardrails` must be successful, and every other GitHub Actions check run on
+the head commit must be green except the advisory browser suite (`End-to-end`),
+which `AGENTIC_ODI_E2E_BLOCKING=true` turns into a gate. The legacy combined
+commit status is deliberately not consulted — it carries only third-party
+statuses, so it reads `success` while CI is still queued. See
+[ADR 0009](architecture/adr/0009-ai-merge-gate-reads-the-check-suite.md).
 
 ```bash
 python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
@@ -420,9 +428,17 @@ python3 scripts/pr_ai_authorize.py --managed            # list owned labels
 ### Auto-merge (Phase 2)
 
 The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
-`gh pr merge --auto --squash` on any open PR carrying `ai-merge-authorized`,
-re-verifying CI green immediately before arming. Human override: `do-not-merge`
-or `needs human review` cancels auto-merge and a comment explains why.
+`gh pr merge --auto --squash` only on an open PR that carries
+`ai-merge-authorized`, `ai-merge-safe` and `ready-for-merge`, whose head commit
+passes the check-suite gate, and whose labels it has just re-read. The trigger
+is narrowed to the labels that can change the decision, so an unrelated label
+cannot arm a merge.
+
+Arming is a request, not a decision: every run can disarm. If a gate stops
+holding — the authorization or trust label is removed, a new push resets the
+checks, a human adds `do-not-merge` or `needs human review`, or the suite goes
+red — the workflow calls `gh pr merge --disable-auto` and says why in an
+idempotent `## AI merge act` comment that names the head commit it judged.
 
 ### Branch protection (enforced on `main`)
 

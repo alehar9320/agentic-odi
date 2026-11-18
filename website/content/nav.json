@@ -66,6 +66,12 @@
           "slug": "test-map",
           "source": "docs/reference/test-map.md",
           "title": "Test map"
+        },
+        {
+          "blurb": "What a turn cost, which tool was slow, and the one logging setup.",
+          "slug": "observability",
+          "source": "docs/architecture/observability.md",
+          "title": "Observability"
         }
       ],
       "title": "Build"
@@ -107,6 +113,12 @@
           "slug": "superpowers",
           "source": "docs/superpowers.md",
           "title": "Superpowers"
+        },
+        {
+          "blurb": "Every environment variable, its default, and the form it accepts.",
+          "slug": "configuration",
+          "source": "docs/reference/configuration.md",
+          "title": "Configuration"
         }
       ],
       "title": "Operate"

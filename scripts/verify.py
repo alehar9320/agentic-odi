@@ -127,6 +127,13 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str]]:
             targets["brand"] = True
             mapped = True
             continue
+        if path.startswith(".qoder/"):
+            # Agent worktree state must never reach the index: a gitlink there
+            # breaks actions/checkout's submodule cleanup. The contract test
+            # that pins the invariant is the target for adding or dropping one.
+            targets["tests_root"] = True
+            mapped = True
+            continue
 
         # Markdown and agent-facing docs are covered by the documentation drift
         # test and the root suite. A docs-only PR must still be verifiable, and

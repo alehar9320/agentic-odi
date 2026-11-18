@@ -39,6 +39,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_context.py` | Tests for the CLI's global backend context. |
 | `apps/cli/tests/test_customer_outcomes_cli.py` | Customer Outcomes CLI: local backend, aliases, output, and errors. |
 | `apps/cli/tests/test_data_export.py` | `data-export` writes a restorable snapshot of the local store. |
+| `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
@@ -80,6 +81,7 @@ isolation, and coverage rules stay in
 | `apps/mcp-server/tests/test_tool_branches.py` | Branch coverage for MCP tool prompts, errors, and full updates. |
 | `apps/mcp-server/tests/test_tool_progress.py` | Long tools report progress so the Studio can stop looking hung. |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | Startup validation refuses a contract that the server cannot serve. |
+| `apps/mcp-server/tests/test_tool_timing.py` | Every MCP tool call emits one timing line, so a slow tool is visible. |
 | `apps/mcp-server/tests/test_tools.py` | — |
 | `apps/mcp-server/tests/test_traceability_tools.py` | The traceability tools round-trip through the live MCP registry. |
 | `apps/studio-api/tests/conftest.py` | Isolate each test's Studio memory database from the developer's home. |
@@ -116,6 +118,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_models.py` | Tests for listing the configured backend's model ids. |
 | `apps/studio-api/tests/test_studio_observability.py` | Tests for the per-turn structured log line and its redaction. |
 | `apps/studio-api/tests/test_studio_outcome_evidence_crud.py` | Customer-outcome and evidence CRUD through the Studio API. |
+| `apps/studio-api/tests/test_studio_paths.py` | Tests for the per-install sidecar token file and its mode. |
 | `apps/studio-api/tests/test_studio_probes.py` | Tests for endpoint probing and LLM health classification. |
 | `apps/studio-api/tests/test_studio_proposals.py` | The proposal routes: mine evidence, review it, approve or reject it. |
 | `apps/studio-api/tests/test_studio_router.py` | Tests for successful passthrough responses from the Studio router. |
@@ -139,6 +142,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/assistant/extract/pdf.test.ts` | Vitest runs with the studio package as its working directory. |
 | `apps/studio/src/assistant/interview/Interview.test.tsx` | The interview host's wiring (issue #397). |
 | `apps/studio/src/assistant/interview/conductor.test.ts` | The interview conductor's rules (issue #397). |
+| `apps/studio/src/assistant/interview/persistence.test.ts` | The interview draft's rules (issue #402). |
 | `apps/studio/src/assistant/parts.approval.test.tsx` | The approval card, exercised directly. |
 | `apps/studio/src/assistant/parts.test.tsx` | — |
 | `apps/studio/src/assistant/pending.test.ts` | The pending-call selector (issue #390). |
@@ -167,14 +171,15 @@ isolation, and coverage rules stay in
 | `apps/studio/src/bridge/runtime.test.ts` | The four hosts the Studio can run in, as a table. |
 | `apps/studio/src/components/BlockedReasonNote.test.tsx` | Setup renders in the chat stage, which Customize replaces while it is |
 | `apps/studio/src/components/BootFailurePage.test.tsx` | — |
-| `apps/studio/src/components/ChangelogModal.test.tsx` | — |
+| `apps/studio/src/components/ChangelogModal.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/FailurePanel.visual.test.tsx` | The build table would otherwise name this `FailurePanel.visual` after the |
 | `apps/studio/src/components/OdiMascot.test.tsx` | — |
-| `apps/studio/src/components/SettingsPanel.test.tsx` | A supported transport: the unsupported file-level stub never syncs |
+| `apps/studio/src/components/SettingsPanel.test.tsx` | A browser build has no desktop version to report, so About shows the |
 | `apps/studio/src/components/ShareAction.test.tsx` | — |
-| `apps/studio/src/components/ShareSheet.test.tsx` | — |
+| `apps/studio/src/components/ShareSheet.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/SharedArtifact.test.tsx` | An ISO timestamp `ms` from now, so the expiry wording is stable in the test. */ |
 | `apps/studio/src/components/brief/BriefLens.test.tsx` | The brief sheet is the one place the document is read, so these tests hold it |
+| `apps/studio/src/components/canvas/Dashboard.test.tsx` | A signal from a month ago is in "All time" but not in "This week". |
 | `apps/studio/src/components/canvas/DirectCapture.test.tsx` | The capture form is where a score is born, and it showed two decimals while |
 | `apps/studio/src/components/canvas/EvidenceStream.test.tsx` | A workspace with jobs, and one with nothing but evidence — the second is the |
 | `apps/studio/src/components/canvas/JobMap.test.tsx` | A cold load: the cached canvas is on disk, the sidecar has not answered. |
@@ -222,6 +227,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/settings/DataSection.test.tsx` | — |
 | `apps/studio/src/components/settings/InstallSection.test.tsx` | #800: the desktop app is already its own window, so it cannot be installed. |
 | `apps/studio/src/components/settings/ModelSection.test.tsx` | — |
+| `apps/studio/src/components/settings/SettingsLayout.test.tsx` | The updater's state stays in the Updates row. |
 | `apps/studio/src/components/settings/SettingsPanel.perFieldSave.test.tsx` | Typing is not saving: the request waits for the field to be left. |
 | `apps/studio/src/components/settings/UpdatesSection.test.tsx` | — |
 | `apps/studio/src/components/settings/saves.test.ts` | — |
@@ -231,8 +237,9 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/status/StatusDot.visual.test.tsx` | Chromatic would otherwise name this build `StatusDot.visual` after the file. |
 | `apps/studio/src/components/workspace/WorkbenchRail.test.tsx` | The caret is somewhere else — on an empty stage, that is the composer. |
 | `apps/studio/src/components/workspace/WorkspacePanel.test.tsx` | The docked lens is the second panel of the stage split, so every test renders |
+| `apps/studio/src/components/workspace/panelContext.test.ts` | — |
 | `apps/studio/src/components/workspace/panels.test.tsx` | `findPanel` returns SETTINGS_PANEL for an id it does not know, so a lens |
-| `apps/studio/src/diagnostics/DiagnosticsModal.test.tsx` | The dialog sits outside the inert shell, so it stays reachable. |
+| `apps/studio/src/diagnostics/DiagnosticsModal.test.tsx` | The primitive hides the page behind from assistive technology (and marks |
 | `apps/studio/src/diagnostics/bundle.test.ts` | #800: About and diagnostics must report the same runtime facts, and those |
 | `apps/studio/src/diagnostics/redact.test.ts` | — |
 | `apps/studio/src/features/flags.test.ts` | — |
@@ -244,8 +251,10 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/canvasProvenance.test.ts` | — |
 | `apps/studio/src/lib/changelogRead.test.ts` | — |
 | `apps/studio/src/lib/commands.test.ts` | — |
+| `apps/studio/src/lib/dashboard.test.ts` | The days really held zero signals, so a flat zero line is honest here — |
 | `apps/studio/src/lib/export.test.ts` | The list item lost its terminal punctuation, so the claim cannot be |
 | `apps/studio/src/lib/focus.test.ts` | — |
+| `apps/studio/src/lib/formula.test.ts` | The opportunity-score ratchet (issue #1087). |
 | `apps/studio/src/lib/greeting.test.ts` | — |
 | `apps/studio/src/lib/guidance.test.ts` | — |
 | `apps/studio/src/lib/intro.test.ts` | — |
@@ -256,6 +265,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/records.test.ts` | — |
 | `apps/studio/src/lib/relativeTime.test.ts` | — |
 | `apps/studio/src/lib/sampleLoop.test.ts` | Bundled sample data, never the person's live canvas. |
+| `apps/studio/src/lib/scoreVocabulary.test.ts` | — |
 | `apps/studio/src/lib/session.test.ts` | — |
 | `apps/studio/src/lib/setup.test.ts` | — |
 | `apps/studio/src/lib/share.test.ts` | A token with a broken percent escape must not crash the boot; it is simply |
@@ -290,7 +300,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/ui/UiRenderer.test.tsx` | A verdict never appears without the confidence behind it. |
 | `apps/studio/src/ui/protocol.test.ts` | A recommendation without its alternatives is a conclusion. The catalog |
 | `apps/studio/src/updater/UpdateBanner.test.tsx` | The bar keeps changing; if it lived inside the live region a screen |
-| `apps/studio/src/updater/UpdateSettings.test.tsx` | — |
+| `apps/studio/src/updater/UpdateSettings.test.tsx` | The updater's detail (the running version, the last check, the release |
 | `apps/studio/src/updater/machine.test.ts` | — |
 | `apps/studio/src/updater/service.test.ts` | — |
 | `apps/studio/src/updater/transport.test.ts` | — |
@@ -316,7 +326,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
-| `packages/core/tests/test_connection.py` | — |
+| `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
@@ -327,7 +337,9 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_funnel_service.py` | The funnel is counted by the paths a person actually walks. |
 | `packages/core/tests/test_intent_store.py` | Tests for the append-only Intent Store. |
 | `packages/core/tests/test_job_validation.py` | — |
+| `packages/core/tests/test_logging.py` | The shared logging configuration is idempotent and level-aware. |
 | `packages/core/tests/test_messages.py` | Tests for shared assistant messages and error helpers. |
+| `packages/core/tests/test_migrations.py` | The migration ledger: numbered, recorded, and gapless. |
 | `packages/core/tests/test_models.py` | Tests for core domain models. |
 | `packages/core/tests/test_opportunity_ranking.py` | Pin the opportunity leaderboard and its served/underserved buckets. |
 | `packages/core/tests/test_opportunity_score.py` | Regression tests for the ODI opportunity score. |
@@ -359,11 +371,13 @@ isolation, and coverage rules stay in
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
+| `tests/contract/test_no_unregistered_gitlinks.py` | Index gitlinks must be registered submodules with a url. |
 | `tests/contract/test_protected_files.py` | Protected files must never be deleted on main. |
 | `tests/scripts/conftest.py` | Make the standalone scripts in scripts/ importable under pytest. |
 | `tests/scripts/test_artifact_a11y.py` | The shared structural audit for artifact HTML (issue ALH-238). |
 | `tests/scripts/test_artifact_inventory.py` | The renderer inventory and the gate that keeps it true. |
 | `tests/scripts/test_assistant_ui_ledger.py` | Tests for the assistant-ui ledger check in scripts/doc_check.py (issue #429). |
+| `tests/scripts/test_audit_ignore.py` | The accepted-advisory ledger is the gate's memory (#1090). |
 | `tests/scripts/test_bundle_budget.py` | The cold-start bundle budget gate (#529). |
 | `tests/scripts/test_ci_release.py` | — |
 | `tests/scripts/test_cli_docs.py` | Assert that docs/cli.md stays synchronized with registered Typer CLI commands. |
@@ -376,7 +390,8 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_gen_job_stages.py` | The Studio's eight job stages are generated from the core constant (issue #79). |
 | `tests/scripts/test_hosted_first_run_workflow.py` | The hosted probe has a schedule, a commit to compare against, and no vote. |
 | `tests/scripts/test_label_merge_conflicts.py` | The merge-conflict labeler, pinned against the failures that silenced it. |
-| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization script (``scripts/pr_ai_authorize.py``). |
+| `tests/scripts/test_migrations_registry.py` | The migration registries are contracts, and these are their guards. |
+| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization and the check-suite gate it reads. |
 | `tests/scripts/test_pr_ai_merge.py` | The AI merge trust labeler, pinned so a silent gate failure cannot ship. |
 | `tests/scripts/test_pr_ai_merge_act.py` | Test the AI merge act workflow (``.github/workflows/pr-ai-merge-act.yml``). |
 | `tests/scripts/test_pr_ai_merge_workflow.py` | The AI merge trust workflow, pinned so the silent failures cannot come back. |
@@ -385,11 +400,14 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_pr_labeler_workflow.py` | The labeler workflows, pinned so the silent failures cannot come back. |
 | `tests/scripts/test_pr_labels.py` | — |
 | `tests/scripts/test_pr_provenance.py` | — |
+| `tests/scripts/test_pr_sweep.py` | ``scripts/pr_sweep.py``, the read-only view of the open pull request queue. |
+| `tests/scripts/test_pr_sweep_workflow.py` | The PR sweep weekly workflow, pinned so the schedule and permissions cannot regress. |
 | `tests/scripts/test_pr_triage.py` | — |
 | `tests/scripts/test_release_assets.py` | Unit tests for scripts/release_assets.py. |
 | `tests/scripts/test_release_instructions.py` | Unit tests for scripts/release_instructions.py. |
 | `tests/scripts/test_release_version_gate.py` | A release tag must match the version the CLI reports. |
 | `tests/scripts/test_release_workflow.py` | The release workflows must be wired so assets actually get attached. |
+| `tests/scripts/test_settings_registry.py` | Settings drift: declared variables, documented rows, and direct reads. |
 | `tests/scripts/test_updater_proof_gate.py` | Where the updater's proof gets read (#613). |
 | `tests/scripts/test_vendor_policy.py` | Tests for scripts/vendor_policy.py (issue #383). |
 | `tests/scripts/test_verify.py` | — |

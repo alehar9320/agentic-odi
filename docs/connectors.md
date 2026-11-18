@@ -270,10 +270,13 @@ not consume tokens.
 | Records admitted per second | `AGENTIC_ODI_INGEST_RATE` | `100` |
 | Burst (max tokens held) | one second's worth | `100` for the default rate |
 
-Invalid or non-positive values fall back to 100. The limiter never blocks: a
-burst is shed with a typed error instead of being queued in memory, which is the
-failure mode this guard exists to prevent. Construct `IngestSink` with an
-explicit `RateLimiter` to override the rate or the burst in-process.
+An unset or empty `AGENTIC_ODI_INGEST_RATE` uses the default of 100. A value
+that is present but not a positive integer — `0`, `-1`, or a typo such as
+`1OO` — raises `ValueError` naming the variable, so the process does not run at
+a rate the operator did not choose. The limiter never blocks: a burst is shed
+with a typed error instead of being queued in memory, which is the failure mode
+this guard exists to prevent. Construct `IngestSink` with an explicit
+`RateLimiter` to override the rate or the burst in-process.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
@@ -302,6 +305,9 @@ behavior are predictable. Tune it with environment variables:
 | `AGENTIC_ODI_HTTP_TIMEOUT` | `30.0` | Per-request timeout in seconds |
 | `AGENTIC_ODI_HTTP_RETRIES` | `3` | Retries for connection-level failures |
 
-Invalid or out-of-range values fall back to the default instead of failing the
-process.
+An unset or empty variable uses its default. A present but invalid value — a
+typo, or a number below the minimum (1 for the pool size, 0.001 for the
+timeout, 0 for retries) — raises `ValueError` naming the variable, so a
+mistyped configuration fails loudly instead of silently behaving like the
+default.
 
