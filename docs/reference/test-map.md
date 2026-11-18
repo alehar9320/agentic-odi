@@ -366,6 +366,7 @@ isolation, and coverage rules stay in
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
+| `tests/contract/test_no_unregistered_gitlinks.py` | Index gitlinks must be registered submodules with a url. |
 | `tests/contract/test_protected_files.py` | Protected files must never be deleted on main. |
 | `tests/scripts/conftest.py` | Make the standalone scripts in scripts/ importable under pytest. |
 | `tests/scripts/test_artifact_a11y.py` | The shared structural audit for artifact HTML (issue ALH-238). |
