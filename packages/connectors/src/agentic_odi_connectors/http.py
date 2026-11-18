@@ -24,24 +24,28 @@ RETRIES_ENV = "AGENTIC_ODI_HTTP_RETRIES"
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:
     raw = os.environ.get(name)
-    if raw is None:
+    if raw is None or not raw.strip():
         return default
     try:
         value = int(raw)
-    except ValueError:
-        return default
-    return value if value >= minimum else default
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {raw!r}") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {value}")
+    return value
 
 
 def _env_float(name: str, default: float, *, minimum: float) -> float:
     raw = os.environ.get(name)
-    if raw is None:
+    if raw is None or not raw.strip():
         return default
     try:
         value = float(raw)
-    except ValueError:
-        return default
-    return value if value >= minimum else default
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number >= {minimum}, got {raw!r}") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be a number >= {minimum}, got {value}")
+    return value
 
 
 class ConnectorHTTPClient:
