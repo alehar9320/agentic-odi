@@ -235,3 +235,36 @@ def test_the_existing_abbreviations_still_hold_a_sentence_together() -> None:
         "We ran it with tools, e.g. a probe.",
         "It worked.",
     ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Record counts fell 40% last quarter.",
+        "Run time doubled after the migration.",
+        "Review latency is the bottleneck.",
+        "Copy volume is up.",
+    ],
+)
+def test_a_declarative_opening_with_an_imperative_verb_is_a_claim(text: str) -> None:
+    claims = split_claims(text)
+
+    assert len(claims) == 1
+    assert claims[0].status == "uncited"
+    assert claims[0].text == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Check the invoice step.",
+        "Try the newer model.",
+        "Open the records lens.",
+    ],
+)
+def test_an_instruction_opening_with_an_imperative_verb_is_exempt(text: str) -> None:
+    assert split_claims(text) == []
+
+
+def test_a_question_still_ends_the_exemption_check_early() -> None:
+    assert split_claims("Review the latency, is it the bottleneck?") == []
