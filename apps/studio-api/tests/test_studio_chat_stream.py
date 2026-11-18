@@ -851,10 +851,10 @@ def test_a_rejected_include_usage_is_retried_without_it(monkeypatch, caplog) -> 
             return _FakeStream([_chunk(content="Done.")])
 
     def _bad_request() -> Any:
-        import httpx
+        import httpx2
 
-        request = httpx.Request("POST", "http://llm/v1/chat/completions")
-        response = httpx.Response(400, request=request)
+        request = httpx2.Request("POST", "http://llm/v1/chat/completions")
+        response = httpx2.Response(400, request=request)
         return chat.openai.BadRequestError("unsupported", response=response, body=None)
 
     async def _healthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:

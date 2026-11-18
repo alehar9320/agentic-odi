@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Generator
 
 import pytest
 from agentic_odi_core import logging as odi_logging
 
 
 @pytest.fixture(autouse=True)
-def _reset_logging() -> None:
+def _reset_logging() -> Generator[None, None, None]:
     """Undo whatever a test configured, so the next test starts clean."""
     root = logging.getLogger()
     before = list(root.handlers)
