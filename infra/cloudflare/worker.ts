@@ -306,9 +306,26 @@ export default {
 
     // Without a sidecar the Worker can still serve a local-only capabilities
     // manifest so the browser BFF knows what works offline. Anything else
-    // under /api needs the sidecar.
+    // under /api needs the sidecar. Like `/api/build` and `/api/deploy`, the
+    // route answers only GET, so a probe that guesses the verb is told so
+    // rather than handed a manifest that reads as accepted.
     if (!sidecar) {
       if (url.pathname === "/api/capabilities" || url.pathname === "/api/capabilities/") {
+        if (request.method !== "GET") {
+          return secure(
+            sidecarError(
+              {
+                code: "method_not_allowed",
+                message: "The capabilities route only answers GET.",
+                suggestion: "Read /api/capabilities with GET.",
+                retryable: false,
+              },
+              requestId,
+              { status: 405, headers: { Allow: "GET" } },
+            ),
+            env,
+          );
+        }
         return localCapabilitiesResponse(env);
       }
       console.error(
