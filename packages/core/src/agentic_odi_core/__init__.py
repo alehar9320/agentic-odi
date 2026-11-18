@@ -38,6 +38,7 @@ from agentic_odi_core.evaluation import (
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.logging import configure_logging
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -261,6 +262,7 @@ __all__ = [
     "build_repository",
     "compute_opportunity_score",
     "confidence_weighted_inputs",
+    "configure_logging",
     "create_job",
     "customer_outcome_not_found",
     "error_status",

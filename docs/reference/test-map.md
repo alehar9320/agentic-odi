@@ -81,6 +81,7 @@ isolation, and coverage rules stay in
 | `apps/mcp-server/tests/test_tool_branches.py` | Branch coverage for MCP tool prompts, errors, and full updates. |
 | `apps/mcp-server/tests/test_tool_progress.py` | Long tools report progress so the Studio can stop looking hung. |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | Startup validation refuses a contract that the server cannot serve. |
+| `apps/mcp-server/tests/test_tool_timing.py` | Every MCP tool call emits one timing line, so a slow tool is visible. |
 | `apps/mcp-server/tests/test_tools.py` | — |
 | `apps/mcp-server/tests/test_traceability_tools.py` | The traceability tools round-trip through the live MCP registry. |
 | `apps/studio-api/tests/conftest.py` | Isolate each test's Studio memory database from the developer's home. |
@@ -334,6 +335,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_funnel_service.py` | The funnel is counted by the paths a person actually walks. |
 | `packages/core/tests/test_intent_store.py` | Tests for the append-only Intent Store. |
 | `packages/core/tests/test_job_validation.py` | — |
+| `packages/core/tests/test_logging.py` | The shared logging configuration is idempotent and level-aware. |
 | `packages/core/tests/test_messages.py` | Tests for shared assistant messages and error helpers. |
 | `packages/core/tests/test_migrations.py` | The migration ledger: numbered, recorded, and gapless. |
 | `packages/core/tests/test_models.py` | Tests for core domain models. |

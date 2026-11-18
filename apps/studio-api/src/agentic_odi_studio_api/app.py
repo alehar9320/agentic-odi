@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from agentic_odi_core import ODIService
+from agentic_odi_core import ODIService, configure_logging
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.funnel import count_launch, start_session
 from agentic_odi_core.messages import CAPABILITIES
@@ -222,6 +222,11 @@ def create_app(
     marketplace: StudioMarketplace | None = None,
     sharing: ShareService | None = None,
 ) -> FastAPI:
+    # The sidecar is started two ways: ``python -m agentic_odi_studio_api.main``
+    # and uvicorn's factory (``scripts/dev.py``). This call is what makes both
+    # paths log the same way; it is idempotent, so a process that took the first
+    # path does not log twice.
+    configure_logging()
     # A damaged file must not reach the person as a traceback. The store is
     # gated on open; when it fails, the app still starts and answers with the
     # failure page until the file is restored. The file itself is never touched.

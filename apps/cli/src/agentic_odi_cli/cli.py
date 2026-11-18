@@ -120,6 +120,11 @@ def main(
     mcp_url: str | None = typer.Option(None, "--mcp-url", help="MCP server URL (mcp backend)."),
     no_update: bool = typer.Option(False, "--no-update", help="Disable the startup update check"),
 ) -> None:  # noqa: B008
+    # Imported here, not at module load: ``--version`` and ``--help`` must not
+    # pull the core domain layer in just to print a string (test_startup_perf).
+    from agentic_odi_core.logging import configure_logging
+
+    configure_logging()
     context.set_options(backend=backend, db_path=db, mcp_url=mcp_url)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()
