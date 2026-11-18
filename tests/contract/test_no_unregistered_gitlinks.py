@@ -24,9 +24,7 @@ GITLINK_MODE = "160000"
 
 def _index_gitlinks() -> list[str]:
     """Paths of index entries that are gitlinks (mode 160000)."""
-    output = subprocess.check_output(
-        ["git", "ls-files", "--stage"], text=True, cwd=ROOT
-    )
+    output = subprocess.check_output(["git", "ls-files", "--stage"], text=True, cwd=ROOT)
     paths: list[str] = []
     for line in output.splitlines():
         meta, _, path = line.partition("\t")
@@ -83,9 +81,7 @@ def test_gitlinks_are_registered_submodules() -> None:
         "the gitignored .qoder/ directory and never belong in the index."
     )
 
-    missing_url = sorted(
-        path for path, url in declared.items() if path in gitlinks and not url
-    )
+    missing_url = sorted(path for path, url in declared.items() if path in gitlinks and not url)
     assert not missing_url, (
         "Submodules declared in .gitmodules without a url: "
         + ", ".join(missing_url)
