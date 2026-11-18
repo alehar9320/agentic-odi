@@ -559,6 +559,7 @@ def test_check_names_the_stale_test_map(tmp_path: Path) -> None:
 def test_the_committed_test_map_matches_a_fresh_render() -> None:
     assert docs_index.check(ROOT) == []
 
+
 # --- assistant-ui ledger blocks (issue #1046) ---
 
 _LEDGER = """# The assistant-ui ledger
