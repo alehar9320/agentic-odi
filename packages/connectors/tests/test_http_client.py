@@ -64,6 +64,15 @@ async def test_retries_come_from_the_environment(monkeypatch: pytest.MonkeyPatch
         await client.aclose()
 
 
+@pytest.mark.asyncio
+async def test_invalid_environment_values_raise(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "not-a-number")
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "-5")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        get_http_client()
+
+
 def test_a_typo_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "not-a-number")
 
