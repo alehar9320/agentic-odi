@@ -9,6 +9,9 @@ export interface PillDescriptor {
  * fails the moment the two disagree. */
 export const UNDERSERVED_THRESHOLD = 10;
 
+/** The one phrase for a score the store does not hold. */
+export const UNSCORED_LABEL = "Not scored";
+
 export function opportunityScore(importance: number, satisfaction: number): number {
   return importance + Math.max(importance - satisfaction, 0);
 }
@@ -25,7 +28,7 @@ export function hasScore(value: unknown): value is number {
 
 export function formatOpportunityScore(score: number | null | undefined): string {
   if (score == null) {
-    return "N/A";
+    return UNSCORED_LABEL;
   }
   return score.toFixed(1);
 }
@@ -56,7 +59,7 @@ export function opportunityPill(score: number | null | undefined): PillDescripto
   // A missing score is not "served". Saying so would read as a verdict the
   // store never reached, so it gets a neutral descriptor of its own.
   if (!hasScore(score)) {
-    return { label: "Not scored", variant: "blue" };
+    return { label: UNSCORED_LABEL, variant: "blue" };
   }
   const formatted = formatOpportunityScore(score);
   if (isUnderserved(score)) {
@@ -135,7 +138,7 @@ export function scoredAverage(outcomes: ReadonlyArray<Outcome>): MemberScoreSumm
  */
 export function formatMemberMean(summary: MemberScoreSummary): string {
   if (summary.mean == null) {
-    return "Not scored";
+    return UNSCORED_LABEL;
   }
   const base = `Mean opportunity ${summary.mean.toFixed(1)} across ${summary.scored} scored`;
   return summary.unscored > 0 ? `${base} · ${summary.unscored} not scored` : base;

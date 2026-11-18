@@ -264,6 +264,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/records.test.ts` | — |
 | `apps/studio/src/lib/relativeTime.test.ts` | — |
 | `apps/studio/src/lib/sampleLoop.test.ts` | Bundled sample data, never the person's live canvas. |
+| `apps/studio/src/lib/scoreVocabulary.test.ts` | — |
 | `apps/studio/src/lib/session.test.ts` | — |
 | `apps/studio/src/lib/setup.test.ts` | — |
 | `apps/studio/src/lib/share.test.ts` | A token with a broken percent escape must not crash the boot; it is simply |
