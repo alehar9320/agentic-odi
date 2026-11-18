@@ -21,8 +21,12 @@ const ACTION_LABELS: Record<UpdateActionKind, string> = {
 const ACTION_LOG_LIMIT = 6;
 
 /**
- * The honest, complete picture: the running version, what the updater is doing,
- * the release notes, and the two preferences that matter.
+ * Updates: one line that says where things stand, and at most one action.
+ *
+ * The running version and the build facts live in About; the bar's version
+ * pill and the banner carry the urgent restart. This row is the quiet,
+ * configuration-facing summary, so the release notes, the last-check time, and
+ * the skip control are deliberately absent here.
  */
 export function UpdateSettings() {
   const service = useUpdateService();
@@ -33,26 +37,36 @@ export function UpdateSettings() {
     snapshot.phase === "checking" ||
     snapshot.phase === "downloading" ||
     snapshot.phase === "installing";
-  const version = snapshot.currentVersion;
-  const notes = snapshot.available?.notes;
-  // A check that never reached the server has no update to talk about; the
-  // status line owns that sentence, so the bare check time would contradict it.
-  const checkFailed = snapshot.phase === "error" && snapshot.available === null;
   const recentActions = snapshot.actions.slice(0, ACTION_LOG_LIMIT);
-  const canSkip =
-    snapshot.available !== null &&
-    !snapshot.installed &&
-    (snapshot.phase === "error" || snapshot.phase === "ready");
+
+  const action = !supported ? null : snapshot.phase === "ready" ? (
+    <button
+      type="button"
+      className="button button--ghost"
+      onClick={() => void service.installAndRestart()}
+    >
+      {snapshot.pendingInstall ? "Update & restart" : "Restart now"}
+    </button>
+  ) : snapshot.phase === "error" ? (
+    <button type="button" className="button button--ghost" onClick={() => void service.retry()}>
+      Try again
+    </button>
+  ) : (
+    <button
+      type="button"
+      className="button button--ghost"
+      disabled={busy}
+      onClick={() => void service.check()}
+    >
+      {snapshot.phase === "checking" ? "Checking…" : "Check now"}
+    </button>
+  );
 
   return (
-    <section className="update-settings" aria-labelledby="software-update-heading">
-      <div className="update-settings__head">
-        <h3 className="settings__title" id="software-update-heading">
-          Software update
-        </h3>
-        {version && <span className="update-settings__version">v{version}</span>}
-      </div>
-
+    <section className="update-settings" aria-labelledby="settings-updates-heading">
+      <h3 className="settings__title" id="settings-updates-heading">
+        Updates
+      </h3>
       <p className="update-settings__status">
         <StatusDot
           tone={
@@ -66,71 +80,24 @@ export function UpdateSettings() {
           }
         />
         <span>{service.statusLine()}</span>
+        {action}
       </p>
-
-      {supported && snapshot.lastCheckedAt !== null && !checkFailed && (
-        <p className="muted">{service.checkedAtLabel()}</p>
-      )}
 
       {supported && recentActions.length > 0 && (
         <details className="disclosure update-settings__activity">
           <summary>Recent update activity</summary>
           <ul className="update-settings__log">
-            {recentActions.map((action, index) => (
+            {recentActions.map((entry, index) => (
               <li
-                key={`${action.kind}-${action.at}-${index}`}
+                key={`${entry.kind}-${entry.at}-${index}`}
                 className="update-settings__log-row"
               >
-                <span>{ACTION_LABELS[action.kind]}</span>
-                <span className="muted">{formatActionTime(action.at)}</span>
+                <span>{ACTION_LABELS[entry.kind]}</span>
+                <span className="muted">{formatActionTime(entry.at)}</span>
               </li>
             ))}
           </ul>
         </details>
-      )}
-
-      {snapshot.available && notes && (
-        <details className="disclosure update-settings__notes">
-          <summary>What's new in {snapshot.available.version}</summary>
-          <p className="update-settings__notes-body">{notes}</p>
-        </details>
-      )}
-
-      {supported && (
-        <div className="update-settings__actions">
-          {snapshot.phase === "ready" ? (
-            <button
-              type="button"
-              className="button"
-              onClick={() => void service.installAndRestart()}
-            >
-              {snapshot.pendingInstall ? "Update & restart" : "Restart now"}
-            </button>
-          ) : snapshot.phase === "error" ? (
-            <button type="button" className="button" onClick={() => void service.retry()}>
-              Try again
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="button button--ghost"
-              disabled={busy}
-              onClick={() => void service.check()}
-            >
-              {snapshot.phase === "checking" ? "Checking…" : "Check now"}
-            </button>
-          )}
-
-          {canSkip && snapshot.available && (
-            <button
-              type="button"
-              className="button button--ghost"
-              onClick={() => service.skipCurrent()}
-            >
-              Skip this version
-            </button>
-          )}
-        </div>
       )}
 
       {supported && (

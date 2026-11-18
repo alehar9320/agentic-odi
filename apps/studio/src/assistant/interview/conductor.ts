@@ -65,6 +65,7 @@ export type InterviewEvent =
   | { type: "submit" }
   | { type: "submitted"; created: CreatedRecords }
   | { type: "failed"; failure: SubmitFailure; created: CreatedRecords }
+  | { type: "restore"; answers: Answers; index: number }
   | { type: "abandon" };
 
 function emptyCreated(): CreatedRecords {
@@ -111,6 +112,15 @@ export function reduce(state: InterviewState, event: InterviewEvent): InterviewS
 
     case "begin":
       return state.status === "asking" ? { ...state, status: "collecting", index: 0 } : state;
+
+    case "restore": {
+      // A resumed draft reopens at the same question with every answer intact.
+      // The index is clamped to the script, so a draft written against a longer
+      // script cannot point past the end of this one.
+      const last = Math.max(0, state.questions.length - 1);
+      const index = Math.min(Math.max(0, Math.floor(event.index)), last);
+      return { ...state, status: "collecting", answers: { ...event.answers }, index };
+    }
 
     case "answer": {
       if (state.status !== "collecting") {

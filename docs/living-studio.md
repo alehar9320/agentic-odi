@@ -47,7 +47,7 @@ The Studio opens as a conversation, not a dashboard.
 |---|---|
 | **First paint** | The window opens already the right colour. `apps/studio/index.html` carries an inline `<style>` with the background and the shell grid (bar, rail, stage) and a short inline script that resolves the theme — the stored `studio.settings` choice, or `prefers-color-scheme` when nothing is stored — and sets the class on `<html>` before the module bundle parses. React replaces the shell on its first commit, so there is no white flash and no dark-then-light flip. The inline colours are copies of `--bg` and `--line` in `src/styles/theme.css`, and `src/styles/bootShell.test.ts` fails if the two drift apart. |
 | **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step, and no warning about a server nothing you have done needs yet. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
-| **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and where the outcome lands. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. The last scene plots the scored sample outcome on the landscape beside two comparisons and names the evidence the sample is missing. It ends on one honest choice: **Start your own job** removes every record the tour made (and never a job you made), or **Keep the sample to poke at** leaves the sample marked. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
+| **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and where the outcome lands. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. The last scene plots the scored sample outcome on the landscape beside two comparisons and names the evidence the sample is missing. It ends on one honest choice: **Start your own job** removes every record the tour made (and never a job you made), or **Keep the sample to poke at** leaves the sample marked. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → About → Take the tour** opens it. |
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Above the composer, three canvas-aware conversation cards name a situation the person is actually in rather than one of our nouns: **Turn 40 interview notes into one bet**, **Find what the churn spike is telling you**, and **Inherit a roadmap without inheriting its assumptions**. An empty canvas always offers those three, in that order; once the canvas holds outcomes or jobs the second and third swap to **Pressure-test a bet** and **Capture what you heard**. Each card carries a subtitle and the artifact it produces (`artifact` on `StudioSuggestion`), which the card layout (#317) renders. Select one to start that prompt in the thread — the prompt is sent verbatim, and it opens with the material the person brings. **Opportunity landscape** remains a separate, quiet shortcut. |
@@ -56,7 +56,7 @@ The Studio opens as a conversation, not a dashboard.
 | **Bar** | The only persistent chrome: home, **New thread**, catch-up, live model status, **Customize**, and settings. **New thread** shows its words above 720px and is named *Start a new thread* at every width; it is switched off with the reason *This thread is already new.* when there is nothing to leave, asks — *A reply is still coming. Stop it and start a new thread?* — only while a reply is in flight, and otherwise gives the thread back for ten seconds through **Undo** on the toast. Starting one creates no conversation until the first message, and moves nothing on the canvas. Home closes what is open and never discards the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
-| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Closing puts focus back on the chip that opened the lens, so `Esc` never drops the caret into the composer behind it — that only happens when nothing else is open. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. In the Records lens a row is a button: it opens that one record below the tables with every field the store holds, its id behind **Copy id**, and each parent that exists as a filter that narrows the tables without leaving the lens. Where the store knows nothing it says so — `—` for an absent value, `unscored` for an outcome with no score, and the plain line *This record stores only the fields above — no author and no timestamp.* |
+| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. The header names the detail and, when a real step backs it, its place in the job above the title — *Step 2 of 4 • Locate* — with **Expand**/restore and **Close** beside it; the width the person last chose comes back on the next open. Closing puts focus back on the chip that opened the lens, so `Esc` never drops the caret into the composer behind it — that only happens when nothing else is open. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. In the Records lens a row is a button: it opens that one record below the tables with every field the store holds, its id behind **Copy id**, and each parent that exists as a filter that narrows the tables without leaving the lens. Where the store knows nothing it says so — `—` for an absent value, `unscored` for an outcome with no score, and the plain line *This record stores only the fields above — no author and no timestamp.* |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 While a turn has produced no text yet, an activity line names the phase (*Waking
@@ -89,7 +89,7 @@ handled in the SPA and never call the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/dashboard`, `/settings` | Open that lens beside the conversation |
 | `/brief` | Open the decision brief — the document a review reads, ready to download or print |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
@@ -101,7 +101,8 @@ Unknown commands produce a transcript notice pointing at `/help`.
 The stage is the front door; the tour is an answer to "show me around", not a
 gate. It is skippable at every step (`Skip the tour` or `Escape`), resumable
 (progress is stored after every transition in `localStorage["studio.onboarding"]`),
-and replayable from Settings. Nothing opens it automatically, and a fresh
+and replayable from **Settings → About** with **Take the tour**. Nothing opens it
+automatically, and a fresh
 install writes no record until the person asks for it.
 
 Everything lives in `apps/studio/src/onboarding/`:
@@ -240,6 +241,15 @@ Studio says so in one place and keeps going:
   registered step from the version the person has up to `DB_VERSION`, so a
   release that adds a store upgrades an existing database instead of failing to
   open it. A version bump with no migration is caught by a test before it ships.
+- A half-finished interview survives a reload. `apps/studio/src/assistant/interview/persistence.ts`
+  writes the conductor's draft — the answers and the question it was on — to the
+  browser's `interview_drafts` store (schema v4 in
+  `apps/studio/src/bff/store/migrations.ts`) on every transition, debounced to at
+  most one write per second, and deletes it once the interview reaches a terminal
+  state. On mount the most recent draft for the current job is read back and the
+  interview reopens at the same question; a draft for another job is ignored. A
+  store that throws leaves the interview usable in memory and raises no banner,
+  and a submitted interview leaves no draft behind.
 - When a second tab opens a newer schema, the first tab would otherwise hold the
   old connection and block the upgrade. `IndexedDbLocalStore` closes its
   connection on `versionchange` and sets `needsReload`, which the app can read
@@ -410,6 +420,14 @@ sampled from `2 × importance − satisfaction > 10` and drawn with its threshol
 line — so the region a point sits in and `isUnderserved` never disagree. The
 pill follows suit: a score the store never computed reads **Not scored**, never
 **Served**.
+
+The score is edited where it is read. **Adjust scores** on the card opens a
+score panel (`ScorePopover`) that holds the two assumptions — importance and
+satisfaction — as a slider and a number each, prints the arithmetic live as
+`importance + gap = opportunity` with the underserved verdict, and saves both in
+one `updateOutcome`. The stored score is shown beside the draft, and when it no
+longer matches the inputs it was made from the panel says so and offers
+**Recompute**; it never repairs the record on its own.
 
 A score that was computed also says how well it is backed. The card and the
 landscape's **Backed by** column read one derived helper, `scoreConfidence`, over
@@ -644,6 +662,13 @@ turns, and continues with the same `conversation_id` on the next message. **New
 conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
+
+The history list is also where a thread gets its name. **Rename** on any row swaps
+the row into a field holding the current name: Enter or leaving the field commits
+it, Escape puts the old name back, and a blank name is refused without a request.
+The name is stored with the conversation, so it survives a reload. Renaming never
+opens the thread it renames and never touches the branch that was visible — a
+name is not a reason to move the person off the reply they were reading.
 
 ### Printing and export
 
@@ -955,19 +980,21 @@ returns to the foreground after that interval. A found update downloads in the
 background; the shell shows one quiet bar above the conversation with progress
 and a single action. macOS and Linux stage the update as soon as its signature
 verifies, so it also applies on the next ordinary launch. **Restart now** in the
-bar, **Settings → Software update**, or the version line in the sidebar applies
-it immediately. Windows needs the app to exit before its installer runs, so it
+bar, **Settings → Updates**, or the version line in the sidebar applies it
+immediately. Windows needs the app to exit before its installer runs, so it
 offers **Update & restart** instead. Dismissing the bar is safe: a staged update
-still applies on the next launch, and check failures are reported in Settings
-rather than interrupting the conversation. A failed check never borrows the
-last attempt's timestamp: Settings says plainly that the app could not check and
-names when it last reached the server successfully, or that it has not yet.
-Below that, **Recent update activity** lists the most recent updater actions of
-this session — checks, downloads, installs, skips and dismissals — newest first
-and capped, so a support conversation starts from what actually happened.
+still applies on the next launch, and check failures are reported in
+**Settings → Updates** rather than interrupting the conversation. A failed check
+never borrows the last attempt's timestamp: Settings says plainly that the app
+could not check and names when it last reached the server successfully, or that
+it has not yet. Below that, **Recent update activity** lists the most recent
+updater actions of this session — checks, downloads, installs, skips and
+dismissals — newest first and capped, so a support conversation starts from what
+actually happened.
 
 In-app updates are inactive in the browser build and in `tauri dev`; both say so
-in **Settings → Software update**.
+in **Settings → Updates**. The running version, commit, and build date live in
+**Settings → About**, not in the Updates row.
 
 `scripts/verify-desktop-update.sh` proves the path locally: it builds signed
 0.1.0 and 0.2.0 AppImages against a throwaway key and a local `latest.json`,

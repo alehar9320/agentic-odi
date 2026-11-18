@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeOpportunityScore } from "./localDataService";
+import { opportunityScore } from "../../lib/odi";
 import { MemoryLocalStore } from "../store/memoryStore";
 import { LocalDataService } from "./localDataService";
 
@@ -8,11 +8,11 @@ function makeStore() {
   return new MemoryLocalStore();
 }
 
-describe("computeOpportunityScore", () => {
+describe("opportunity score", () => {
   it("scores importance plus the gap to satisfaction", () => {
-    expect(computeOpportunityScore(8, 3)).toBe(13);
-    expect(computeOpportunityScore(3, 8)).toBe(3);
-    expect(computeOpportunityScore(5, 5)).toBe(5);
+    expect(opportunityScore(8, 3)).toBe(13);
+    expect(opportunityScore(3, 8)).toBe(3);
+    expect(opportunityScore(5, 5)).toBe(5);
   });
 });
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from agentic_odi_connectors.models import HealthStatus, IngestBatch
+from agentic_odi_connectors.models import HealthStatus, IngestBatch, LinkPreviewData
 
 
 class Connector(ABC):
@@ -20,3 +20,12 @@ class Connector(ABC):
     @abstractmethod
     async def ingest(self) -> IngestBatch:
         """Pull data from the external system into a normalized batch."""
+
+    async def preview(self, external_id: str) -> LinkPreviewData | None:
+        """Describe one external item by id, or return ``None``.
+
+        ``None`` means this connector cannot describe the item (unsupported or
+        unavailable). The default is concrete, not abstract, so a connector
+        without preview support inherits this answer and cannot break.
+        """
+        return None

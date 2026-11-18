@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 
 import { fetchChangelog } from "../api/studioApi";
 import { markReleasesRead, readReleaseVersions, unreadReleases } from "../lib/changelogRead";
 import { formatExactTime } from "../lib/relativeTime";
-import { useFocusTrap } from "../lib/useFocusTrap";
 import type { ChangelogData } from "../types";
+import { Dialog } from "@/components/ui/dialog";
 
 interface ChangelogModalProps {
   isOpen: boolean;
@@ -27,9 +26,6 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
     () => new Set(unread.map((release) => release.version)),
     [unread],
   );
-
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef, isOpen, true);
 
   function markAllRead() {
     const count = unread.length;
@@ -59,132 +55,20 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
         }
       });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
     return () => {
       mounted = false;
-      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  // Rendered at the document root, outside `.studio-app`, so the shell behind
-  // it can be made inert without inerting the dialog too.
-  return createPortal(
-    <div className="changelog-overlay fade-in">
-      {/* A real control so a pointer can dismiss; Escape and the close button
-          are the keyboard paths. */}
-      <button
-        type="button"
-        className="changelog-scrim"
-        aria-label="Close release notes"
-        tabIndex={-1}
-        onClick={onClose}
-      />
-      <div
-        ref={dialogRef}
-        className="changelog-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="changelog-modal-title"
-      >
-        <header className="changelog-modal__header">
-          <div>
-            <div className="changelog-modal__badge">WHAT'S NEW</div>
-            <h2 id="changelog-modal-title" className="changelog-modal__title">
-              Release Notes & Progress
-            </h2>
-            {unread.length > 0 && (
-              <p className="changelog-modal__unread" role="status">
-                {unread.length} new
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="changelog-modal__close"
-            onClick={onClose}
-            aria-label="Close changelog modal"
-          >
-            ✕
-          </button>
-        </header>
-
-        <div className="changelog-modal__body">
-          {loading && (
-            <div className="changelog-modal__loading">
-              <div className="skeleton skeleton-title" style={{ width: "40%" }} />
-              <div className="skeleton skeleton-line" style={{ width: "80%" }} />
-              <div className="skeleton skeleton-line" style={{ width: "60%" }} />
-            </div>
-          )}
-
-          {error && (
-            <div className="changelog-modal__error">
-              <p>⚠️ Unable to fetch release notes: {error}</p>
-            </div>
-          )}
-
-          {!loading && !error && changelog && changelog.releases.length === 0 && (
-            <p className="changelog-modal__empty">
-              Release notes come from the studio service. Start it to see what changed.
-            </p>
-          )}
-
-          {!loading && !error && changelog && changelog.releases.length > 0 && (
-            <div className="changelog-timeline">
-              {changelog.releases.map((release) => (
-                <article
-                  key={release.version}
-                  className={
-                    unreadVersions.has(release.version)
-                      ? "changelog-release changelog-release--unread"
-                      : "changelog-release"
-                  }
-                >
-                  <div className="changelog-release__meta">
-                    <span className="changelog-release__version">
-                      v{release.version}
-                    </span>
-                    <time
-                      className="changelog-release__date"
-                      dateTime={release.date}
-                      title={formatExactTime(release.date)}
-                    >
-                      {release.date}
-                    </time>
-                    {unreadVersions.has(release.version) && (
-                      <span className="changelog-release__new">New</span>
-                    )}
-                  </div>
-
-                  <div className="changelog-release__content">
-                    {release.categories.map((cat) => (
-                      <div key={cat.name} className="changelog-category">
-                        <h3 className="changelog-category__title">{cat.name}</h3>
-                        <ul className="changelog-category__list">
-                          {cat.items.map((item, idx) => (
-                            <li key={idx} className="changelog-category__item">
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <footer className="changelog-modal__footer">
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Release Notes & Progress"
+      footer={
+        <>
           <span className="changelog-modal__quote">
             "Design is not just what it looks like and feels like. Design is how it works."
           </span>
@@ -202,17 +86,91 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
             >
               Mark all read
             </button>
-            <button
-              type="button"
-              className="studio-button"
-              onClick={onClose}
-            >
+            <button type="button" className="studio-button" onClick={onClose}>
               Done
             </button>
           </div>
-        </footer>
+        </>
+      }
+    >
+      <div className="changelog-modal__header">
+        <div>
+          <div className="changelog-modal__badge">WHAT'S NEW</div>
+          {unread.length > 0 && (
+            <p className="changelog-modal__unread" role="status">
+              {unread.length} new
+            </p>
+          )}
+        </div>
       </div>
-    </div>,
-    document.body,
+
+      <div className="changelog-modal__body">
+        {loading && (
+          <div className="changelog-modal__loading">
+            <div className="skeleton skeleton-title" style={{ width: "40%" }} />
+            <div className="skeleton skeleton-line" style={{ width: "80%" }} />
+            <div className="skeleton skeleton-line" style={{ width: "60%" }} />
+          </div>
+        )}
+
+        {error && (
+          <div className="changelog-modal__error">
+            <p>⚠️ Unable to fetch release notes: {error}</p>
+          </div>
+        )}
+
+        {!loading && !error && changelog && changelog.releases.length === 0 && (
+          <p className="changelog-modal__empty">
+            Release notes come from the studio service. Start it to see what changed.
+          </p>
+        )}
+
+        {!loading && !error && changelog && changelog.releases.length > 0 && (
+          <div className="changelog-timeline">
+            {changelog.releases.map((release) => (
+              <article
+                key={release.version}
+                className={
+                  unreadVersions.has(release.version)
+                    ? "changelog-release changelog-release--unread"
+                    : "changelog-release"
+                }
+              >
+                <div className="changelog-release__meta">
+                  <span className="changelog-release__version">
+                    v{release.version}
+                  </span>
+                  <time
+                    className="changelog-release__date"
+                    dateTime={release.date}
+                    title={formatExactTime(release.date)}
+                  >
+                    {release.date}
+                  </time>
+                  {unreadVersions.has(release.version) && (
+                    <span className="changelog-release__new">New</span>
+                  )}
+                </div>
+
+                <div className="changelog-release__content">
+                  {release.categories.map((cat) => (
+                    <div key={cat.name} className="changelog-category">
+                      <h3 className="changelog-category__title">{cat.name}</h3>
+                      <ul className="changelog-category__list">
+                        {cat.items.map((item, idx) => (
+                          <li key={idx} className="changelog-category__item">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </Dialog>
   );
 }

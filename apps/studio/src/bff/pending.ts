@@ -1,6 +1,6 @@
 import type { CanvasData, Evidence, Job, Outcome, Step } from "../types";
 import type { CanvasProvenance } from "../types";
-import { computeOpportunityScore } from "./data/localDataService";
+import { opportunityScore } from "../lib/odi";
 import type { OutboxRecord } from "./store/types";
 
 /**
@@ -65,7 +65,7 @@ function pendingOutcome(id: string, payload: unknown): Outcome {
     satisfaction,
     opportunity_score:
       importance !== null && satisfaction !== null
-        ? computeOpportunityScore(importance, satisfaction)
+        ? opportunityScore(importance, satisfaction)
         : null,
     pending: true,
   };

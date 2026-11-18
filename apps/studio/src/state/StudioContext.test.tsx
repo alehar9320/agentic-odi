@@ -123,6 +123,9 @@ let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let renamePatches: Record<string, unknown>[] = [];
+/** When true, the conversation PATCH route answers 503 so a rename fails. */
+let renameFails = false;
 let conversationCreates = 0;
 /** When true, the canvas/evidence write routes answer 503 with no structured error. */
 let writeFails = false;
@@ -337,7 +340,19 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    if ("title" in body) {
+      if (renameFails) {
+        return new Response(JSON.stringify({ detail: "nope" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      renamePatches.push({ url, ...body });
+    }
+    if ("head_id" in body) {
+      headPatches.push(body);
+    }
     return json({ conversation: CONVERSATION });
   }
   if (url === "/api/conversations/c-1/tree") {
@@ -439,6 +454,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -806,6 +823,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -857,6 +876,70 @@ describe("StudioContext failures", () => {
     const messages = result.current.messages;
     expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
     expect(messages.at(-1)?.error?.code).toBe("internal");
+  });
+
+  it("drops a failed send and its question when the row is dismissed (#405)", async () => {
+    chatFailure = new Error("network down");
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const before = result.current.messages;
+    const failed = before.at(-1);
+    const question = before.at(-2);
+    expect(question?.role).toBe("user");
+    expect(question?.content).toBe("list the jobs");
+    expect(failed?.role).toBe("assistant");
+    expect(failed?.error).toBeDefined();
+
+    await act(async () => {
+      result.current.dismissFailedTurn(failed?.id ?? null);
+    });
+
+    // Both the question and the dead reply leave together: the pair is one send.
+    // The earlier, answered turns stay.
+    const after = result.current.messages;
+    expect(after.map((message) => message.id)).not.toContain(failed?.id);
+    expect(after.map((message) => message.id)).not.toContain(question?.id);
+    expect(after).toHaveLength(before.length - 2);
+  });
+
+  it("never dismisses a turn that did not fail (#405)", async () => {
+    chatStream = 'event: message\ndata: {"content":"Here you go."}\n\n';
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const answered = result.current.messages.at(-1);
+    expect(answered?.role).toBe("assistant");
+    expect(answered?.error).toBeUndefined();
+    const before = result.current.messages.length;
+
+    await act(async () => {
+      result.current.dismissFailedTurn(answered?.id ?? null);
+    });
+
+    expect(result.current.messages).toHaveLength(before);
   });
 
   it("reports a stream that ends without a message as an internal failure", async () => {
@@ -1024,6 +1107,47 @@ describe("StudioContext first run in a browser with no server", () => {
     // The reply says where it came from, on the reply — not in a strip above.
     expect(result.current.offlineReplyFor).toBe(last?.id);
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+  });
+
+  it("surfaces a real application error instead of falling back", async () => {
+    // A 401 from the sidecar is an application error, not a transport failure:
+    // the local assistant must not answer for it.
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/chat") {
+        chatAttempts += 1;
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "Bad token.", retryable: false } }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    // The error surfaces on the assistant message; no local-served marker.
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last?.role).toBe("assistant");
+      expect(last?.error).toBeDefined();
+    });
+    const last = result.current.messages.at(-1);
+    expect(last?.error).toBeDefined();
+    expect(result.current.offlineReplyFor).toBeNull();
+    // Only one attempt at /api/chat — no fall-through to the browser BFF.
+    expect(chatAttempts).toBe(1);
   });
 
   it("calls nothing broken until the person asks", async () => {
@@ -1930,6 +2054,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1982,6 +2108,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2025,6 +2153,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2195,6 +2325,8 @@ describe("StudioContext startNewThread (#319)", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -2597,6 +2729,8 @@ describe("StudioContext agent focus", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -3056,5 +3190,72 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext rename conversation (#642)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmTransportFails = false;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    renamePatches = [];
+    renameFails = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function booted() {
+    const harness = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(harness.result.current.conversations).toHaveLength(2));
+    return harness;
+  }
+
+  it("renames a thread and re-reads the history", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(renamePatches).toEqual([{ url: "/api/conversations/c-1", title: "Renamed thread" }]);
+    // The list is re-read from the store, not patched by hand.
+    expect(result.current.conversations).toHaveLength(2);
+  });
+
+  it("reports a failed rename and leaves the history as it was", async () => {
+    const { result } = await booted();
+    renameFails = true;
+    const before = result.current.conversations;
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.conversations).toEqual(before);
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "I couldn't rename that conversation.",
+    );
   });
 });

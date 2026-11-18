@@ -1,15 +1,46 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import type { PanelImperativeHandle } from "react-resizable-panels";
 import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { buildRecords } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import { useMediaQuery } from "../../lib/useMediaQuery";
-import { CloseIcon } from "../icons";
+import { CloseIcon, ExpandIcon } from "../icons";
 import { PanelBoundary } from "./PanelBoundary";
 import type { WorkspacePanelId } from "../../types";
-import { findPanel, type PanelDefinition } from "./panels";
+import { stepContextLine } from "./panelContext";
+import { findPanel, WORKSPACE_PANELS, type PanelDefinition } from "./panels";
 
 const MOBILE_QUERY = "(max-width: 1023px)";
+
+/** The lens width the person last chose, so a reload reopens where they left it. */
+const LENS_WIDTH_KEY = "studio.lensWidth";
+const LENS_WIDTH_MIN = 360;
+const LENS_WIDTH_MAX = 760;
+
+function readLensWidth(): number | null {
+  try {
+    const raw = localStorage.getItem(LENS_WIDTH_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= LENS_WIDTH_MIN && value <= LENS_WIDTH_MAX
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLensWidth(value: number): void {
+  try {
+    localStorage.setItem(LENS_WIDTH_KEY, String(Math.round(value)));
+  } catch {
+    // A blocked store must not stop the resize from taking effect.
+  }
+}
 
 /**
  * The lens body as its own component, so a lens that throws while rendering is
@@ -21,8 +52,15 @@ function PanelBody({ panel }: { panel: PanelDefinition }) {
 
 interface LensChromeProps {
   panel: PanelDefinition;
+  conversationTitle: string;
+  siblingCounts: Partial<Record<WorkspacePanelId, number>>;
+  onOpenPanel: (id: WorkspacePanelId) => void;
+  /** The "Step 2 of 4 • Locate" line, when a real step backs it. */
+  contextLine: string | null;
   onClose: () => void;
   onTalk: () => void;
+  onExpand: () => void;
+  expanded: boolean;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   bodyRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
@@ -32,30 +70,80 @@ interface LensChromeProps {
  * The lens header, body, and foot. The same markup serves the docked panel and
  * the mobile sheet, so the two shells cannot drift apart.
  */
-function LensChrome({ panel, onClose, onTalk, headingRef, bodyRef, onScroll }: LensChromeProps) {
+function LensChrome({
+  panel,
+  conversationTitle,
+  siblingCounts,
+  onOpenPanel,
+  contextLine,
+  onClose,
+  onTalk,
+  onExpand,
+  expanded,
+  headingRef,
+  bodyRef,
+  onScroll,
+}: LensChromeProps) {
   return (
     <>
       <header className="lens__head">
         <div className="lens__heading">
+          <p className="lens__where" aria-label={`In ${conversationTitle}`}>
+            {conversationTitle}
+          </p>
           <span className="lens__icon" aria-hidden="true">
             {panel.icon}
           </span>
-          <div>
-            <h2 className="lens__title" tabIndex={-1} ref={headingRef}>
+          <div className="lens__heading-text">
+            {contextLine ? <p className="lens__context">{contextLine}</p> : null}
+            <h2
+              id={`lens-title-${panel.id}`}
+              className="lens__title"
+              tabIndex={-1}
+              ref={headingRef}
+            >
               {panel.title}
             </h2>
             <p className="lens__blurb">{panel.blurb}</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close workspace view"
-          title="Close"
-          onClick={onClose}
-        >
-          <CloseIcon size={16} />
-        </button>
+        <nav className="lens__siblings" aria-label="Other views">
+          {WORKSPACE_PANELS.filter((item) => item.id !== panel.id).map((item) => {
+            const count = siblingCounts[item.id];
+            const label = typeof count === "number" ? `${item.label} (${count})` : item.label;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className="lens__sibling"
+                onClick={() => onOpenPanel(item.id)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="lens__controls">
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={expanded ? "Restore workspace view" : "Expand workspace view"}
+            aria-pressed={expanded}
+            title={expanded ? "Restore" : "Expand"}
+            onClick={onExpand}
+          >
+            <ExpandIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close workspace view"
+            title="Close"
+            onClick={onClose}
+          >
+            <CloseIcon size={16} />
+          </button>
+        </div>
       </header>
 
       <div className="lens__body" ref={bodyRef} onScroll={onScroll}>
@@ -89,12 +177,34 @@ function LensChrome({ panel, onClose, onTalk, headingRef, bodyRef, onScroll }: L
  * (#407).
  */
 export function WorkspacePanel() {
-  const { activePanel, closePanel, sendMessage } = useStudio();
+  const {
+    activePanel,
+    openPanel,
+    closePanel,
+    sendMessage,
+    streaming,
+    canvas,
+    conversations,
+    conversationId,
+    memory,
+    segments,
+    detail,
+  } = useStudio();
   const isMobile = useMediaQuery(MOBILE_QUERY);
   const panel = activePanel ? findPanel(activePanel) : null;
   const panelId = panel?.id ?? null;
+  const contextLine = stepContextLine(detail, canvas);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // The panel's imperative handle, so Expand can drive the split and the last
+  // chosen width can be restored on mount.
+  const panelRef = useRef<PanelImperativeHandle | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  // The width to open at: the person's last choice, read once.
+  const [chosenWidth] = useState(() => readLensWidth() ?? 480);
+  // The width the person was on before Expand, so Restore returns there rather
+  // than to the ceiling Expand itself just wrote.
+  const preExpandWidthRef = useRef<number | null>(null);
   // Where each lens was left. The body remounts with the lens, so the position
   // has to outlive the DOM to come back with it — per panel, never global (#696).
   const scrollByPanel = useRef(new Map<WorkspacePanelId, number>());
@@ -125,6 +235,29 @@ export function WorkspacePanel() {
     document.addEventListener("click", rememberOpener, true);
     return () => document.removeEventListener("click", rememberOpener, true);
   }, []);
+
+  // The header says where you are: the conversation this lens belongs to, and
+  // the sibling lenses with the count each one holds (#324).
+  const conversationTitle = useMemo(() => {
+    const current = conversations.find((item) => item.id === conversationId);
+    const title = current?.title?.trim();
+    return title || "This conversation";
+  }, [conversations, conversationId]);
+
+  const siblingCounts = useMemo(() => {
+    const outcomes = canvas?.outcomes ?? [];
+    const steps = canvas?.steps ?? [];
+    const evidence = outcomes.filter((outcome) => outcome.evidence?.trim()).length;
+    const records = buildRecords(canvas);
+    return {
+      records: records.length,
+      landscape: outcomes.length,
+      jobmap: steps.length,
+      segments: segments.length,
+      evidence,
+      memory: memory.length,
+    } as Partial<Record<WorkspacePanelId, number>>;
+  }, [canvas, memory, segments]);
 
   // On a wide screen the lens opens under the keyboard, so focus goes to the
   // heading and comes back to the control that opened it. The composer is
@@ -158,6 +291,26 @@ export function WorkspacePanel() {
     headingRef.current?.focus();
   }, [panelId, isMobile]);
 
+  // Escape closes the open lens and returns focus to its opener. Captured so it
+  // never reaches the app-level handler. A running reply is the exception: Escape
+  // stops the stream first and leaves the lens open, which is the order the app
+  // shell promises (#324, #692).
+  useEffect(() => {
+    if (!activePanel) {
+      return;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || streaming) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      closePanel();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [activePanel, streaming, closePanel]);
+
   // A lens opens where it was left; a different lens starts at its top.
   useLayoutEffect(() => {
     if (!panelId) {
@@ -169,6 +322,28 @@ export function WorkspacePanel() {
     }
     body.scrollTop = scrollByPanel.current.get(panelId) ?? 0;
   }, [panelId]);
+
+  function rememberWidth(size: { inPixels: number }) {
+    // Expand writes the ceiling into the same store, so only a resize the
+    // person made while not expanded is remembered as their chosen width.
+    if (!expanded) {
+      writeLensWidth(size.inPixels);
+    }
+  }
+
+  function toggleExpand() {
+    const handle = panelRef.current;
+    if (!handle) {
+      return;
+    }
+    if (expanded) {
+      handle.resize(preExpandWidthRef.current ?? chosenWidth);
+    } else {
+      preExpandWidthRef.current = handle.getSize().inPixels;
+      handle.resize(LENS_WIDTH_MAX);
+    }
+    setExpanded((value) => !value);
+  }
 
   function rememberScroll() {
     const body = bodyRef.current;
@@ -189,8 +364,14 @@ export function WorkspacePanel() {
   const chrome = panel ? (
     <LensChrome
       panel={panel}
+      conversationTitle={conversationTitle}
+      siblingCounts={siblingCounts}
+      onOpenPanel={openPanel}
+      contextLine={contextLine}
       onClose={closePanel}
       onTalk={talk}
+      onExpand={toggleExpand}
+      expanded={expanded}
       headingRef={headingRef}
       bodyRef={bodyRef}
       onScroll={rememberScroll}
@@ -227,12 +408,18 @@ export function WorkspacePanel() {
       <ResizableHandle withHandle />
       <ResizablePanel
         className="lens-panel"
-        defaultSize={480}
-        minSize={360}
-        maxSize={760}
+        defaultSize={chosenWidth}
+        minSize={LENS_WIDTH_MIN}
+        maxSize={LENS_WIDTH_MAX}
+        panelRef={panelRef}
+        onResize={rememberWidth}
         key={panel.id}
       >
-        <aside className="lens lens--docked" role="complementary" aria-label={panel.title}>
+        <aside
+          className="lens lens--docked"
+          role="complementary"
+          aria-labelledby={`lens-title-${panel.id}`}
+        >
           {chrome}
         </aside>
       </ResizablePanel>

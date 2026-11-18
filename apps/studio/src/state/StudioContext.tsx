@@ -55,6 +55,7 @@ import {
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
+  renameConversation as apiRenameConversation,
   setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
@@ -106,6 +107,7 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Outcome,
   Segment,
   Signal,
   SignalSubjectKind,
@@ -398,6 +400,13 @@ export interface StudioContextValue {
   regenerateFrom: (messageId: string | null) => Promise<void>;
   /** Replace the user turn before `messageId`, as a sibling branch. */
   editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
+  /**
+   * Forget a failed send (#405). `messageId` is the failed reply; the question
+   * it answered and any notices that hung off it go with it, so the row leaves
+   * the transcript instead of sitting there unretryable forever. The text is
+   * the caller's to restore to the composer.
+   */
+  dismissFailedTurn: (messageId: string | null) => void;
   /** Take the branch the runtime switched to as the visible conversation. */
   switchBranch: (messages: ChatMessage[]) => void;
   /** Answer a paused write. The turn resumes on its own stream. */
@@ -428,6 +437,11 @@ export interface StudioContextValue {
    * to the empty state; a failure leaves the history untouched.
    */
   deleteConversation: (conversationId: string) => Promise<boolean>;
+  /**
+   * Give one thread a new name. The row is renamed in place, and the list is
+   * re-read so ordering follows the touch; a failure leaves the old name.
+   */
+  renameConversation: (conversationId: string, title: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -451,10 +465,13 @@ export interface StudioContextValue {
   deleteJob: (jobId: string) => Promise<void>;
   updateStep: (stepId: string, payload: { name?: string; order?: number }) => Promise<void>;
   deleteStep: (stepId: string) => Promise<void>;
+  /** Resolves with the outcome the server returned, or `null` when the write
+   * failed — the failure is already surfaced as a toast, and the caller may keep
+   * the editor open on the values it holds. */
   updateOutcome: (
     outcomeId: string,
     payload: { statement?: string; importance?: number; satisfaction?: number },
-  ) => Promise<void>;
+  ) => Promise<Outcome | null>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
@@ -1590,7 +1607,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     async (
       outcomeId: string,
       payload: { statement?: string; importance?: number; satisfaction?: number },
-    ) => {
+    ): Promise<Outcome | null> => {
       try {
         const outcome = await apiUpdateOutcome(outcomeId, {
           ...payload,
@@ -1598,8 +1615,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         });
         pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
+        return outcome;
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+        return null;
       }
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -2428,6 +2447,47 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [messages, runTurn, streaming],
   );
 
+  /**
+   * Drop a failed send from the transcript (#405).
+   *
+   * A failed reply is a row the person can retry; it is also a row they should
+   * be able to put down. Today the only way out is to send something new, so the
+   * dead row and its question stay on screen forever. This removes the failed
+   * reply and the user turn it answered together — the pair is one send — plus
+   * any notice that hung off the reply, so the thread reads as though the send
+   * never left. It never touches a turn that did not fail, and it never touches
+   * the composer: the caller decides whether to offer the text back.
+   */
+  const dismissFailedTurn = useCallback(
+    (messageId: string | null) => {
+      if (!messageId) {
+        return;
+      }
+      setMessages((prev) => {
+        const failed = prev.find((message) => message.id === messageId);
+        if (!failed || failed.role !== "assistant" || !failed.error) {
+          return prev;
+        }
+        const doomed = new Set<string>([messageId]);
+        // The question this reply answered is part of the same send.
+        if (failed.parentId) {
+          const question = prev.find((message) => message.id === failed.parentId);
+          if (question?.role === "user") {
+            doomed.add(question.id);
+          }
+        }
+        // Notices the reply produced are commentary on it, not history.
+        for (const message of prev) {
+          if (message.role === "notice" && message.parentId && doomed.has(message.parentId)) {
+            doomed.add(message.id);
+          }
+        }
+        return prev.filter((message) => !doomed.has(message.id));
+      });
+    },
+    [],
+  );
+
   const switchBranch = useCallback(
     (next: ChatMessage[]) => {
       setMessages(next);
@@ -2599,6 +2659,29 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       return true;
     },
     [conversationId, pushToast, refreshConversations],
+  );
+
+  /**
+   * Give one thread a new name, and re-read the history.
+   *
+   * The list is re-read rather than patched in place so the renamed thread
+   * moves to the top — its `updated_at` was just touched — exactly as a reload
+   * would show it. A failed rename changes nothing the person can see.
+   */
+  const renameConversation = useCallback(
+    async (targetId: string, title: string) => {
+      try {
+        await apiRenameConversation(targetId, title);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't rename that conversation.");
+        return false;
+      }
+      await refreshConversations();
+      return true;
+    },
+    [pushToast, refreshConversations],
   );
 
   const clearChat = useCallback(() => {
@@ -2931,6 +3014,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -2942,6 +3026,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -3047,6 +3132,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -3058,6 +3144,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,

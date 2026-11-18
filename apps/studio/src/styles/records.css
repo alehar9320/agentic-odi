@@ -268,3 +268,102 @@
   color: var(--faint);
   font-size: 0.72rem;
 }
+
+/* ------------------------------------------------------------------ */
+/* Score panel — the two inputs, the arithmetic, the record's own score */
+/* ------------------------------------------------------------------ */
+.score-popover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.score-popover__id {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+
+.score-popover__assumptions {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.score-popover__assumption {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+}
+
+.score-popover__assumption-label {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.score-popover__assumption input[type="range"] {
+  width: 100%;
+}
+
+.score-popover__assumption input[type="number"] {
+  width: 4.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.score-popover__formula {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--text-base);
+  color: var(--muted);
+}
+
+.score-popover__formula b {
+  color: var(--text);
+  font-size: var(--text-lg);
+}
+
+.score-popover__verdict {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--faint);
+}
+
+.score-popover__stored {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.score-popover__mismatch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+}
+
+.score-popover__mismatch p {
+  margin: 0;
+  color: var(--amber);
+  font-size: var(--text-sm);
+}
+
+.score-popover__error {
+  margin: 0;
+  color: var(--red);
+  font-size: var(--text-sm);
+}

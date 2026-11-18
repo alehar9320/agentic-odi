@@ -13,7 +13,9 @@ from agentic_odi_core.models import (
     Direction,
     Evidence,
     Job,
+    Link,
     Outcome,
+    RelationshipType,
     Signal,
     SignalKind,
     Step,
@@ -338,6 +340,7 @@ def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
     assert repo.last_event_id() == after_add + 1
 
 
+<<<<<<< HEAD
 def _candidate(id: str = "cand-1") -> CandidateSolution:
     return CandidateSolution(
         id=id,
@@ -381,3 +384,53 @@ def test_updating_a_missing_candidate_returns_none() -> None:
     repo = InMemoryRepository()
     assert repo.update_candidate("missing", {"status": "accepted"}) is None
     assert repo.get_candidate("missing") is None
+=======
+def _link(
+    source_type="job",
+    source_id="s1",
+    target_type="outcome",
+    target_id="o1",
+    relationship_type="references",
+) -> Link:
+    return Link(
+        source_type=source_type,
+        source_id=source_id,
+        target_type=target_type,
+        target_id=target_id,
+        relationship_type=RelationshipType(relationship_type),
+    )
+
+
+def test_add_and_get_link() -> None:
+    repo = InMemoryRepository()
+    link = _link()
+    created = repo.add_link(link)
+    assert repo.get_link(created.id) == link
+
+
+def test_list_links_filters_by_source_and_target() -> None:
+    repo = InMemoryRepository()
+    repo.add_link(_link(source_type="job", source_id="j1", target_type="outcome", target_id="o1"))
+    repo.add_link(_link(source_type="job", source_id="j1", target_type="evidence", target_id="e1"))
+    repo.add_link(_link(source_type="outcome", source_id="o1", target_type="job", target_id="j1"))
+
+    by_source = [link.id for link in repo.list_links(source_type="job", source_id="j1")]
+    assert len(by_source) == 2
+    by_target = [link.id for link in repo.list_links(target_type="outcome", target_id="o1")]
+    assert len(by_target) == 1
+    assert repo.list_links(source_type="job", target_type="outcome") == [
+        repo.get_link(by_source[0])
+    ]
+
+
+def test_remove_link_returns_true() -> None:
+    repo = InMemoryRepository()
+    link = _link()
+    created = repo.add_link(link)
+    assert repo.remove_link(created.id) is True
+    assert repo.get_link(created.id) is None
+
+
+def test_remove_link_unknown_returns_false() -> None:
+    assert InMemoryRepository().remove_link("missing") is False
+>>>>>>> origin/main

@@ -28,13 +28,13 @@ const outcome = {
 };
 
 describe("OutcomeCard score preview", () => {
-  // The read-only card shows one decimal; the preview under "Adjust scores"
-  // showed two, so 16 read as "16.0" above and "16.00" below on the same card.
-  it("shows the adjusted opportunity score to one decimal", () => {
-    const { container } = render(<OutcomeCard outcome={outcome} />);
+  // The card's read-only number and the editor's live arithmetic must agree:
+  // both print one decimal, so 16 never reads as "16.0" above and "16.00" below.
+  it("opens the score panel on the same one-decimal value the card shows", () => {
+    render(<OutcomeCard outcome={outcome} />);
     fireEvent.click(screen.getByRole("button", { name: "Adjust scores" }));
 
-    expect(container.querySelector(".score-preview b")?.textContent).toBe("16.0");
+    expect(screen.getByTestId("score-formula")).toHaveTextContent("9.0 + 7.0 = 16.0");
   });
 });
 

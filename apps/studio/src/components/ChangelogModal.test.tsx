@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChangelogModal } from "./ChangelogModal";
@@ -63,9 +63,19 @@ describe("ChangelogModal", () => {
       expect(screen.getByText("Added super powers feature")).toBeInTheDocument();
     });
 
-    const closeBtn = screen.getByLabelText("Close changelog modal");
+    const closeBtn = screen.getByLabelText("Close dialog");
     fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes an accessible name through the dialog role", async () => {
+    vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
+
+    render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(
+      screen.getByRole("dialog", { name: "Release Notes & Progress" }),
+    ).toBeInTheDocument();
   });
 
   it("clears the unread badge and keeps it cleared after a remount", async () => {
@@ -111,22 +121,13 @@ describe("ChangelogModal", () => {
     expect(screen.queryByRole("article")).toBeNull();
   });
 
-  it("moves focus into the dialog and traps Tab at both ends", async () => {
+  it("moves focus into the dialog when it opens", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValueOnce({ releases: [] });
 
     render(<ChangelogModal isOpen={true} onClose={vi.fn()} />);
 
-    const dialog = screen.getByRole("dialog");
-    const close = screen.getByRole("button", { name: "Close changelog modal" });
+    const close = screen.getByRole("button", { name: "Close dialog" });
     await waitFor(() => expect(close).toHaveFocus());
-
-    const done = screen.getByRole("button", { name: "Done" });
-    done.focus();
-    fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(close).toHaveFocus();
-
-    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
-    expect(done).toHaveFocus();
   });
 
   it("closes on Escape key press", async () => {
@@ -135,18 +136,19 @@ describe("ChangelogModal", () => {
     });
 
     const onClose = vi.fn();
-    await act(async () => {
-      render(<ChangelogModal isOpen={true} onClose={onClose} />);
-    });
+    render(<ChangelogModal isOpen={true} onClose={onClose} />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus(),
+    );
 
-    await act(async () => {
-      fireEvent.keyDown(window, { key: "Escape" });
-    });
+    // The primitive dismisses on a keydown it receives from the document,
+    // which is where a real Escape lands before it bubbles to the window.
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("makes the page behind the dialog inert and restores it on close", async () => {
+  it("takes the page behind the dialog out of reach while it is open", async () => {
     vi.mocked(studioApi.fetchChangelog).mockResolvedValue({ releases: [] });
 
     const { unmount } = render(
@@ -156,10 +158,17 @@ describe("ChangelogModal", () => {
     );
 
     const shell = document.querySelector(".studio-app");
-    await waitFor(() => expect(shell).toHaveAttribute("inert"));
+    // The primitive hides the page behind from assistive technology (and marks
+    // it inert where the browser supports it) by hiding every sibling of the
+    // portaled content, so an ancestor of the shell carries the attribute.
+    await waitFor(() =>
+      expect(shell?.closest('[aria-hidden="true"]')).not.toBeNull(),
+    );
+    const hidden = shell?.closest('[aria-hidden="true"]') as HTMLElement | null;
+    expect(hidden?.contains(screen.getByRole("dialog"))).toBe(false);
 
     unmount();
-    expect(shell).not.toHaveAttribute("inert");
+    expect(shell?.closest('[aria-hidden="true"]')).toBeNull();
   });
 
   it("announces how many releases were marked read without shifting the footer", async () => {

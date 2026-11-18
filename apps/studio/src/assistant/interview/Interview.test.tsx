@@ -10,6 +10,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { Interview } from "./Interview";
+import { MemoryLocalStore } from "../../bff/store/memoryStore";
 import type { InterviewPorts } from "./conductor";
 
 function ports() {
@@ -127,5 +128,69 @@ describe("Interview", () => {
     expect(await screen.findByText("Not saved — the store refused it")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save answers/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Answered/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Interview — the draft (#402)", () => {
+  it("reopens the same question with the same answers after a remount", async () => {
+    const { port } = ports();
+    const store = new MemoryLocalStore();
+    const draft = { store, jobId: "j-1", debounceMs: 0 };
+
+    const first = render(<Interview ports={port} draft={draft} />);
+    fireEvent.change(
+      screen.getByRole("textbox", { name: /what job is this market trying to get done/i }),
+      { target: { value: "Turn interview notes into one opportunity" } },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: /what is the customer trying to get done/i }),
+      { target: { value: "Minimize the time it takes to decide" } },
+    );
+    await waitFor(async () =>
+      expect((await store.listInterviewDrafts("j-1")).length).toBeGreaterThan(0),
+    );
+    first.unmount();
+
+    // A reload: the same job's draft is read back and the answers are there.
+    render(<Interview ports={port} draft={draft} />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("textbox", { name: /what job is this market trying to get done/i }),
+      ).toHaveValue("Turn interview notes into one opportunity"),
+    );
+    expect(
+      screen.getByRole("textbox", { name: /what is the customer trying to get done/i }),
+    ).toHaveValue("Minimize the time it takes to decide");
+  });
+
+  it("ignores a draft that belongs to another job", async () => {
+    const { port } = ports();
+    const store = new MemoryLocalStore();
+    await store.putInterviewDraft({
+      id: "other",
+      jobId: "j-2",
+      answers: { job: "Another job entirely" },
+      index: 2,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    render(<Interview ports={port} draft={{ store, jobId: "j-1" }} />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("textbox", { name: /what job is this market trying to get done/i }),
+      ).toHaveValue(""),
+    );
+  });
+
+  it("leaves no draft behind once the interview is submitted", async () => {
+    const { port } = ports();
+    const store = new MemoryLocalStore();
+    render(<Interview ports={port} draft={{ store, jobId: "j-1", debounceMs: 0 }} />);
+
+    await answerEveryQuestion();
+    fireEvent.click(screen.getByRole("button", { name: /save answers/i }));
+
+    await waitFor(async () => expect(await store.listInterviewDrafts("j-1")).toEqual([]));
   });
 });

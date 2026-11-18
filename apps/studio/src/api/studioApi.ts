@@ -853,6 +853,25 @@ export async function setConversationHead(
 }
 
 /**
+ * Give a thread a new name. Falls through to the local store, so a rename still
+ * lands when the sidecar is down. The sidecar caps the title at 200 characters.
+ */
+export function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<Conversation> {
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { title },
+      ).then((body) => body.conversation),
+    (bff) => bff.memory.renameConversation(conversationId, title),
+  );
+}
+
+/**
  * Remove one thread and its turns. Falls through to the local store, so a
  * delete still lands when the sidecar is down.
  */

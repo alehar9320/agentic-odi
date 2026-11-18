@@ -31,6 +31,7 @@ const VIEW_COMMANDS = new Set<string>([
   "jobmap",
   "segments",
   "evidence",
+  "dashboard",
   "settings",
 ]);
 

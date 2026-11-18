@@ -1,0 +1,71 @@
+# Accepted dependency advisories for the `dependencies` CI job (#1090).
+#
+# One [[ignore]] table per advisory the repository accepts rather than fixes.
+# `scripts/audit_ignore.py` reads this file: it turns each `id` into the ignore
+# argument the audit tool understands, and it fails the job when an entry is
+# expired or dated more than 90 days out. An ignore that never expires is how a
+# vulnerability becomes permanent, so every entry carries a date.
+#
+# Add an entry only after deciding not to fix it, and name that decision in the
+# reason. Fixing the dependency is always preferred; the date is the deadline to
+# do so, not permission to forget.
+
+[[ignore]]
+id = "GHSA-vvf4-9x63-8xvv"
+package = "dnspython"
+reason = "Transitive via email-validator. Fix is a patch bump to 2.9.2; deferred to the next dependency refresh so this job lands as a CI change, not a lockfile change (#1090)."
+expires = "2027-01-15"
+
+[[ignore]]
+id = "GHSA-mf5v-w3w3-f6cg"
+package = "opentelemetry-api"
+reason = "Transitive telemetry dependency; low-impact denial of service in traceparent parsing, not on the request path. Fix is a patch bump to 1.45.2; deferred to the next dependency refresh (#1090)."
+expires = "2027-01-15"
+
+[[ignore]]
+id = "GHSA-hq66-cqwq-w95j"
+package = "pdfjs-dist"
+reason = "Runtime PDF renderer. The only fix is pdfjs-dist 6.x, a breaking major that needs a Studio change; accepted until that upgrade is scheduled (#1090)."
+expires = "2027-01-15"
+
+# --- Tauri Cargo tree (apps/studio/src-tauri/Cargo.lock), found 2026-11-16 ---
+# `cargo audit` reports these as vulnerabilities. The zip ones are all fixed by
+# the same breaking major (4.6.1 -> 9.0.0); the two webpki ones are patch bumps.
+# Short expiry: this batch should be a `cargo update` in a lockfile PR, not a
+# standing acceptance.
+
+[[ignore]]
+id = "RUSTSEC-2026-0369"
+package = "zip"
+reason = "Symlink extraction escapes the destination (critical). Fix is zip 9.x, a breaking major that needs the Tauri updater path reviewed. Short expiry to force the upgrade (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
+id = "RUSTSEC-2026-0367"
+package = "zip"
+reason = "SUID/SGID bits preserved on extraction. Same zip 9.x breaking major as RUSTSEC-2026-0369 (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
+id = "RUSTSEC-2026-0368"
+package = "zip"
+reason = "Attacker-controlled symlink targets outside the destination. Same zip 9.x breaking major (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
+id = "RUSTSEC-2026-0429"
+package = "zip"
+reason = "Extraction aborts the process on a crafted symlink entry. Same zip 9.x breaking major (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
+id = "RUSTSEC-2026-0382"
+package = "rustls-webpki"
+reason = "Certificate verification may accept distrusted intermediates. Fix is a patch bump to 0.103.16 via `cargo update` (#1090)."
+expires = "2026-12-16"
+
+[[ignore]]
+id = "RUSTSEC-2026-0383"
+package = "webpki-root-certs"
+reason = "Bundled roots trust distrusted emSign intermediates. Fix is a patch bump to 1.0.10 via `cargo update` (#1090)."
+expires = "2026-12-16"

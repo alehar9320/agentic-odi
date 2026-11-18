@@ -105,6 +105,15 @@ class StoreCorrupt(StoreError):
         super().__init__(summary)
 
 
+class MigrationError(StoreError):
+    """A schema migration could not be applied.
+
+    Raised when the registry has a gap (a version with no step) or when a step
+    fails. It names the version so the failure points at the ledger entry that
+    is wrong, not at the line that happened to raise.
+    """
+
+
 class SerializationError(OdiError):
     """A payload could not be converted to or from its wire format."""
 

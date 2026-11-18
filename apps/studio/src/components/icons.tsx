@@ -141,6 +141,14 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+export function ExpandIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 4H5a1 1 0 0 0-1 1v4M15 4h4a1 1 0 0 1 1 1v4M15 20h4a1 1 0 0 0 1-1v-4M9 20H5a1 1 0 0 1-1-1v-4" />
+    </Icon>
+  );
+}
+
 export function ArrowUpIcon(props: IconProps) {
   return (
     <Icon {...props}>
@@ -307,6 +315,15 @@ export function TrashIcon(props: IconProps) {
       <path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
       <path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7" />
       <path d="M10 11v6M14 11v6" />
+    </Icon>
+  );
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="M14.5 5.5l4 4" />
     </Icon>
   );
 }

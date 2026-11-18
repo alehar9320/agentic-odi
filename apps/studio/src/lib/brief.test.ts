@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CanvasData, ConnectorPreset, StudioBrief, Thesis } from "../types";
 import { briefFilename, briefToMarkdown } from "./export";
 import { buildDecisionBrief, EXCERPT_LIMIT } from "./brief";
+import { opportunityScore } from "./odi";
 
 /**
  * The decision brief is the document a review reads, so these tests hold it to
@@ -32,7 +33,7 @@ function outcome(
 ) {
   const score =
     importance != null && satisfaction != null
-      ? importance + Math.max(importance - satisfaction, 0)
+      ? opportunityScore(importance, satisfaction)
       : null;
   return { id, statement, importance, satisfaction, opportunity_score: score, ...overrides };
 }
