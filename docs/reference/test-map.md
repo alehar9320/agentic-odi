@@ -39,6 +39,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_context.py` | Tests for the CLI's global backend context. |
 | `apps/cli/tests/test_customer_outcomes_cli.py` | Customer Outcomes CLI: local backend, aliases, output, and errors. |
 | `apps/cli/tests/test_data_export.py` | `data-export` writes a restorable snapshot of the local store. |
+| `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |

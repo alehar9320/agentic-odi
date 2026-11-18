@@ -391,6 +391,19 @@ record is the same `model_dump()` shape the MCP tools return, so each entry can
 be re-validated with the corresponding core Pydantic model. The default
 filename carries a UTC ISO 8601 timestamp (`YYYYMMDDTHHMMSSZ`).
 
+## Inspect the data files
+
+```bash
+agentic-odi data path                 # both resolved paths
+agentic-odi data path --json          # machine-readable JSON
+```
+
+`data path` prints the exact files the *current* configuration uses — the
+`AGENTIC_ODI_DB` and `AGENTIC_ODI_STUDIO_DB` environment overrides included —
+so a person can find the two local SQLite files without guessing
+platform-specific defaults. It never opens a database, prints credentials, or
+creates files: a missing parent directory shows up as a resolved path, nothing
+more.
 
 ## Inspect settings and feature flags
 

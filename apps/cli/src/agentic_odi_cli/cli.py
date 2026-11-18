@@ -17,6 +17,7 @@ from agentic_odi_cli import context, paths, update, version
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.data import data_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
@@ -57,6 +58,7 @@ app.add_typer(
     name="segments",
     help="Stage 5: segments derived from scored outcomes, never from demographics.",
 )
+app.add_typer(data_app, name="data", help="Inspect the local ODI data files.")
 app.add_typer(
     studies_app,
     name="studies",
