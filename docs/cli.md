@@ -577,7 +577,9 @@ Use `--clear <field>` (repeatable) to unset `product_name`, `domain`,
 `primary_user`, `business_model`, `core_problem`, or `current_focus`; an
 unknown name exits 2, and clear is applied after set options in the same call.
 `profile path` prints the baseline file path. `setup` runs the interactive
-baseline wizard.
+baseline wizard. Before `setup` overwrites an existing baseline it writes a
+dated `baseline.json.bak-<UTC>` copy beside it and keeps only the newest five,
+so the config directory does not grow without bound.
 
 ## Manage Customer Outcomes
 

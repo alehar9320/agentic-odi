@@ -163,6 +163,67 @@ def test_backup_baseline_copies_the_current_file(monkeypatch, tmp_path):
     assert backup.read_text() == profile.baseline_file().read_text()
 
 
+def _make_backups(monkeypatch, tmp_path, stamps: list[str]) -> list[Path]:
+    """Write one backup per stamp and return the paths, oldest first."""
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(profile.Baseline(product_name="Acme"))
+    cfg = profile.config_dir()
+    cfg.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for stamp in stamps:
+        p = cfg / f"baseline.json.bak-{stamp}"
+        p.write_text("{}")
+        paths.append(p)
+    return paths
+
+
+def test_prune_keeps_the_newest_n(monkeypatch, tmp_path):
+    stamps = [f"2026010{i}T000000Z" for i in range(1, 9)]
+    _make_backups(monkeypatch, tmp_path, stamps)
+
+    removed = profile.prune_baseline_backups(keep=3)
+
+    remaining = sorted(p.name for p in profile.config_dir().glob("baseline.json.bak-*"))
+    assert len(remaining) == 3
+    assert remaining == sorted(f"baseline.json.bak-{s}" for s in stamps[-3:])
+    assert sorted(p.name for p in removed) == sorted(f"baseline.json.bak-{s}" for s in stamps[:5])
+
+
+def test_prune_never_removes_the_new_copy(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(profile.Baseline(product_name="Acme"))
+
+    for i in range(1, 9):
+        monkeypatch.setattr(profile, "_backup_timestamp", lambda i=i: f"2026060{i}T000000Z")
+        profile.backup_baseline()
+
+    newest = profile.config_dir() / "baseline.json.bak-20260608T000000Z"
+    assert newest.exists()
+    assert len(list(profile.config_dir().glob("baseline.json.bak-*"))) == (
+        profile.BASELINE_BACKUP_KEEP
+    )
+
+
+def test_a_failed_unlink_does_not_raise(monkeypatch, tmp_path):
+    stamps = [f"2026010{i}T000000Z" for i in range(1, 9)]
+    _make_backups(monkeypatch, tmp_path, stamps)
+
+    def boom(self, *args, **kwargs):
+        raise OSError("locked")
+
+    monkeypatch.setattr(Path, "unlink", boom)
+
+    assert profile.prune_baseline_backups(keep=3) == []
+
+
+def test_keep_zero_is_a_no_op(monkeypatch, tmp_path):
+    stamps = [f"2026010{i}T000000Z" for i in range(1, 9)]
+    _make_backups(monkeypatch, tmp_path, stamps)
+
+    assert profile.prune_baseline_backups(keep=0) == []
+    assert len(list(profile.config_dir().glob("baseline.json.bak-*"))) == 8
+
+
 # ---------------------------------------------------------------------------
 # LLMProfile tests
 # ---------------------------------------------------------------------------
