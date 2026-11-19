@@ -24,5 +24,8 @@
     },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Visual tests typecheck in tsconfig.visual.json: their Browser Mode matchers
+  // would otherwise narrow the jsdom matchers this program relies on.
+  "exclude": ["src/**/*.visual.test.tsx"]
 }
