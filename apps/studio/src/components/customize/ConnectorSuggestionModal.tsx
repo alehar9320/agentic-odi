@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import { useFocusTrap } from "../../lib/useFocusTrap";
+import { Dialog } from "@/components/ui/dialog";
 import { useStudio } from "../../state/StudioContext";
-import { CloseIcon, PlugIcon } from "../icons";
+import { PlugIcon } from "../icons";
 
 /**
  * The discovery nudge. The studio offers one connector at a time: either the
@@ -19,21 +19,6 @@ export function ConnectorSuggestionModal() {
     installFromMarketplace,
   } = useStudio();
   const [installing, setInstalling] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(dialogRef, connectorSuggestion !== null);
-
-  useEffect(() => {
-    if (!connectorSuggestion) {
-      return;
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        dismissConnectorModal();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [connectorSuggestion, dismissConnectorModal]);
 
   if (!connectorSuggestion) {
     return null;
@@ -65,39 +50,16 @@ export function ConnectorSuggestionModal() {
   }
 
   return (
-    <div
-      ref={dialogRef}
-      className="suggestion-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Connector suggestion"
-    >
-      <div className="suggestion-modal__card">
-        <button
-          type="button"
-          className="suggestion-modal__close"
-          aria-label="Dismiss"
-          onClick={notNow}
-        >
-          <CloseIcon size={15} />
-        </button>
-        <span className="suggestion-modal__mark" aria-hidden="true">
-          <PlugIcon size={20} />
-        </span>
-        <h2 className="suggestion-modal__title">
-          {reason === "empty" ? "Give the studio something to read" : "Connect a suggested system"}
-        </h2>
-        <p className="suggestion-modal__body">
-          {listing
-            ? `${listing.title ?? listing.name} — ${listing.summary}`
-            : `The agent suggested “${id}”. Browse the marketplace to add it.`}
-        </p>
-        {listing && listing.env_vars.length > 0 ? (
-          <p className="suggestion-modal__creds">
-            Set <code>{listing.env_vars.join(", ")}</code> before the studio can use it.
-          </p>
-        ) : null}
-        <div className="suggestion-modal__actions">
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) {
+          dismissConnectorModal();
+        }
+      }}
+      title={reason === "empty" ? "Give the studio something to read" : "Connect a suggested system"}
+      footer={
+        <>
           {listing?.installable ? (
             <button
               type="button"
@@ -114,8 +76,22 @@ export function ConnectorSuggestionModal() {
           <button type="button" className="quiet-action" onClick={notNow}>
             Not now
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <span className="suggestion-modal__mark" aria-hidden="true">
+        <PlugIcon size={20} />
+      </span>
+      <p className="suggestion-modal__body">
+        {listing
+          ? `${listing.title ?? listing.name} — ${listing.summary}`
+          : `The agent suggested “${id}”. Browse the marketplace to add it.`}
+      </p>
+      {listing && listing.env_vars.length > 0 ? (
+        <p className="suggestion-modal__creds">
+          Set <code>{listing.env_vars.join(", ")}</code> before the studio can use it.
+        </p>
+      ) : null}
+    </Dialog>
   );
 }

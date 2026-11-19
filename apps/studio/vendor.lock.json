@@ -1,6 +1,15 @@
 {
-  "$comment": "Ledger for apps/studio/src/vendor. Rule 3 of docs/architecture/vendor.md: every vendored file carries a provenance header and an entry here, so its licence is auditable and a re-copy diff stays possible. `src/vendor/ledger.test.ts` fails the suite if a file in that tree is missing from both lists, or if a header stops agreeing with its entry. `tests/scripts/test_vendor_policy.py` holds every licence to the SPDX ids we may ship and keeps both sections sorted by path, so a refresh diffs as what changed rather than as a reordering. Upstream registry items have no commit, so `integrity` is the sha256 of the artefact fetched from `source` — the handle a refresh diffs against.",
+  "$comment": "Ledger for apps/studio/src/vendor. Rule 3 of docs/architecture/vendor.md: every vendored file carries a provenance header and an entry here, so its licence is auditable and a re-copy diff stays possible. `src/vendor/ledger.test.ts` fails the suite if a file in that tree is missing from both lists, or if a header stops agreeing with its entry. `tests/scripts/test_vendor_policy.py` holds every licence to the SPDX ids we may ship and keeps both sections sorted by path, so a refresh diffs as what changed rather than as a reordering. Upstream registry items have no commit, so `integrity` is the sha256 of the artefact fetched from `source` \u2014 the handle a refresh diffs against.",
   "vendored": {
+    "components/assistant/thread.tsx": {
+      "source": "https://r.assistant-ui.com/thread.json",
+      "retrievedBy": "fetched the assistant-ui `thread` registry item",
+      "retrieved": "2026-11-15",
+      "licence": "MIT",
+      "upstreamIssue": "assistant-ui, registry item thread",
+      "integrity": "sha256-5730679ac3e85e5fdf1f89647ec6ce689f4e1f490dbfc3b1382ced8bfcea4fd2",
+      "localEdits": "only the frame is kept (root, viewport, viewport footer); the message, composer, attachment, markdown, reasoning, and tool-group sections are dropped because Conversation/parts.tsx and ThreadComposer render them, the frame keeps the Studio's classes, the viewport keeps auto-scroll, a float slot carries the jump-to-latest control, and the empty state is a prop rather than derived from the runtime"
+    },
     "components/ui/button.tsx": {
       "source": "https://ui.shadcn.com/r/styles/new-york-v4/button.json",
       "retrievedBy": "npx shadcn@latest add button",
@@ -10,12 +19,34 @@
       "integrity": "sha256-4b8d7d848742727973c1b088af8d15f0b628272a1316f2d2fa344e73ddff9e9c",
       "localEdits": "the class-merger import moves from the \"cn\" package to \"@/lib/utils\"; the six-line header above it is ours",
       "ourCommit": "3e3deff"
+    },
+    "components/ui/resizable.tsx": {
+      "source": "https://ui.shadcn.com/r/styles/new-york-v4/resizable.json",
+      "retrievedBy": "npx shadcn@latest add resizable",
+      "retrieved": "2026-11-15",
+      "licence": "MIT",
+      "upstreamIssue": "shadcn-ui/ui, registry item new-york-v4/resizable",
+      "integrity": "sha256-d6aa302ab794f451e9a38a68c746ded280eba15bcc4b9cf7a453624c4bcbafc6",
+      "localEdits": "the class-merger import moves from the \"cn\" package to \"@/lib/utils\"; the six-line header above it is ours",
+      "ourCommit": "95ed73e"
+    },
+    "components/ui/sheet.tsx": {
+      "source": "https://ui.shadcn.com/r/styles/new-york-v4/sheet.json",
+      "retrievedBy": "npx shadcn@latest add sheet",
+      "retrieved": "2026-11-15",
+      "licence": "MIT",
+      "upstreamIssue": "shadcn-ui/ui, registry item new-york-v4/sheet",
+      "integrity": "sha256-bdf118300491675f05a9181af491217ba690929338aefd108437c2b07d25432f",
+      "localEdits": "the class-merger import moves from the \"cn\" package to \"@/lib/utils\"; the six-line header above it is ours",
+      "ourCommit": "95ed73e"
     }
   },
   "firstParty": {
-    "boundary.ts": "The vendor boundary as data — written here.",
-    "components/assistant/README.md": "Reserved for the second copied surface; empty of code by design.",
+    "boundary.ts": "The vendor boundary as data \u2014 written here.",
+    "components/assistant/README.md": "Policy summary for the conversation surfaces.",
+    "components/assistant/questionnaire.tsx": "Questionnaire surface: one labelled, accessible field per question kind (statement/text/scale). Authored locally for the interview card (#396); no upstream artefact was fetched in this environment.",
     "components/ui/README.md": "Policy summary for this directory.",
+    "components/ui/dialog.tsx": "Dialog primitive: one modal frame composed from the declared radix-ui Dialog parts (portal, overlay, content, title, close). Authored locally for the shared Dialog (#1001); no upstream artefact was fetched in this environment.",
     "components/ui/hover-card.tsx": "Hover-card primitive: a focusable trigger reveals portal content on hover, focus, or Enter/Space; closes on Escape returning focus to the trigger and on blur. Authored locally for the claim-citation surface; no upstream artefact was fetched.",
     "index.css": "Tailwind v4 scoped to this tree only; the `source(none)` and `@source` reasoning is ours, not the registry's.",
     "lib/utils.ts": "Three-line class merger over clsx and tailwind-merge. Not a copy-in: no provenance header arrived with it and it imports only declared npm packages."

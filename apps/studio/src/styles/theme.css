@@ -1,5 +1,24 @@
 @import "./print.css";
 
+/* The Studio's display face, self-hosted so the shell opens with no network
+   (see #545) and the Tauri build works offline. Source Serif 4, SIL OFL 1.1;
+   the licence sits beside the files in public/fonts/. */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-latin-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-latin-600.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
   --bg: #0a0b0e;
@@ -16,8 +35,50 @@
   --line-strong: rgba(255, 255, 255, 0.14);
   --surface: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.06);
+  /* The modal frame: the scrim behind it and the shadow that lifts it. Both
+     are literals here because this file owns the palette; the shared Dialog
+     reads them by name. */
+  --scrim: rgba(11, 13, 19, 0.75);
+  --shadow-dialog: 0 24px 48px rgba(0, 0, 0, 0.6);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* The display voice: the self-hosted serif plus a system-serif fallback, so a
+     heading keeps its weight before the face loads and when it never does. */
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", Times, serif;
+
+  /* One type scale. Existing declarations keep their literal sizes until a
+     later, separately-labelled pass adopts these names component by component. */
+  --text-2xs: 0.64rem;
+  --text-xs: 0.72rem;
+  --text-sm: 0.78rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.15rem;
+  --text-2xl: 1.4rem;
+  --text-3xl: 1.8rem;
+  --text-4xl: 2.25rem;
+
+  /* One spacing scale, on a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* One corner scale, replacing the 23 one-off radii as rules adopt it. */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* One leading scale. */
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
 
   /* Canvas components were written against the original palette; the aliases
      keep them on the live tokens so both themes stay in step. */
@@ -31,6 +92,47 @@
   --studio-surface: var(--surface);
   --studio-border: var(--line);
   --studio-radius: 12px;
+
+  /* One motion scale. Every duration in this file is one of these five, so two
+     comparable state changes cannot drift 4x apart. */
+  --motion-instant: 0ms;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 280ms;
+  --motion-loop: 1600ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.22);
+
+  /* Kept as aliases for one release so no existing rule breaks. */
+  --ease-apple-spring: var(--ease-spring);
+  --ease-apple-out: var(--ease-out);
+  --ease-tactile: var(--ease-in-out);
+}
+
+/* Reduced motion collapses the scale itself, so every rule that reads a token
+   stops with it — no blanket !important and no second definition to drift. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+    --motion-loop: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* A blink collapsed to one frame would land on the caret's invisible half,
+     so the caret stays solid: it still marks where the words arrive. */
+  .caret {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 html.theme-dark {
@@ -274,8 +376,8 @@ a {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.14s ease,
-    color 0.14s ease;
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
 .bar__new:hover:not(:disabled) {
@@ -385,6 +487,133 @@ a {
   gap: 2px;
 }
 
+.bar__history-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.bar__history-row .bar__history-item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bar__history-delete {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.bar__history-rename-open {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.bar__history-row:hover .bar__history-rename-open,
+.bar__history-rename-open:focus-visible {
+  opacity: 1;
+}
+
+.bar__history-rename-open:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__history-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 2px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.bar__history-rename:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 1px;
+}
+
+.bar__history-row:hover .bar__history-delete,
+.bar__history-delete:focus-visible {
+  opacity: 1;
+}
+
+.bar__history-delete:hover {
+  background: var(--surface-hover);
+  color: var(--danger, #e5484d);
+}
+
+.bar__history-confirm {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.bar__history-confirm-text {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.bar__history-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bar__history-confirm-actions button {
+  padding: 3px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.bar__history-confirm-delete {
+  border-color: transparent !important;
+  background: var(--danger, #e5484d) !important;
+  color: #fff !important;
+}
+
+.bar__history-confirm-delete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .bar__history-item[aria-current="true"] {
   background: var(--surface-hover);
 }
@@ -464,11 +693,27 @@ a {
 }
 
 .chat__scroll {
+  /* The frame the vendored thread Element renders; also the positioning context
+     for the jump-to-latest control, which floats over the transcript. */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 6px 22px 20px;
   scrollbar-gutter: stable;
+}
+
+/* The Element's content column: the message list and the footer, centred. */
+.chat__thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+/* The empty stage: the welcome and the footer share the centred column. */
+.chat__thread.aui-thread-content--empty {
+  justify-content: center;
 }
 
 /* Keyboard readers can scroll history without a mouse (WCAG 2.1.1). */
@@ -478,12 +723,16 @@ a {
   border-radius: 14px;
 }
 
+/* The jump-to-latest pill floats over the transcript in the scroll frame,
+   not inside the dock, so it never covers the composer. `.chat__scroll`
+   (position: relative) is its positioning context. */
 .chat__latest {
-  position: absolute;
-  z-index: 1;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* In flow above the composer inside the dock, so it never covers the
+     composer; `.chat__dock > *` centres it. Visually hidden when the reader is
+     already at the bottom (ChatStage only mounts it while scrolled away). */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 7px 13px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
@@ -504,11 +753,22 @@ a {
   margin: 0 auto;
 }
 
+/* The footer docks to the bottom of the scroll frame when the thread has turns,
+   so it stays visible while the transcript scrolls under it. The scroll frame
+   already provides the side and bottom padding, so the dock drops its own. */
 .chat__dock {
-  position: relative;
   flex: none;
   padding: 6px 22px calc(16px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+
+/* The pinned modifier must come after the base rule so `position: sticky`
+   wins the cascade and the composer stays pinned to the viewport bottom. */
+.chat__dock--pinned {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 6px 0 0;
 }
 
 /* Scroll anchor: floats above the composer only while the reader is behind. */
@@ -569,11 +829,12 @@ a {
   margin: 0;
   min-height: 2.34em;
   max-width: 24ch;
+  font-family: var(--font-display);
   font-size: clamp(1.55rem, 3.4vw, 2.25rem);
   font-weight: 600;
   line-height: 1.17;
   letter-spacing: -0.03em;
-  animation: hero-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: hero-in var(--motion-slow) var(--ease-out);
 }
 
 .hero__sub {
@@ -675,19 +936,19 @@ a {
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface);
   color: var(--muted);
   font-size: 0.775rem;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease,
-    border-color 0.15s ease;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
 }
 
 .suggestion--card {
   align-items: flex-start;
   min-width: min(210px, 100%);
   max-width: 260px;
-  min-height: 64px;
+  min-height: 132px;
   padding: 11px 14px;
   border-radius: 14px;
   text-align: left;
@@ -710,6 +971,9 @@ a {
   font-size: 0.8rem;
   font-weight: 600;
   line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .suggestion__description {
@@ -753,7 +1017,7 @@ a {
   border-radius: 14px;
   background: var(--bg-raised);
   box-shadow: 0 24px 50px rgba(0, 0, 0, 0.42);
-  animation: fade-in 0.12s ease;
+  animation: fade-in var(--motion-fast) ease;
 }
 
 .palette__group-title {
@@ -830,7 +1094,7 @@ a {
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.035);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 
 .composer__shell:focus-within {
@@ -888,6 +1152,21 @@ a {
   }
 }
 
+/* On a phone the starter pills stack in one full-width column so nothing
+   wraps or overflows past the screen edge. */
+@media (max-width: 390px) {
+  .composer__pills {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .suggestion {
+    flex: 1 1 100%;
+    max-width: none;
+    width: 100%;
+  }
+}
+
 @media (pointer: coarse) {
   .composer__send {
     width: 40px;
@@ -910,7 +1189,7 @@ a {
   background: var(--text);
   color: #0b0c10;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 
 .composer__send:hover:not(:disabled) {
@@ -927,12 +1206,32 @@ a {
   color: var(--text);
 }
 
-.composer__pills {
-  display: flex;
-  flex-wrap: wrap;
+.composer__starters {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  list-style: none;
+  margin: 0 0 2px 0;
+  padding: 0;
+}
+
+@media (min-width: 720px) {
+  .composer__starters {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.composer__starter--link {
+  display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
 }
 
 .composer__hint {
@@ -1350,7 +1649,7 @@ a {
 .message {
   display: flex;
   gap: 12px;
-  animation: fade-in 0.25s ease;
+  animation: fade-in var(--motion-slow) ease;
 }
 
 .message--user {
@@ -1446,7 +1745,7 @@ a {
   gap: 4px;
   margin-top: 6px;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--motion-fast) ease;
 }
 
 .message:hover .message__actions,
@@ -1463,18 +1762,12 @@ a {
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--motion-fast) ease;
 }
 
 .message:hover .message__time,
 .message:focus-within .message__time {
   opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .message__time {
-    transition: none;
-  }
 }
 
 /* A rule across the log where the calendar day changes, and nowhere else. */
@@ -1548,19 +1841,6 @@ a {
   flex: none;
   border-radius: 50%;
   background: var(--accent);
-  animation: run-pulse 1.4s ease-out infinite;
-}
-
-@keyframes run-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(139, 140, 248, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(139, 140, 248, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(139, 140, 248, 0);
-  }
 }
 
 .run__steps {
@@ -1643,7 +1923,7 @@ a {
   content: "›";
   display: inline-block;
   color: var(--faint);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-fast) ease;
 }
 
 .run--settled[open] .run__summary::before {
@@ -1710,7 +1990,6 @@ a {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: shimmer 2.4s linear infinite;
   }
 }
 
@@ -1725,15 +2004,15 @@ a {
   border-radius: 50%;
   background: var(--accent);
   opacity: 0.4;
-  animation: dot-pulse 1.2s infinite ease-in-out;
+  animation: dot-pulse var(--motion-loop) infinite ease-in-out;
 }
 
 .thinking__dots i:nth-child(2) {
-  animation-delay: 0.15s;
+  animation-delay: var(--motion-fast);
 }
 
 .thinking__dots i:nth-child(3) {
-  animation-delay: 0.3s;
+  animation-delay: var(--motion-slow);
 }
 
 .thinking__timer {
@@ -1763,7 +2042,7 @@ a {
   border-radius: 2px;
   background: var(--accent);
   vertical-align: text-bottom;
-  animation: caret-blink 1.1s steps(1) infinite;
+  animation: caret-blink var(--motion-loop) steps(1) infinite;
 }
 
 /* Referenced above (and by message/palette entrance); kept here so the motion
@@ -1866,6 +2145,50 @@ a {
   border-top: 1px solid var(--line);
 }
 
+/* GFM tables arrive as real tables (#394). The wrapper scrolls a wide table
+   instead of letting it push the message column out of the transcript. */
+.md-table-wrap {
+  margin: 0 0 10px;
+  overflow-x: auto;
+}
+
+.md-table {
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.md-table th,
+.md-table td {
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table th {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* A task list reads as a list of statements, not as a row of empty bullets. */
+.md-list .task-list-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.md-list .task-list-item > input {
+  margin-top: 3px;
+}
+
 /* Panel content primitives */
 .stack {
   display: flex;
@@ -1901,6 +2224,20 @@ a {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+/* The dashboard's trend is drawn by hand: one inline SVG, no charting
+   dependency. A short series still reads as a shape rather than a stub. */
+.dashboard-trend__svg {
+  display: block;
+  width: 100%;
+  height: 72px;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.dashboard .metrics {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .chips {
@@ -1941,7 +2278,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.022);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
 .card:hover {
@@ -1989,8 +2326,8 @@ a {
   font-weight: 600;
 }
 
-/* The interview behind the number. Verified reads as settled; an unverified
-   score is dashed and amber, so a guess never borrows a measured claim's look. */
+/* The interview behind the number. Verified reads as settled; a hypothesis is
+   dashed and amber, so a guess never borrows a measured claim's look. */
 .claim-check {
   margin: 0 0 8px;
   padding-left: 10px;
@@ -2000,20 +2337,13 @@ a {
   line-height: 1.45;
 }
 
-.claim-check--unverified {
+.claim-check--hypothesis,
+.claim-check--partial {
   border-left-style: dashed;
 }
 
 .claim-check__head {
   margin: 0 0 4px;
-}
-
-.claim-check__head b {
-  color: var(--muted);
-}
-
-.claim-check--unverified .claim-check__head b {
-  color: var(--amber);
 }
 
 .claim-check__list {
@@ -2077,6 +2407,22 @@ a {
   border-color: rgba(139, 140, 248, 0.3);
   background: rgba(99, 102, 241, 0.12);
   color: var(--accent);
+}
+
+/* A badge that is also a control: it reveals the evidence behind a score, so
+   it must read as pressable without losing the badge's shape. */
+.badge--button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.badge--button:hover {
+  filter: brightness(1.15);
+}
+
+.badge--button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* Job map */
@@ -2237,7 +2583,7 @@ input[type="range"] {
   color: var(--text);
   font-size: 0.82rem;
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background var(--motion-fast) ease;
 }
 
 .button:hover:not(:disabled) {
@@ -2573,7 +2919,6 @@ input[type="range"] {
     rgba(255, 255, 255, 0.03) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.6s infinite ease-in-out;
 }
 
 .skeleton--tile {
@@ -2583,15 +2928,6 @@ input[type="range"] {
 .skeleton--line {
   height: 12px;
   margin-bottom: 8px;
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
 }
 
 @keyframes hero-in {
@@ -2744,6 +3080,17 @@ button.message__tag:hover {
   margin-top: 8px;
 }
 
+/* The pair sits on one line: Retry is the primary way out, Delete the quiet one. */
+.failure__delete {
+  margin-top: 8px;
+  margin-left: 12px;
+  color: var(--muted);
+}
+
+.failure__delete:hover {
+  color: var(--text);
+}
+
 /* ------------------------------------------------------------------ */
 /* Setup conversation                                                 */
 /* ------------------------------------------------------------------ */
@@ -2783,7 +3130,7 @@ button.message__tag:hover {
   gap: 6px;
   margin-left: 38px;
   padding-bottom: 4px;
-  animation: fade-in 0.3s ease;
+  animation: fade-in var(--motion-slow) ease;
 }
 
 .suggestion--primary {
@@ -2941,7 +3288,7 @@ button.message__tag:hover {
   gap: 2px;
   margin-left: auto;
   opacity: 0;
-  transition: opacity 0.14s ease;
+  transition: opacity var(--motion-fast) ease;
 }
 
 .step:hover .step__actions,
@@ -3054,22 +3401,10 @@ button.message__tag:hover {
   font-size: 0.62rem;
   font-weight: 700;
   box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
-  animation: pulse-badge 2s infinite ease-in-out;
-}
-
-@keyframes pulse-badge {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 6px rgba(99, 102, 241, 0.5);
-  }
-  50% {
-    transform: scale(1.1);
-    box-shadow: 0 0 12px rgba(139, 140, 248, 0.8);
-  }
 }
 
 .catchup-feed {
-  animation: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fade-in var(--motion-slow) var(--ease-out);
 }
 
 .catchup-summary {
@@ -3180,7 +3515,7 @@ button.message__tag:hover {
 .catchup-card {
   position: relative;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all var(--motion-base) ease-in-out;
 }
 
 /* Stretched over the card so the whole surface is one real button; the
@@ -3352,25 +3687,15 @@ button.message__tag:hover {
 }
 
 /* StudioContext holds this class for one theme change only, so the tokens
-   cross-fade for 120ms instead of snapping. Reduced motion never adds it, and
-   the global reduce rule shortens it if it runs anyway. */
+   cross-fade for one fast step instead of snapping. Reduced motion collapses
+   the token, so the class never animates for a reader who asked for less. */
 html.theme-fading,
 html.theme-fading *,
 html.theme-fading *::before,
 html.theme-fading *::after {
   transition-property: background-color, border-color, color, fill, stroke;
-  transition-duration: 120ms;
+  transition-duration: var(--motion-fast);
   transition-timing-function: linear;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -3378,7 +3703,7 @@ html.theme-fading *::after {
 /* ------------------------------------------------------------------ */
 
 .outcome-card {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--motion-base) var(--ease-out), box-shadow var(--motion-base) var(--ease-out);
   background: var(--studio-surface);
   border: 1px solid var(--studio-border);
   border-radius: var(--studio-radius);
@@ -3424,7 +3749,7 @@ html.theme-fading *::after {
 }
 
 .studio-button {
-  transition: all 0.15s ease-in-out;
+  transition: all var(--motion-fast) ease-in-out;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
@@ -3548,7 +3873,7 @@ html.theme-fading *::after {
 /* Generated surfaces                                                 */
 /* ------------------------------------------------------------------ */
 .ui-surface {
-  animation: surface-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: surface-enter var(--motion-slow) var(--ease-out) both;
   min-width: 0;
 }
 
@@ -3777,7 +4102,7 @@ html.theme-fading *::after {
   display: block;
   height: 100%;
   border-radius: 9999px;
-  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width var(--motion-slow) var(--ease-out);
 }
 
 .ui-tone-bg--neutral {
@@ -3818,6 +4143,7 @@ html.theme-fading *::after {
 
 .ui-stat__value {
   margin-top: 3px;
+  font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -3920,8 +4246,8 @@ html.theme-fading *::after {
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
-    transform 0.1s ease;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
 .ui-action--primary {
@@ -4199,7 +4525,7 @@ html.theme-fading *::after {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
 }
 
 .ui-member:hover,
@@ -4298,16 +4624,6 @@ html.theme-fading *::after {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ui-surface {
-    animation: none;
-  }
-
-  .ui-meter__fill {
-    transition: none;
-  }
-}
-
 /* Markdown inside a surface. Cards are dense; paragraphs should hug. */
 .ui-card .md-paragraph,
 .ui-callout__body .md-paragraph,
@@ -4341,7 +4657,7 @@ html.theme-fading *::after {
   color: #a5b4fc;
   border: 1px solid rgba(129, 140, 248, 0.4);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--motion-base) ease;
 }
 
 .pill-changelog:hover {
@@ -4437,7 +4753,7 @@ html.theme-fading *::after {
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 6px;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
 .changelog-modal__close:hover {
@@ -4646,15 +4962,6 @@ html.theme-fading *::after {
   }
 }
 
-/* ================================================================== */
-/* PR #61 micro-interactions (reconciled onto main)                  */
-/* ================================================================== */
-:root {
-  --ease-apple-spring: cubic-bezier(0.175, 0.885, 0.32, 1.22);
-  --ease-apple-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-tactile: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 /* 1. Glassmorphic Backdrop Blur & Vibrancy on elevated panels */
 .bar,
 .outcome-card,
@@ -4727,7 +5034,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--accent);
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  transition: transform 0.15s var(--ease-apple-spring), background 0.15s var(--ease-apple-out);
+  transition: transform var(--motion-fast) var(--ease-spring), background var(--motion-fast) var(--ease-out);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
@@ -4742,14 +5049,14 @@ input[type="range"]::-webkit-slider-thumb:active {
 
 /* 3. Settings Accordion / Drawer smooth expansion */
 details {
-  transition: all 0.25s var(--ease-apple-out);
+  transition: all var(--motion-slow) var(--ease-out);
 }
 
 details summary {
   cursor: pointer;
   user-select: none;
   font-weight: 500;
-  transition: color 0.15s ease;
+  transition: color var(--motion-fast) ease;
 }
 
 details summary:hover {
@@ -4772,17 +5079,6 @@ details[open] summary {
   font-size: 0.72rem;
   line-height: 1;
   white-space: nowrap;
-}
-
-@keyframes pill-dot-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.75);
-  }
 }
 
 /* 16. Evidence stream signal pulse */
@@ -4816,18 +5112,6 @@ details[open] summary {
   }
 }
 
-/* 10. Agent thinking wave pulse */
-@keyframes thinkingPulse {
-  0%, 100% {
-    opacity: 0.4;
-    transform: scale(0.98);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-}
-
 /* 17. Quick prompt button shimmer / pulse glow */
 .chat-quick-pills button {
   position: relative;
@@ -4848,24 +5132,13 @@ details[open] summary {
     transparent
   );
   transform: rotate(30deg) translateX(-100%);
-  transition: transform 0.6s ease;
+  transition: transform var(--motion-slow) ease;
 }
 
 .chat-quick-pills button:hover::after {
   transform: rotate(30deg) translateX(100%);
 }
 
-/* 20. Accessibility & motion preference respect */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
 /* ------------------------------------------------------------------ */
 /* One room: the conversation never leaves the stage                  */
 /* ------------------------------------------------------------------ */
@@ -4885,7 +5158,7 @@ details[open] summary {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.14s ease;
+  transition: background var(--motion-fast) ease;
 }
 
 .brand--home:hover {
@@ -4898,11 +5171,12 @@ details[open] summary {
 
 .brand__wordmark {
   color: var(--muted);
+  font-family: var(--font-display);
   font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
-  transition: color 0.14s ease;
+  transition: color var(--motion-fast) ease;
 }
 
 .brand__mark {
@@ -4930,8 +5204,8 @@ details[open] summary {
   color: var(--muted);
   cursor: pointer;
   transition:
-    background 0.14s ease,
-    color 0.14s ease;
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
 .icon-button:hover {
@@ -4978,6 +5252,14 @@ details[open] summary {
   min-height: 0;
 }
 
+/* The split itself. `ResizablePanelGroup` carries Tailwind's `h-full w-full`,
+   which would pin it to its content, so the flex container's own sizing wins. */
+.stage__split-group {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 .stage__thread {
   display: flex;
   flex-direction: column;
@@ -5005,7 +5287,7 @@ details[open] summary {
   list-style: none;
   overflow-x: auto;
   scrollbar-width: none;
-  animation: fade-in 0.24s ease;
+  animation: fade-in var(--motion-slow) ease;
 }
 
 .rail__list::-webkit-scrollbar {
@@ -5026,9 +5308,9 @@ details[open] summary {
   white-space: nowrap;
   cursor: pointer;
   transition:
-    color 0.14s ease,
-    background 0.14s ease,
-    border-color 0.14s ease;
+    color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
 }
 
 .rail__chip:hover {
@@ -5078,18 +5360,30 @@ details[open] summary {
 /* ------------------------------------------------------------------ */
 /* Lens: a view docks beside the conversation, never over it          */
 /* ------------------------------------------------------------------ */
+/* The column that fills whichever shell holds it. The docked panel owns the
+   width, so the lens no longer sizes itself; the sheet content does the same
+   on a narrow screen (#407). */
 .lens {
   display: flex;
   flex-direction: column;
-  flex: none;
-  width: min(520px, 44vw);
-  min-width: 360px;
+  min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--line);
+  height: 100%;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006)),
     var(--bg-raised);
-  animation: lens-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: lens-in var(--motion-base) var(--ease-out);
+}
+
+.lens--docked {
+  border-left: 1px solid var(--line);
+}
+
+/* The copied `sheet` renders the same lens inside a Radix dialog. Drop the
+   docked border and the slide-in, which the sheet already animates. */
+.lens--sheet {
+  border-left: 0;
+  animation: none;
 }
 
 .lens__head {
@@ -5105,8 +5399,50 @@ details[open] summary {
 .lens__heading {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 11px;
   min-width: 0;
+  flex: 1;
+}
+
+.lens__where {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.lens__siblings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 100%;
+  margin-top: 2px;
+}
+
+.lens__sibling {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.lens__sibling:hover,
+.lens__sibling:focus-visible {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--line) 60%, var(--text));
+}
+
+.lens__sibling[aria-current="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .lens__icon {
@@ -5122,6 +5458,7 @@ details[open] summary {
 
 .lens__title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -5259,6 +5596,29 @@ details[open] summary {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* What a note is about: the parent record, its id, and its title. */
+.memory-item__subject {
+  margin: 2px 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+  text-align: left;
+  background: none;
+  border: none;
+}
+
+.memory-item__subject--link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.memory-item__subject--link:hover {
+  color: var(--text);
 }
 
 .memory-item__text {
@@ -5418,7 +5778,7 @@ details[open] summary {
 
 .reasoning__chevron {
   margin-left: auto;
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) ease;
 }
 
 .reasoning__chevron.is-open {
@@ -5476,7 +5836,7 @@ details[open] summary {
 
 .work-block__chevron {
   margin-left: auto;
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) ease;
 }
 
 .work-block__chevron.is-open {
@@ -5702,6 +6062,7 @@ details[open] summary {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
+  min-height: 44px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
@@ -5725,6 +6086,116 @@ details[open] summary {
 .approval__deny:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.approval__consequence {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.approval__arguments {
+  margin: 0 0 10px;
+}
+
+.approval__argument-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  /* Six rows is what fits without pushing the buttons out of reach; past that
+     the list scrolls rather than hiding an argument the person is approving. */
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+.approval__argument {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.4fr) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+.approval__argument-key {
+  color: var(--muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+}
+
+.approval__argument-value {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.approval__raw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.approval__raw-toggle:hover {
+  color: var(--text);
+}
+
+.approval__raw-chevron {
+  transition: transform var(--motion-fast) ease;
+}
+
+.approval__raw-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.approval__raw {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+
+.approval__reason-label {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.approval__reason-input {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.approval__reason-count {
+  align-self: flex-end;
+  color: var(--faint);
+  font-size: 11.5px;
 }
 
 .branch-picker {
@@ -5818,7 +6289,7 @@ details[open] summary {
 .message__actions--user {
   justify-content: flex-end;
   opacity: 0;
-  transition: opacity 160ms var(--ease-tactile);
+  transition: opacity var(--motion-base) var(--ease-tactile);
 }
 
 .message--user:hover .message__actions--user,
@@ -5848,7 +6319,7 @@ details[open] summary {
   font: inherit;
   font-size: 0.7rem;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease, border-color var(--motion-fast) ease;
 }
 
 .model-picker__trigger:hover {
@@ -6103,7 +6574,7 @@ details[open] summary {
 .tool-trace.is-running .tool-trace__dot {
   background: var(--accent);
   opacity: 1;
-  animation: thinkingPulse 1.4s ease-in-out infinite;
+  animation: dot-pulse var(--motion-loop) infinite ease-in-out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -6285,7 +6756,7 @@ details[open] summary {
 }
 
 .banner {
-  animation: bannerIn 0.28s var(--ease-apple-spring, ease-out);
+  animation: bannerIn var(--motion-base) var(--ease-out);
 }
 
 /* Customize: the connector shelf                                     */
@@ -6295,7 +6766,7 @@ details[open] summary {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--motion-base) ease;
 }
 
 .customize {
@@ -6356,7 +6827,7 @@ details[open] summary {
   font-size: 0.78rem;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all var(--motion-base) ease;
 }
 
 .customize__type.is-active {
@@ -6550,7 +7021,7 @@ details[open] summary {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--bg-raised);
-  transition: border-color 0.18s ease;
+  transition: border-color var(--motion-base) ease;
 }
 
 .connector-card:hover {
@@ -6761,7 +7232,7 @@ details[open] summary {
     radial-gradient(120% 180% at 0% 0%, rgba(139, 140, 248, 0.12), transparent 62%),
     var(--bg-raised);
   overflow: hidden;
-  animation: updateBannerIn 0.34s var(--ease-apple-out) both;
+  animation: updateBannerIn var(--motion-base) var(--ease-out) both;
 }
 
 @keyframes updateBannerIn {
@@ -6798,7 +7269,7 @@ details[open] summary {
 }
 
 .update-banner--downloading .update-banner__mark {
-  animation: pill-dot-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 3px rgba(139, 140, 248, 0.16);
 }
 
 .update-banner__copy {
@@ -6842,7 +7313,7 @@ details[open] summary {
   height: 100%;
   border-radius: 0 999px 999px 0;
   background: linear-gradient(90deg, var(--accent-strong), var(--accent));
-  transition: width 0.35s var(--ease-apple-out);
+  transition: width var(--motion-slow) var(--ease-out);
 }
 
 .update-banner__actions {
@@ -6871,7 +7342,7 @@ details[open] summary {
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
 }
 
 .update-banner__dismiss:hover {
@@ -6889,7 +7360,7 @@ details[open] summary {
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: color 0.14s ease, background 0.14s ease;
+  transition: color var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
 .bar__version:hover {
@@ -6912,20 +7383,6 @@ details[open] summary {
   border-top: 1px solid var(--line);
 }
 
-.update-settings__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.update-settings__version {
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .update-settings__status {
   display: flex;
   align-items: center;
@@ -6934,12 +7391,6 @@ details[open] summary {
   color: var(--muted);
   font-size: 0.79rem;
   line-height: 1.4;
-}
-
-.update-settings__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
 }
 
 .update-settings__toggle {
@@ -6970,18 +7421,9 @@ details[open] summary {
   accent-color: var(--accent);
 }
 
-.update-settings__notes-body {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
 .status-dot.is-busy {
   background: var(--accent);
   box-shadow: 0 0 0 3px rgba(139, 140, 248, 0.16);
-  animation: pill-dot-pulse 1.8s ease-in-out infinite;
 }
 
 .status-dot.is-ready {
@@ -7384,4 +7826,64 @@ input,
 textarea,
 [contenteditable="true"] {
   caret-color: var(--accent);
+}
+
+/* The calls a turn is waiting on (issue #390). A summary, not a second
+   transcript: it sits below the last message and carries only what is still in
+   flight, in the transcript's own row anatomy. */
+.pending-calls {
+  margin: 2px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.pending-calls__head {
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.pending-calls__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pending-calls__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pending-calls__state {
+  color: var(--faint);
+  opacity: 0.85;
+}
+
+.pending-calls__elapsed {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.pending-calls__prompt {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* blocked actions */
+/* The reason sits under the control it explains, quieter than the control and
+   never a second alert: the person reads why at the moment they pressed. */
+.blocked-reason {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.blocked-reason__action {
+  color: var(--accent);
+  font-weight: 600;
 }

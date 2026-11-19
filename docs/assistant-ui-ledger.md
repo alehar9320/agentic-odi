@@ -1,3 +1,11 @@
+---
+title: The assistant-ui ledger
+blurb: Every assistant-ui capability, and the one honest state it is in.
+nav_group: Operate
+nav_order: 2
+slug: assistant-ui-ledger
+---
+
 # The assistant-ui ledger
 
 The Studio runs on assistant-ui, and "we use assistant-ui" is not a coverage
@@ -46,7 +54,7 @@ by the presence of one handler.
 | `onReload` (regenerate) | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `regenerateFrom`. |
 | `onCancel` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `stopStreaming`. |
 | `onRespondToToolApproval` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `respondToApproval`, the write gate. |
-| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text refused above 20k chars (not shortened, #652), images at 5 MB, refusals explained. |
+| `adapters.attachments` | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text refused above 20k chars (not shortened, #652), images at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. |
 | runtime `suggestions` | Adopted | `apps/studio/src/assistant/StudioRuntime.tsx` | #238 | `suggestionsFor`, computed from canvas state. |
 | `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | `apps/studio/src/state/StudioContext.tsx` | — | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. |
 | `queue` adapter | Adopted | `apps/studio/src/assistant/queue.ts` | #410 | Keeps a follow-up while a reply runs. |
@@ -87,7 +95,7 @@ by the presence of one handler.
 |---|---|---|---|---|
 | `MessagePrimitive.Parts` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | With the `components` map. |
 | `MessagePrimitive.Attachments` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | User turns show what was sent. |
-| `MessagePrimitive.Root` | Partial | `apps/studio/src/components/chat/Conversation.tsx` | — | The message wrapper is a hand-written article carrying `aria-busy` and the assistant avatar. |
+| `MessagePrimitive.Root` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #994 | Every turn — user, assistant, and notice — renders its root through the primitive, which supplies the hover state the action bar reads and the top anchor. The `article`, the classes, the assistant avatar, and `aria-busy` ride on it unchanged. |
 | `MessagePrimitive.Quote` | Adopted | `apps/studio/src/assistant/quote.ts` | #435 | Renders the quoted passage on a sent turn. |
 | `MessagePrimitive.Error` / `ErrorPrimitive` | Rejected | — | — | `FailurePanel` already renders the structured error, the retry copy, and the Try again action from `metadata.custom.error`. Swapping adds nothing and loses the ODI failure language. |
 | `GenerativeUIRender` / `MessagePrimitive.GenerativeUI` | Decision | — | — | Would let a model emit UI we did not validate. The ODI catalog is schema-validated; revisit only if validation moves server-side. |
@@ -100,12 +108,12 @@ by the presence of one handler.
 
 ## Markdown rendering
 
-The Studio renders prose through its own parser (`apps/studio/src/components/chat/Markdown.tsx`
-→ `apps/studio/src/lib/markdown.ts`), not through `@assistant-ui/react-markdown`, which
-is declared in `package.json` and imported nowhere. The package is the canonical owner of
-markdown rendering per `docs/architecture/reuse.md`; the rows below are the decision to
-not adopt it yet, not a silence. A row becomes *Adopted* when prose renders through
-`MarkdownTextPrimitive`, with the file that does it and the PR that landed it.
+The Studio renders prose through `@assistant-ui/react-markdown`. `MarkdownTextPrimitive`
+renders the transcript's prose and reasoning parts, and the shared `mdComponents` map in
+`apps/studio/src/components/chat/Markdown.tsx` serves the standalone `Markdown({ source })`
+callers and `ClaimText`, which keeps its own block renderer so claim chips stay in place.
+The hand-written parser this package replaced was deleted in #394. The rows below were the
+decision to not adopt the package; #857 owns promoting them now that it is adopted.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
@@ -129,7 +137,7 @@ that was looked at and declined is *Rejected* with the reason.
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
 | `markdown-text` Element | Decision | — | — | The prose Element. Declined in favour of the hand-rolled `Markdown.tsx`, which carries claim chips and extraction state the Element cannot see. Vendor question: when prose outgrows the hand-rolled parser, does the Element carry product state, or does the state live in a wrapper? |
-| `thread` Element | Decision | — | — | The thread layout Element. The Studio's transcript is `ThreadPrimitive` directly, because the arrival count, the branch picker, and the part renderers are product concerns the Element would not carry. Vendor question: what does the Element own that we would lose by keeping the primitives? |
+| `thread` Element | Partial | `apps/studio/src/vendor/components/assistant/thread.tsx` | — | The frame is copied in: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout (#993). The Element's message, composer, attachment, markdown, reasoning, and tool-group sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those, and the arrival count, branch picker, and part renderers are product concerns the Element would not carry. The copy's provenance header and `vendor.lock.json` entry record exactly what was dropped. |
 | `composer` Element | Decision | — | — | The composer Element. Our composer is `ThreadComposer.tsx`, built on the primitives because the quote, the attachment adapter, and the queue lane are ours. Vendor question: does the Element's defaults match the attachment accept rules? |
 | `attachment` Element | Decision | — | — | The attachment chip Element. Declined: our chip shows extraction state and the reason a file was refused, which the Element does not. Vendor question: can the Element render a refusal? |
 | `tool-fallback` Element | Decision | — | — | The tool-fallback Element. Our tool parts render through `tools: { Fallback: ToolPart }` in `parts.tsx`, which carries the ODI failure language. Vendor question: does the Element expose the metadata the failure panel reads? |
@@ -195,7 +203,7 @@ must not leave them so.
 
 | Capability | Status | File | Delivered | Where / why |
 |---|---|---|---|---|
-| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, refusals explained. |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | `apps/studio/src/assistant/attachments.ts` | #238 | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. |
 | Drop and paste | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | The composer follows the same accept rules as the input. |
 | `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. |
 
@@ -232,8 +240,10 @@ only the surface is missing.
 |---|---|---|---|---|
 | `ChainOfThoughtPrimitive.Root` / `.AccordionTrigger` / `.Parts` | Rejected | — | — | Checked against the installed 0.15.31 rather than the docs: `groupMessageParts` starts a run at any adjacent `tool-call` or `reasoning` part, so its one disclosure would gather a write that is still asking. `GroupedParts` with `workGrouping` ends a run at an unanswered approval. |
 | Pending approvals inside a group | Rejected | — | — | A pending write is a question, not history. It stays ungrouped and visible, always. |
-| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. |
+| `useToolCallElapsed` | Rejected | — | — | It reads `part.timing`, and none of our parts carry one — the sidecar's frames report a call started and settled, never how long it took. `WorkBlock` times only a run the browser watched, and a restored turn says *Worked · N calls* rather than inventing a duration. The pending strip (#390) counts from a start the store stamps when the call arrives, so it also shows nothing on a restored turn. |
 | `useMessageTiming` | Decision | — | — | Tokens/second is engineering telemetry. Useful to us, not to the PM; expose it only behind a diagnostics toggle if at all. |
+| `useAuiState((s) => s.thread.messages)` for liveness | Rejected | — | — | On the external-store path every part status normalizes to `complete` (`thread-message-client` only keeps a part `running` while its own message is), so the runtime cannot tell a live call from a settled one here. The store's `ChatPart.status` is the honest source, and `pending.ts` reads that instead. |
+| Pending-call strip | Adopted | `apps/studio/src/components/chat/PendingCalls.tsx` | #390 | The running and awaiting-approval calls, below the last message. A summary, never a queue: no speculative "up next" rows. |
 
 ## Selection and quote
 
@@ -315,19 +325,21 @@ only the surface is missing.
 | `DevToolsHooks` / `DevToolsProviderApi` | Rejected | — | — | Developer surface, not a PM surface. `docs/` and the sidecar's diagnostics already cover the need. |
 | `webmcp` host/registration | Rejected | — | — | Would expose the Studio's actions to an external agent browser. Out of scope for a local-first app with approvals. |
 
+<!-- BEGIN GENERATED: assistant-ui-count -->
 ## The count
 
 | Status | Rows |
 |---|---|
-| Adopted | 47 |
+| Adopted | 49 |
 | Partial | 10 |
 | Planned | 13 |
-| Decision | 42 |
-| Rejected | 43 |
-| Total | 155 |
+| Decision | 41 |
+| Rejected | 44 |
+| Total | 157 |
 
-Read it as: **56** of the library's 155 relevant capabilities already deliver
-something a person can use, **13** more are carried by open issues, **42** rows
+Read it as: **59** of the library's 157 relevant capabilities already deliver
+something a person can use, **13** more are carried by open issues, **41** rows
 wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.
+<!-- END GENERATED: assistant-ui-count -->
 

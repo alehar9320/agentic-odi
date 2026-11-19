@@ -22,13 +22,29 @@ export interface Extraction {
 }
 
 /**
+ * Extraction failed for a reason the user can act on, named in a sentence.
+ *
+ * It lives with the shared contract because every format raises the same shape:
+ * a caller catching a refusal should not have to know which library ran.
+ */
+export class ExtractionError extends Error {
+  constructor(public readonly sentence: string) {
+    super(sentence);
+    this.name = "ExtractionError";
+  }
+}
+
+/**
  * One sentence naming what was left out, appended to the extracted text.
  *
  * The unit is the format's own — pages for a PDF, characters for DOCX — so the
  * notice says what the reader lost in the terms of the document they attached.
+ * Pass the plural noun; a count of one reads back in the singular.
  */
 export function truncationSentence(dropped: number, unit: string): string {
-  return `[Truncated: ${dropped.toLocaleString()} ${unit} were left out — the extracted text is capped at ${MAX_EXTRACTED_CHARS.toLocaleString()} characters.]`;
+  const one = dropped === 1;
+  const noun = one ? unit.replace(/s$/, "") : unit;
+  return `[Truncated: ${dropped.toLocaleString()} ${noun} ${one ? "was" : "were"} left out — the extracted text is capped at ${MAX_EXTRACTED_CHARS.toLocaleString()} characters.]`;
 }
 
 /**

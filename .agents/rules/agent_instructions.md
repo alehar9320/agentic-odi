@@ -143,34 +143,36 @@ high-level front door aimed at both users and developers. Detailed material live
 in `docs/` and is linked from the README. The agent MUST keep both current at all
 times.
 
-### When to update
+### Where truth lives
 
-Update the relevant file whenever any of the following change:
+A new fact adds a file; it never edits an index. Each row names the
+directory or front-matter field that is the source of truth, and the
+generated artefact that follows from it — never a list to hand-edit.
 
-| Change type | Where to update |
-|---|---|
-| New or removed Python file / package | `README.md` **Code Overview** |
-| New dependency added (`pip install ...`) | `README.md` **Quick Start → Prerequisites** |
-| New way to run the project | `README.md` **Quick Start** and `docs/living-studio.md` |
-| New MCP tool or capability | `README.md` **Code Overview** / relevant doc |
-| New CLI command or flag | `docs/cli.md` |
-| New connector kind | `docs/connectors.md` |
-| New workflow or agent instruction | `docs/living-studio.md` |
-| New message part or conversation capability | `docs/living-studio.md` (conversation runtime) |
-| Deployment URL or cloud setup changes | `docs/deployment.md` |
-| Roadmap item completed or added | `docs/roadmap.md` |
-| Test layout or coverage changes | `docs/development.md` |
+| Change type | Source of truth | Generated artefact |
+|---|---|---|
+| New or removed Python file / package | the member's `pyproject.toml` description | `README.md` **Code Overview** (via `scripts/docs_index.py`) |
+| New dependency added (`pip install ...`) | the member's `pyproject.toml` `[project] dependencies` | `README.md` **Install** (via `scripts/docs_index.py`) |
+| New way to run the project | `docs/living-studio.md` | `README.md` **Install** (via `scripts/docs_index.py`) |
+| New MCP tool or capability | `packages/core/src/agentic_odi_core/contract.py` (`TOOL_SPECS`) | `README.md` **Code Overview** (via `scripts/docs_index.py`) |
+| New CLI command or flag | `apps/cli/src/agentic_odi_cli/` | `docs/cli.md` (via `scripts/docs_index.py`) |
+| New connector kind | `packages/connectors/src/agentic_odi_connectors/` | `docs/connectors.md` (via `scripts/docs_index.py`) |
+| New workflow or agent instruction | `.agents/` | `docs/living-studio.md` (via `scripts/docs_index.py`) |
+| New message part or conversation capability | `apps/studio/src/assistant/convert.ts` | `docs/living-studio.md` (via `scripts/docs_index.py`) |
+| Deployment URL or cloud setup changes | `docs/deployment.md` | `docs/deployment.md` |
+| Roadmap item completed or added | `docs/roadmap.md` | `docs/roadmap.md` |
+| Test layout or coverage changes | `tests/` | `docs/reference/test-map.md` (via `scripts/docs_index.py`) |
 
 ### Rules
 
 - ✅ **Update docs in the same task** as the change that triggered it — never defer to a follow-up.
 - ✅ **Keep README short**: it stays a high-level orientation page. Push detail into `docs/` and link to it rather than growing the README.
 - ✅ **Optimize the first five seconds**: the top of the README carries the one-line value proposition and two distinct calls to action — try the hosted Living Studio, or run the full stack locally. Keep the `curl … install.sh | sh` one-liner in the hero.
-- ✅ **Use the fixed section order**: `Why this exists` → `What you get` → `How it works` → `Quick Start` → `Connect your agent` → `Documentation` → `Code Overview` → `Contributing`. Prose sections stay bulleted and skimmable.
-- ✅ **Keep the Quick Start accurate**: always reflect `uv run python scripts/dev.py` as the recommended launch command.
+- ✅ **Keep the Install section accurate**: always reflect `uv run python scripts/dev.py` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
 - ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
 - ❌ **Never leave the README or `docs/` in a stale state** where documented commands or files no longer match the codebase.
+- ❌ **Never hand-edit a generated block.** If a register needs a new value, change the source — directory, front matter, or contract — and run the generator. A hand-edited register is a broken invariant.
 
 ---
 
@@ -196,6 +198,7 @@ Update the relevant file whenever any of the following change:
 
 ### 4. General Philosophy
 - **Reuse before you write**: take the ladder in `docs/architecture/reuse.md` in cost order — something already in this repo, then a dependency the workspace already declares, then a copy with a ledger entry, then new. A near-duplicate is a refactor-to-share, not a second copy. Any plan or pull request that adds a source file states a `Reuses:` block; `.agents/skills/reuse-first/SKILL.md` is the short form.
+- **UI component selection**: when adding or changing Studio interaction surfaces, follow the UI Component Selection Workflow in `.agents/skills/reuse-first/SKILL.md` (rungs: existing Studio component → declared foundation/specialist library → reviewed presentation copy-in with provenance → custom behavior). The workflow includes the restraint rule (one decorative standout per page) and preserves boundaries for assistant-ui, behavior dependencies, the vendor ledger, and dependency review.
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.
 - **Agentic Purpose**: Remember that the tools being built are meant to be consumed by autonomous agents. Design tool interfaces that are intuitive for an LLM to call and interpret.
 - **External connectors**: Integrations live in the `packages/connectors` workspace package. New kinds implement `agentic_odi_connectors.protocol.Connector` and register via `register_kind`. Do not write ingested records into `jobs_db` / outcomes unless a later mapping task says so.
@@ -208,12 +211,13 @@ our own store; it is not a hand-rolled message list. Do not replace it, wrap it 
 a second one, or re-implement streaming, the composer, attachments, branches, or
 approval prompts beside it.
 
-- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown` is
-  declared in `apps/studio/package.json` and imported nowhere, while
-  `apps/studio/src/lib/markdown.ts` hand-parses a subset for the transcript. That
-  is the shape the reuse ladder forbids: a paid-for dependency plus a second
-  implementation beside it. New rendering work goes through the library;
-  collapsing the existing parser is its own task, not a reason to add a third.
+- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown`
+  renders the transcript: `MarkdownTextPrimitive` for prose and reasoning, and
+  the shared `mdComponents` map in `apps/studio/src/components/chat/Markdown.tsx`
+  for the standalone `Markdown({ source })` callers and `ClaimText`. The
+  hand-written parser that used to sit beside it was deleted in #394. New
+  rendering work goes through the library and the shared map; do not add a
+  second parser or a second class vocabulary.
 - **One bridge.** `apps/studio/src/assistant/convert.ts` is the only mapping
   between `ChatMessage`/`ChatPart` and assistant-ui parts. It is pure and tested
   without a runtime. A new part type is added there, rendered in `parts.tsx`, and

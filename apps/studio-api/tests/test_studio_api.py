@@ -408,6 +408,7 @@ def test_promote_evidence_creates_a_scored_outcome() -> None:
         name="Call with Ada",
         content="Third time staging broke after a secret rotation.",
         job_id=job.id,
+        confidence="verified",
     )
 
     response = TestClient(create_app(repo)).post(
@@ -616,6 +617,68 @@ def test_pm_authored_context_can_start_confirmed() -> None:
     )
     assert response.status_code == 200
     assert response.json()["observation"]["status"] == "confirmed"
+
+
+def test_an_observation_carries_a_subject_and_can_be_filtered_by_it() -> None:
+    client = _client()
+    attached = client.post(
+        "/api/memory/observations",
+        json={
+            "kind": "opportunity",
+            "text": "Activation is stuck.",
+            "subject_type": "outcome",
+            "subject_id": "O-12",
+        },
+    )
+    assert attached.status_code == 200
+    observation = attached.json()["observation"]
+    assert observation["subject_type"] == "outcome"
+    assert observation["subject_id"] == "O-12"
+
+    client.post(
+        "/api/memory/observations",
+        json={
+            "kind": "opportunity",
+            "text": "Retention is stuck.",
+            "subject_type": "outcome",
+            "subject_id": "O-13",
+        },
+    )
+    client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
+
+    filtered = client.get("/api/memory/observations?subject_type=outcome&subject_id=O-12").json()[
+        "observations"
+    ]
+    assert [item["text"] for item in filtered] == ["Activation is stuck."]
+
+
+def test_an_unknown_subject_type_is_a_422() -> None:
+    client = _client()
+    response = client.post(
+        "/api/memory/observations",
+        json={
+            "kind": "opportunity",
+            "text": "Activation is stuck.",
+            "subject_type": "planet",
+            "subject_id": "O-12",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_repeating_an_observation_does_not_duplicate_it() -> None:
+    client = _client()
+    body = {
+        "kind": "opportunity",
+        "text": "Activation is stuck.",
+        "subject_type": "outcome",
+        "subject_id": "O-12",
+    }
+    first = client.post("/api/memory/observations", json=body).json()["observation"]
+    second = client.post("/api/memory/observations", json=body).json()["observation"]
+
+    assert second["id"] == first["id"]
+    assert len(client.get("/api/memory/observations").json()["observations"]) == 1
 
 
 def test_conversation_endpoints_and_chat_persistence() -> None:

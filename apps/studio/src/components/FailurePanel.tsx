@@ -10,11 +10,14 @@ export function FailurePanel({
   error,
   onRetry,
   retryText,
+  onDelete,
   id,
 }: {
   error: StudioError;
   onRetry?: (text: string) => void;
   retryText?: string;
+  /** Put the failed thing down (#405). The caller decides what "forget" means. */
+  onDelete?: () => void;
   id?: string;
 }) {
   return (
@@ -43,6 +46,11 @@ export function FailurePanel({
             onClick={() => onRetry(retryText ?? "")}
           >
             Retry
+          </button>
+        ) : null}
+        {onDelete ? (
+          <button type="button" className="quiet-action failure__delete" onClick={onDelete}>
+            Delete
           </button>
         ) : null}
       </div>

@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from agentic_odi_core.briefing import Briefing
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
@@ -19,6 +20,7 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
     Job,
+    Link,
     Outcome,
     ScheduledWork,
     Segment,
@@ -27,6 +29,7 @@ from agentic_odi_core.models import (
     Strategy,
     Study,
 )
+from agentic_odi_core.paths import default_odi_db_path
 from agentic_odi_core.repository import (
     V2MOM_ID,
     Repository,
@@ -65,7 +68,7 @@ class SQLiteRepository(Repository):
         device_id: str | None = None,
     ) -> None:
         if db_path is None:
-            db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+            db_path = str(default_odi_db_path())
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
         self.db_path = db_path
@@ -92,6 +95,7 @@ class SQLiteRepository(Repository):
         self.strategies: dict[str, Strategy] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.links: dict[str, Link] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
@@ -216,6 +220,10 @@ class SQLiteRepository(Repository):
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
             self._merge_updates(self.studies, p, Study)
+        elif et == "LINK_CREATED":
+            self.links[p["id"]] = Link.model_validate(p)
+        elif et == "LINK_DELETED":
+            self.links.pop(p["id"], None)
         self._last_event_id = max(self._last_event_id, ev["id"])
         if et not in _DERIVED_EVENT_TYPES:
             self._last_input_event_id = max(self._last_input_event_id, ev["id"])
@@ -867,6 +875,73 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_study
+
+    def add_link(self, link: Link) -> Link:
+        with self._lock:
+            self._sync()
+            for existing in self.links.values():
+                if (
+                    existing.source_type == link.source_type
+                    and existing.source_id == link.source_id
+                    and existing.target_type == link.target_type
+                    and existing.target_id == link.target_id
+                    and existing.relationship_type == link.relationship_type
+                ):
+                    raise ConflictError(
+                        f"Link already exists: {link.source_type}:{link.source_id} -> {link.target_type}:{link.target_id} ({link.relationship_type})"
+                    )
+            self.store.append(
+                "LINK_CREATED",
+                link.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return link
+
+    def get_link(self, link_id: str) -> Link | None:
+        with self._lock:
+            self._sync()
+            return self.links.get(link_id)
+
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]:
+        with self._lock:
+            self._sync()
+            items = list(self.links.values())
+            if source_type is not None:
+                items = [link for link in items if link.source_type == source_type]
+            if source_id is not None:
+                items = [link for link in items if link.source_id == source_id]
+            if target_type is not None:
+                items = [link for link in items if link.target_type == target_type]
+            if target_id is not None:
+                items = [link for link in items if link.target_id == target_id]
+            if relationship_type is not None:
+                items = [link for link in items if link.relationship_type == relationship_type]
+            return page(items, limit, offset)
+
+    def remove_link(self, link_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if link_id not in self.links:
+                return False
+            self.store.append(
+                "LINK_DELETED",
+                {"id": link_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
 
     def add_strategy(self, strategy: Strategy) -> Strategy:
         with self._lock:

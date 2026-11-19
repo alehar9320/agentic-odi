@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { dismissConnectorSuggestion } from "./helpers";
+
 const COMPOSER = "Message the studio";
 
 /**
@@ -21,12 +23,7 @@ test.describe("the first-run introduction", () => {
 
     // A fresh studio with no connectors offers one in a modal. That is real
     // product behavior, so it is dismissed the way a person would.
-    const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
-    await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
-    if (await suggestion.isVisible()) {
-      await suggestion.getByRole("button", { name: "Not now" }).click();
-      await expect(suggestion).toBeHidden();
-    }
+    await dismissConnectorSuggestion(page);
 
     await page.getByRole("button", { name: "Start with you and your team" }).click();
 

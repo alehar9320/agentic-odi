@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 from agentic_odi_core.briefing import Briefing
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
@@ -15,7 +16,9 @@ from agentic_odi_core.models import (
     Direction,
     Evidence,
     Job,
+    Link,
     Outcome,
+    RelationshipType,
     Segment,
     SegmentVerdict,
     Signal,
@@ -730,3 +733,78 @@ def test_adding_a_briefing_is_a_derived_event_that_spends_no_event_id(tmp_path) 
     event_types = [event["type"] for event in repo.store.get_stream()]
     assert "BRIEFING_WRITTEN" in event_types
     repo.close()
+
+
+def _link(
+    source_type="job",
+    source_id="s1",
+    target_type="outcome",
+    target_id="o1",
+    relationship_type="references",
+) -> Link:
+    return Link(
+        source_type=source_type,
+        source_id=source_id,
+        target_type=target_type,
+        target_id=target_id,
+        relationship_type=RelationshipType(relationship_type),
+    )
+
+
+def test_add_and_get_link_round_trip(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    link = _link()
+    created = repo.add_link(link)
+    assert repo.get_link(created.id) == link
+    assert repo.get_link("missing") is None
+    repo.close()
+
+
+def test_list_links_filters_by_source_and_target(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    repo.add_link(_link(source_type="job", source_id="j1", target_type="outcome", target_id="o1"))
+    repo.add_link(_link(source_type="job", source_id="j1", target_type="evidence", target_id="e1"))
+    repo.add_link(_link(source_type="outcome", source_id="o1", target_type="job", target_id="j1"))
+
+    by_source = [link.id for link in repo.list_links(source_type="job", source_id="j1")]
+    assert len(by_source) == 2
+    by_target = [link.id for link in repo.list_links(target_type="outcome", target_id="o1")]
+    assert len(by_target) == 1
+    by_type = [link.id for link in repo.list_links(source_type="job", target_type="outcome")]
+    assert len(by_type) == 1
+    repo.close()
+
+
+def test_remove_link_returns_true(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    link = _link()
+    created = repo.add_link(link)
+    assert repo.remove_link(created.id) is True
+    assert repo.get_link(created.id) is None
+    repo.close()
+
+
+def test_remove_link_unknown_returns_false(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    assert repo.remove_link("missing") is False
+    repo.close()
+
+
+def test_duplicate_link_raises_conflict(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    link = _link()
+    repo.add_link(link)
+    with pytest.raises(ConflictError):
+        repo.add_link(_link())
+    repo.close()
+
+
+def test_snapshot_reloads_links(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path)
+    link = _link()
+    created = repo.add_link(link)
+
+    reopened = SQLiteRepository(db_path)
+    assert reopened.get_link(created.id) == link
+    reopened.close()
