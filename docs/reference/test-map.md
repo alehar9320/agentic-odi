@@ -29,6 +29,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_backend_edges.py` | Edge-case tests for backend validation, parsing, and MCP failures. |
 | `apps/cli/tests/test_backend_selection.py` | — |
 | `apps/cli/tests/test_build_info.py` | — |
+| `apps/cli/tests/test_candidates_cli.py` | Tests for the candidates CLI group and the interviews extract command (A4). |
 | `apps/cli/tests/test_chat_cli.py` | Tests for the interactive CLI chat. |
 | `apps/cli/tests/test_chat_runtime.py` | Runtime tests for the interactive chat loop and command handlers. |
 | `apps/cli/tests/test_chat_wizard.py` | Tests for the /connect wizard. |
@@ -69,6 +70,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_wizard_cli.py` | Tests for the interactive ODI entity creation wizard command. |
 | `apps/mcp-server/tests/conftest.py` | — |
 | `apps/mcp-server/tests/mcp_failures.py` | How these tests read a failing tool's answer. |
+| `apps/mcp-server/tests/test_candidates.py` | MCP coverage for the candidate extraction tools (A4). |
 | `apps/mcp-server/tests/test_context_tools.py` | — |
 | `apps/mcp-server/tests/test_customer_outcomes.py` | Tests for Customer Outcome entities. |
 | `apps/mcp-server/tests/test_graceful_shutdown.py` | Tests for the MCP server's graceful shutdown path. |
@@ -335,6 +337,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_evaluation_harness.py` | The evaluation harness: a service is judged by the shared fixture. |
 | `packages/core/tests/test_events.py` | Tests for the new event-store schema and migration. |
 | `packages/core/tests/test_evidence_not_found.py` | Tests for the actionable ``EvidenceNotFoundError``. |
+| `packages/core/tests/test_extraction.py` | Tests for extracting outcome candidates from a quote (A4). |
 | `packages/core/tests/test_funnel.py` | Onboarding is measurable on this machine (ALH-147): five local counters. |
 | `packages/core/tests/test_funnel_service.py` | The funnel is counted by the paths a person actually walks. |
 | `packages/core/tests/test_intent_store.py` | Tests for the append-only Intent Store. |
@@ -367,6 +370,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_segments_staleness.py` | Tests for the staleness rule on derived artifacts. |
 | `packages/core/tests/test_service.py` | Tests for the core ODIService layer. |
 | `packages/core/tests/test_signal_inbox.py` | Signals: fingerprint dedupe, emissions from real mutations, the attention budget. |
+| `packages/core/tests/test_similarity.py` | Tests for the statement normaliser and similarity score. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
