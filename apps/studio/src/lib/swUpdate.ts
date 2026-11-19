@@ -32,7 +32,11 @@ export interface RegistrationLike {
 /** The subset of `ServiceWorkerContainer` the handshake uses. */
 export interface ContainerLike {
   controller: unknown;
-  addEventListener(type: "controllerchange", listener: () => void): void;
+  addEventListener(
+    type: "controllerchange",
+    listener: () => void,
+    options?: { once?: boolean },
+  ): void;
   register(scriptURL: string): Promise<RegistrationLike>;
 }
 
@@ -120,7 +124,13 @@ export function watchForUpdates({
  */
 export function activateWaiting(
   registration: RegistrationLike,
-  container: { addEventListener(type: "controllerchange", listener: () => void): void },
+  container: {
+    addEventListener(
+      type: "controllerchange",
+      listener: () => void,
+      options?: { once?: boolean },
+    ): void;
+  },
   reload: () => void,
 ): boolean {
   const waiting = registration.waiting;
@@ -128,13 +138,14 @@ export function activateWaiting(
     return false;
   }
   let reloaded = false;
-  container.addEventListener("controllerchange", () => {
+  const onControllerChange = () => {
     if (reloaded) {
       return;
     }
     reloaded = true;
     reload();
-  });
+  };
+  container.addEventListener("controllerchange", onControllerChange, { once: true });
   waiting.postMessage({ type: "SKIP_WAITING" });
   return true;
 }

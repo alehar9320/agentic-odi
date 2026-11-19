@@ -40,6 +40,20 @@ interface Env {
 
 const API_PREFIX = "/api/";
 
+/** Module-scope cache so the entry is resolved once per isolate. */
+let entryCache: string | null = null;
+
+/** Resolve the entry bundle name from the asset shelf. */
+async function resolveEntry(env: Env): Promise<string> {
+  const page = await env.ASSETS.fetch(new Request("https://assets/"));
+  if (page.status !== 200) {
+    return "unknown";
+  }
+  const text = await page.text();
+  const match = text.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
+  return match?.[0] ?? "unresolved";
+}
+
 /**
  * Capabilities the Worker can guarantee without any sidecar: local-only data,
  * memory, and the deterministic assistant. Everything that needs a sidecar
@@ -140,6 +154,17 @@ function securityHeaders(env: Env): Record<string, string> {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    // The hosted Studio is served over HTTPS only, and a first visit over a
+    // hostile network can be downgraded before the redirect lands. HSTS tells
+    // the browser to refuse plaintext for a year, including subdomains.
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    // Isolate the Studio from cross-origin windows and resources. No
+    // `Cross-Origin-Embedder-Policy`: the model-endpoint fetches allowed by
+    // `connect-src` and the blob/image handling in `img-src` require embedding
+    // external content, which `require-corp` would break. This absence is
+    // deliberate; do not "finish the job" by adding it.
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
   };
 }
 
@@ -262,11 +287,8 @@ export default {
           env,
         );
       }
-      const page = await env.ASSETS.fetch(new Request("https://assets/"));
-      const entry =
-        page.status === 200
-          ? ((await page.text()).match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "unknown")
-          : "unknown";
+      const entry = entryCache ?? (await resolveEntry(env));
+      entryCache = entry;
       return secure(
         Response.json(
           {

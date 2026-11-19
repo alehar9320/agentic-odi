@@ -368,6 +368,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_signal_inbox.py` | Signals: fingerprint dedupe, emissions from real mutations, the attention budget. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
+| `packages/core/tests/test_steve_jobs.py` | Tier 0 deterministic responder: branch routing, context, and the no-fabrication contract. |
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
 | `packages/core/tests/test_study.py` | A Study is one named pass over a Job, and running it again makes a wave. |
 | `packages/core/tests/test_traceability.py` | Traceability: orphans, unfunded objectives, and drift. |
@@ -414,6 +415,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_updater_proof_gate.py` | Where the updater's proof gets read (#613). |
 | `tests/scripts/test_vendor_policy.py` | Tests for scripts/vendor_policy.py (issue #383). |
 | `tests/scripts/test_verify.py` | — |
+| `tests/scripts/test_verify_ci_parity.py` | The pre-PR gate must account for every job the merge waits on. |
 | `tests/scripts/test_verify_hosted_first_run.py` | The hosted probe: what it must answer, and what a failure must look like. |
 | `tests/scripts/test_version_sync.py` | The released version must be the version the workspace declares. |
 | `tests/scripts/test_workflow_triggers.py` | The release workflows must be triggered by the release itself. |

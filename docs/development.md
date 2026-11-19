@@ -473,13 +473,15 @@ for the decision and the deferred `label gate` check.
 See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
 
 ```bash
-uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
-uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
-uv run python scripts/verify.py --full      # full matrix (CI's job)
+uv run python scripts/verify.py --changed   # required CI checks the diff can drive (PR bar)
+uv run python scripts/verify.py --default   # adds repo-wide mypy, studio build, site build
+uv run python scripts/verify.py --full      # local matrix; e2e/Tauri/audit stay CI-only
 ```
 
 Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
-`--full`. The PR body must list the tiers run and skipped.
+`--full`. The gate prints which tier covers each required CI job and why the
+rest are CI-only; `tests/scripts/test_verify_ci_parity.py` keeps that table
+equal to `ci-green.needs`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they

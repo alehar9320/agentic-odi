@@ -660,9 +660,6 @@ def delete_outcome(outcome_id: str) -> str:
     return f"Outcome deleted successfully: {outcome_id}"
 
 
-# impact and confidence are accepted per the add_evidence contract (impact:
-# high/medium/low, confidence: verified/claimed) but not yet stored;
-# persistence lands in issue #984.
 @mcp.tool
 async def add_evidence(
     ctx: Context,
