@@ -27,6 +27,9 @@ MAX_EVIDENCE_PER_CLAIM = 3
 #: Why a cited claim was downgraded. Stable, so the client can explain it.
 UNKNOWN_EVIDENCE_ID = "unknown_evidence_id"
 
+#: A sentence named more records than it may carry; the first three stand.
+TOO_MANY_EVIDENCE_IDS = "too_many_evidence_ids"
+
 #: Tools whose arguments or results name a record the reply may cite.
 EVIDENCE_TOOLS: frozenset[str] = frozenset(
     {"list_evidence", "get_evidence", "add_evidence", "promote_evidence"}
@@ -425,9 +428,11 @@ def split_claims(text: str, index: EvidenceIndex | None = None) -> list[Claim]:
             if hypothesis:
                 status = "hypothesis"
             elif evidence_ids:
+                unique_ids = list(dict.fromkeys(evidence_ids))
+                overflow = len(unique_ids) > MAX_EVIDENCE_PER_CLAIM
                 resolved: list[EvidenceSnapshot] = []
                 unknown = False
-                for evidence_id in list(dict.fromkeys(evidence_ids))[:MAX_EVIDENCE_PER_CLAIM]:
+                for evidence_id in unique_ids[:MAX_EVIDENCE_PER_CLAIM]:
                     snapshot = index.resolve(evidence_id) if index is not None else None
                     if snapshot is None:
                         if index is None:
@@ -442,6 +447,8 @@ def split_claims(text: str, index: EvidenceIndex | None = None) -> list[Claim]:
                 else:
                     status = "cited"
                     evidence = tuple(resolved)
+                    if overflow:
+                        reason = TOO_MANY_EVIDENCE_IDS
             else:
                 if _is_exempt(display):
                     continue
@@ -463,6 +470,7 @@ __all__ = [
     "EVIDENCE_TOOLS",
     "MAX_EVIDENCE_PER_CLAIM",
     "UNKNOWN_EVIDENCE_ID",
+    "TOO_MANY_EVIDENCE_IDS",
     "Claim",
     "ClaimStatus",
     "EvidenceIndex",

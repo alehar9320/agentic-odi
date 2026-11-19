@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from agentic_odi_studio_api.studio.claims import (
     MAX_EVIDENCE_PER_CLAIM,
+    TOO_MANY_EVIDENCE_IDS,
     UNKNOWN_EVIDENCE_ID,
     EvidenceIndex,
     EvidenceSnapshot,
@@ -78,6 +79,55 @@ def test_one_sentence_may_cite_several_records_up_to_the_cap() -> None:
     assert claims[0].status == "cited"
     assert [snapshot.id for snapshot in claims[0].evidence] == ["A", "B", "C"]
     assert len(claims[0].evidence) == MAX_EVIDENCE_PER_CLAIM
+
+
+def test_four_ids_keep_three_and_set_a_reason() -> None:
+    index = _index(
+        ("A", "First call", "Gong"),
+        ("B", "Second call", "Gong"),
+        ("C", "Third call", "Gong"),
+        ("D", "Fourth call", "Gong"),
+    )
+
+    claims = split_claims("They agree on the invite step. [[ev:A,B,C,D]]", index)
+
+    assert claims[0].status == "cited"
+    assert [snapshot.id for snapshot in claims[0].evidence] == ["A", "B", "C"]
+    assert len(claims[0].evidence) == MAX_EVIDENCE_PER_CLAIM
+    assert claims[0].reason == TOO_MANY_EVIDENCE_IDS
+
+
+def test_three_ids_have_no_reason() -> None:
+    index = _index(
+        ("A", "First call", "Gong"),
+        ("B", "Second call", "Gong"),
+        ("C", "Third call", "Gong"),
+    )
+
+    claims = split_claims("They agree on the invite step. [[ev:A,B,C]]", index)
+
+    assert claims[0].status == "cited"
+    assert claims[0].reason is None
+
+
+def test_an_unknown_id_outranks_the_overflow_reason() -> None:
+    index = _index(("A", "First call", "Gong"))
+
+    claims = split_claims("They churned. [[ev:A,B,C,E-9]]", index)
+
+    assert claims[0].status == "uncited"
+    assert claims[0].reason == UNKNOWN_EVIDENCE_ID
+    assert claims[0].evidence == ()
+
+
+def test_a_duplicate_id_is_not_overflow() -> None:
+    index = _index(("A", "First call", "Gong"))
+
+    claims = split_claims("They agree. [[ev:A,A,A]]", index)
+
+    assert claims[0].status == "cited"
+    assert claims[0].reason is None
+    assert [snapshot.id for snapshot in claims[0].evidence] == ["A"]
 
 
 def test_an_id_the_turn_never_received_becomes_uncited_with_a_reason() -> None:
