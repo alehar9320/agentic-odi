@@ -12,12 +12,32 @@ export interface StudioSession {
 
 export const SESSION_KEY = "studio.session";
 
+function sessionStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 function asId(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
 export function loadSession(): StudioSession | null {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const storage = sessionStorage();
+  if (!storage) {
+    return null;
+  }
+  let raw: string | null;
+  try {
+    raw = storage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
   if (!raw) {
     return null;
   }
@@ -39,9 +59,25 @@ export function loadSession(): StudioSession | null {
 }
 
 export function saveSession(session: StudioSession): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  const storage = sessionStorage();
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Storage denied or full: the session is a convenience, not state.
+  }
 }
 
 export function clearSession(): void {
-  localStorage.removeItem(SESSION_KEY);
+  const storage = sessionStorage();
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.removeItem(SESSION_KEY);
+  } catch {
+    // Storage denied or full: nothing to clear.
+  }
 }
