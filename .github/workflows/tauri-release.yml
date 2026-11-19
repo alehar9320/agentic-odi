@@ -161,6 +161,12 @@ jobs:
         run: npm ci
         working-directory: apps/studio
 
+      # The Tauri CLI is optional tooling (#752); `npm ci` no longer pulls it.
+      - name: Install optional test tooling
+        if: ${{ inputs.skip_updater_proof != true }}
+        run: npm run tooling:install
+        working-directory: apps/studio
+
       - name: Prove the updater against a local feed
         if: ${{ inputs.skip_updater_proof != true }}
         env:
@@ -227,6 +233,11 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+        working-directory: apps/studio
+
+      # The Tauri CLI is optional tooling (#752); `npm ci` no longer pulls it.
+      - name: Install optional test tooling
+        run: npm run tooling:install
         working-directory: apps/studio
 
       - name: Import Windows signing certificate

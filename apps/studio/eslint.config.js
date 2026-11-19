@@ -31,6 +31,13 @@ export default tseslint.config(
     },
   },
   {
+    // Node scripts (no TypeScript project) run under Node globals.
+    files: ["scripts/**/*.{mjs,js}"],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  {
     // Copied presentation stays a leaf: props in, markup out. The product
     // wrapper under src/components owns state and passes data down.
     // src/vendor/boundary.test.ts resolves relative specifiers as well, because
