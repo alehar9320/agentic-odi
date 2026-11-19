@@ -103,7 +103,7 @@ def test_an_unmatched_entry_says_unresolved_not_unknown() -> None:
     # Verify the resolveEntry function returns "unresolved" on no match
     assert '"unresolved"' in source
     # And "unknown" is only returned on non-200 status
-    assert 'page.status !== 200' in source
+    assert "page.status !== 200" in source
     assert 'return "unknown"' in source
 
 
@@ -111,5 +111,5 @@ def test_a_failed_asset_read_says_unknown() -> None:
     # When the asset read fails (non-200), the value must be "unknown".
     source = _source()
     # The resolveEntry function returns "unknown" for non-200 responses
-    assert 'page.status !== 200' in source
+    assert "page.status !== 200" in source
     assert 'return "unknown"' in source
