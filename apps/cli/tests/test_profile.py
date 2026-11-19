@@ -251,3 +251,10 @@ def test_chat_config_from_env_falls_back_to_profile(monkeypatch, tmp_path):
     assert config.api_key == "profile-key"
     assert config.model == "profile-model"
     assert config.mcp_url == "http://profile-mcp:7000/mcp"
+
+
+def test_llm_profile_round_trips_non_ascii(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    from agentic_odi_cli.profile import LLMProfile, load_llm_profile, save_llm_profile
+    save_llm_profile(LLMProfile(model="münchen-7b", base_url="http://localhost:8001/v1"))
+    assert load_llm_profile().model == "münchen-7b"

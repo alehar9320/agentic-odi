@@ -152,3 +152,16 @@ def test_defaults_read_environment(monkeypatch) -> None:
         "model_name": "model",
         "mcp_url": "http://mcp",
     }
+
+
+def test_load_profile_fallback_reads_utf8_non_ascii(monkeypatch, tmp_path) -> None:
+    cfg_dir = tmp_path / "agentic-odi"
+    cfg_dir.mkdir(parents=True)
+    profile_file = cfg_dir / "llm_profile.json"
+    profile_file.write_text('{"model": "münchen-7b", "base_url": "http://localhost:8001/v1"}', encoding="utf-8")
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    loaded = probes._load_profile_fallback()
+    assert loaded.get("model") == "münchen-7b"
+    assert loaded.get("base_url") == "http://localhost:8001/v1"
