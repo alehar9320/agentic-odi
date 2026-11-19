@@ -94,6 +94,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_approvals.py` | The write-approval gate: it resolves once, expires, and never leaks. |
 | `apps/studio-api/tests/test_studio_auth.py` | Authentication requirements for the Living Studio sidecar API (``/api/*``). |
 | `apps/studio-api/tests/test_studio_brief.py` | The user's onboarding context must reach the model and the offline fallback. |
+| `apps/studio-api/tests/test_studio_briefing_route.py` | The one read route for the latest briefing: 204 when none, else the record. |
 | `apps/studio-api/tests/test_studio_capabilities.py` | Tests for the sidecar capabilities manifest. |
 | `apps/studio-api/tests/test_studio_chat_branches.py` | Branch tests for the streaming tool loop in ``studio.chat``. |
 | `apps/studio-api/tests/test_studio_chat_prompt.py` | What the Studio's system prompt tells the agent to do before it scores. |
@@ -217,6 +218,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/interview/answered.test.ts` | The answered record's pure mapping (issue #400). |
 | `apps/studio/src/components/layout/StudioBar.test.tsx` | #309: an unconfigured browser is a fact about the settings, not a failure |
 | `apps/studio/src/components/layout/StudioBar.visual.test.tsx` | The build table would otherwise name this `StudioBar.visual` after the file; |
+| `apps/studio/src/components/notifications/BriefingCard.test.tsx` | agent_work cannot be opened, so only the two openable lines render. |
 | `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | Point the mocked store at a feed; `unread` defaults to what the feed shows. */ |
 | `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | The signal inbox is evidence-first: every card is a change the store |
 | `apps/studio/src/components/records/RecordDetail.test.tsx` | The detail as the lens renders it: a real row out of the real builder, so a field the |
@@ -323,6 +325,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_registry.py` | — |
 | `packages/connectors/tests/test_rest_connector.py` | — |
 | `packages/connectors/tests/test_sink.py` | — |
+| `packages/core/tests/test_briefing.py` | — |
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
