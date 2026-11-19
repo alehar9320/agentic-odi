@@ -129,7 +129,7 @@ describe("studio session", () => {
       } as unknown as Storage);
 
       expect(loadSession()).toBeNull();
-      expect(() => saveSession({ job_id: null, step_id: null, outcome_id: null })).not.toThrow();
+      expect(() => saveSession({ schema_version: SESSION_SCHEMA_VERSION, job_id: null, step_id: null, outcome_id: null })).not.toThrow();
       expect(() => clearSession()).not.toThrow();
     });
 
@@ -142,14 +142,14 @@ describe("studio session", () => {
         removeItem: () => {},
       } as unknown as Storage);
 
-      expect(() => saveSession({ job_id: "JOB-1", step_id: null, outcome_id: null })).not.toThrow();
+      expect(() => saveSession({ schema_version: SESSION_SCHEMA_VERSION, job_id: "JOB-1", step_id: null, outcome_id: null })).not.toThrow();
       expect(loadSession()).toBeNull();
     });
   });
 
   it("still round-trips a session when storage works", () => {
-    saveSession({ job_id: "JOB-1", step_id: "S-1", outcome_id: "O-1" });
+    saveSession({ schema_version: SESSION_SCHEMA_VERSION, job_id: "JOB-1", step_id: "S-1", outcome_id: "O-1" });
 
-    expect(loadSession()).toEqual({ job_id: "JOB-1", step_id: "S-1", outcome_id: "O-1" });
+    expect(loadSession()).toEqual({ schema_version: SESSION_SCHEMA_VERSION, job_id: "JOB-1", step_id: "S-1", outcome_id: "O-1" });
   });
 });
