@@ -98,7 +98,7 @@ def load_baseline() -> Baseline | None:
     if not baseline_exists():
         return None
     try:
-        with open(baseline_file()) as f:
+        with open(baseline_file(), encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise ValueError(f"Failed to parse baseline file: {e}") from e
@@ -119,7 +119,7 @@ def save_baseline(b: Baseline) -> Path:
     )
     target = baseline_file()
     tmp = target.with_name(target.name + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(b.to_dict()))
     os.replace(tmp, target)
     return target
@@ -197,7 +197,7 @@ def load_llm_profile() -> LLMProfile | None:
     if not llm_profile_exists():
         return None
     try:
-        with open(llm_profile_file()) as f:
+        with open(llm_profile_file(), encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise ValueError(f"Failed to parse LLM profile file: {e}") from e
@@ -239,7 +239,7 @@ def save_llm_profile(p: LLMProfile) -> Path:
     d["updated_at"] = now
     target = llm_profile_file()
     tmp = target.with_name(target.name + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(d))
     os.replace(tmp, target)
     return target
