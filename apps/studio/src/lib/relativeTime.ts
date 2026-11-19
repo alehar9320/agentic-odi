@@ -11,6 +11,12 @@ export function formatRelativeTime(isoString: string, now: Date = new Date()): s
     return "Recently";
   }
   const diffMs = now.getTime() - date.getTime();
+
+  if (diffMs < -60_000) {
+    return formatFuture(diffMs * -1);
+  }
+  if (diffMs < 0) return "Just now";
+
   const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
@@ -18,7 +24,24 @@ export function formatRelativeTime(isoString: string, now: Date = new Date()): s
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
-  return `${diffDays}d ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 4) return `${diffWeeks}w ago`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths}mo ago`;
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears}y ago`;
+}
+
+function formatFuture(ms: number): string {
+  const mins = Math.floor(ms / (1000 * 60));
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+
+  if (mins < 1) return "in a moment";
+  if (mins < 60) return `in ${mins}m`;
+  if (hours < 24) return `in ${hours}h`;
+  return `in ${days}d`;
 }
 
 /** The three buckets the history strip and the transcript both separate by. */

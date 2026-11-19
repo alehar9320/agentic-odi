@@ -16,6 +16,7 @@ from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
+    CandidateSolution,
     CustomerOutcome,
     Evidence,
     Interview,
@@ -35,6 +36,7 @@ from agentic_odi_core.repository import (
     V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
+    link_identity,
     page,
     rank_signals,
     sort_outcomes,
@@ -90,6 +92,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.candidates: dict[str, CandidateSolution] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self.interviews: dict[str, Interview] = {}
@@ -227,6 +230,10 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "CANDIDATE_CREATED":
+            self.candidates[p["id"]] = CandidateSolution.model_validate(p)
+        elif et == "CANDIDATE_UPDATED":
+            self._merge_updates(self.candidates, p, CandidateSolution)
         elif et == "PROPOSAL_CREATED":
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
         elif et == "PROPOSAL_UPDATED":
@@ -869,26 +876,26 @@ class SQLiteRepository(Repository):
 
     def add_link(self, link: Link) -> Link:
         with self._lock:
-            self._sync()
-            for existing in self.links.values():
-                if (
-                    existing.source_type == link.source_type
-                    and existing.source_id == link.source_id
-                    and existing.target_type == link.target_type
-                    and existing.target_id == link.target_id
-                    and existing.relationship_type == link.relationship_type
-                ):
+            # The snapshot read, the duplicate check, and the append share one
+            # write lock: two connections must not both pass the check before
+            # either event is durable.
+            with self.store.write_transaction():
+                self._sync()
+                identity = link_identity(link)
+                if any(link_identity(existing) == identity for existing in self.links.values()):
                     raise ConflictError(
-                        f"Link already exists: {link.source_type}:{link.source_id} -> {link.target_type}:{link.target_id} ({link.relationship_type})"
+                        f"A {link.relationship_type.value} link already connects "
+                        f"{link.source_type}:{link.source_id} to "
+                        f"{link.target_type}:{link.target_id}."
                     )
-            self.store.append(
-                "LINK_CREATED",
-                link.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return link
+                self.store.append(
+                    "LINK_CREATED",
+                    link.model_dump(mode="json"),
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return link
 
     def get_link(self, link_id: str) -> Link | None:
         with self._lock:
@@ -907,17 +914,15 @@ class SQLiteRepository(Repository):
     ) -> list[Link]:
         with self._lock:
             self._sync()
-            items = list(self.links.values())
-            if source_type is not None:
-                items = [link for link in items if link.source_type == source_type]
-            if source_id is not None:
-                items = [link for link in items if link.source_id == source_id]
-            if target_type is not None:
-                items = [link for link in items if link.target_type == target_type]
-            if target_id is not None:
-                items = [link for link in items if link.target_id == target_id]
-            if relationship_type is not None:
-                items = [link for link in items if link.relationship_type == relationship_type]
+            items = [
+                link
+                for link in self.links.values()
+                if (source_type is None or link.source_type == source_type)
+                and (source_id is None or link.source_id == source_id)
+                and (target_type is None or link.target_type == target_type)
+                and (target_id is None or link.target_id == target_id)
+                and (relationship_type is None or link.relationship_type.value == relationship_type)
+            ]
             return page(items, limit, offset)
 
     def remove_link(self, link_id: str) -> bool:
@@ -1063,6 +1068,50 @@ class SQLiteRepository(Repository):
             self._sync()
             items = [q for q in self.quotes.values() if q.interview_id == interview_id]
             return sorted(items, key=lambda q: q.ordinal)
+
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution:
+        with self._lock:
+            self.store.append(
+                "CANDIDATE_CREATED",
+                candidate.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return candidate
+
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None:
+        with self._lock:
+            self._sync()
+            return self.candidates.get(candidate_id)
+
+    def list_candidates(self) -> list[CandidateSolution]:
+        with self._lock:
+            self._sync()
+            return list(self.candidates.values())
+
+    def update_candidate(
+        self, candidate_id: str, updates: dict[str, Any]
+    ) -> CandidateSolution | None:
+        with self._lock:
+            self._sync()
+            candidate = self.candidates.get(candidate_id)
+            if candidate is None:
+                return None
+            current = candidate.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_candidate = candidate.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "CANDIDATE_UPDATED",
+                {"id": candidate_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_candidate
 
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         with self._lock:

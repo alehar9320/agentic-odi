@@ -11,6 +11,7 @@ import {
   scoreConfidence,
   underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
+  UNSCORED_LABEL,
 } from "../../lib/odi";
 import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
@@ -278,7 +279,7 @@ export function OpportunityLandscape() {
             <div className="studio-metric__label">Avg Opportunity Score</div>
             <div className="studio-metric__value">
               {averageScore.mean == null
-                ? "Not scored"
+                ? UNSCORED_LABEL
                 : formatOpportunityScore(averageScore.mean)}
             </div>
             {averageScore.mean == null ? null : (
@@ -982,15 +983,15 @@ function OpportunityTableView({
                   {scored ? formatOpportunityScore(outcome.opportunity_score) : "—"}
                 </td>
                 <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                  <span
-                    className="studio-pill"
-                    style={{
-                      background: underserved ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.05)",
-                      color: underserved ? "var(--studio-amber)" : "var(--studio-muted)",
-                    }}
-                  >
-                    {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
-                  </span>
+<span
+                      className="studio-pill"
+                      style={{
+                        background: underserved ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.05)",
+                        color: underserved ? "var(--studio-amber)" : "var(--studio-muted)",
+                      }}
+                    >
+                      {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : UNSCORED_LABEL}
+                    </span>
                 </td>
                 <td style={{ padding: "10px 14px" }}>
                   {scored ? (
