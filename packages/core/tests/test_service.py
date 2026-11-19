@@ -425,6 +425,7 @@ def test_evidence_delete_and_promote(service: ODIService) -> None:
         item_type="tool_result",
         name="quote",
         content="Lost 2 hours on deploy",
+        confidence="verified",
     )
 
     job = service.promote_evidence(evidence.id, "job")

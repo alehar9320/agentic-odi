@@ -4,6 +4,7 @@ import { fetchAlternativeLinks } from "../../api/studioApi";
 import { canvasHasRecords, canvasStatus, keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import {
   confidenceClass,
+  confidencePill,
   formatAdvances,
   formatBand,
   formatOpportunityScore,
@@ -13,12 +14,13 @@ import {
   isUnderserved,
   nAdvisory,
   scoredAverage,
+  scoreConfidence,
   underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
 } from "../../lib/odi";
 import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
-import type { Outcome, OutcomeAlternativeLink } from "../../types";
+import type { Evidence, Outcome, OutcomeAlternativeLink } from "../../types";
 import { FailurePanel } from "../FailurePanel";
 import { ShareAction } from "../ShareAction";
 import { GhostMetrics, GhostOpportunityCards } from "../Skeletons";
@@ -460,6 +462,7 @@ export function OpportunityLandscape() {
       ) : viewMode === "table" ? (
         <OpportunityTableView
           outcomes={sortedOutcomes}
+          evidence={evidence}
           selectedOutcomeId={selectedOutcomeId}
           onSelectOutcome={toggleOutcome}
         />
@@ -1006,10 +1009,12 @@ export function OpportunityPlot({
 
 function OpportunityTableView({
   outcomes,
+  evidence,
   selectedOutcomeId,
   onSelectOutcome,
 }: {
   outcomes: Outcome[];
+  evidence: Evidence[];
   selectedOutcomeId: string | null;
   onSelectOutcome: (id: string) => void;
 }) {
@@ -1026,6 +1031,7 @@ function OpportunityTableView({
             <th style={{ padding: "10px 14px" }}>Band</th>
             <th style={{ padding: "10px 14px" }}>Sample</th>
             <th style={{ padding: "10px 14px", textAlign: "center" }}>Status</th>
+            <th style={{ padding: "10px 14px" }}>Backed by</th>
             <th style={{ padding: "10px 14px" }}>Advances</th>
           </tr>
         </thead>
@@ -1034,6 +1040,8 @@ function OpportunityTableView({
             const scored = hasScore(outcome.opportunity_score);
             const underserved = scored && isUnderserved(outcome.opportunity_score);
             const isSelected = selectedOutcomeId === outcome.id;
+            const linkedEvidence = evidence.filter((item) => item.outcome_id === outcome.id);
+            const confidence = scoreConfidence(outcome, linkedEvidence);
 
             return (
               <tr
@@ -1131,6 +1139,18 @@ function OpportunityTableView({
                   >
                     {scored ? (underserved ? "UNDERSERVED" : "NORMAL") : "Not scored"}
                   </span>
+                </td>
+                <td style={{ padding: "10px 14px" }}>
+                  {scored ? (
+                    <span
+                      className={`badge badge--${confidencePill(confidence).variant}`}
+                      title={confidence.basis}
+                    >
+                      {confidence.label}
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--studio-muted)" }}>—</span>
+                  )}
                 </td>
                 <td style={{ padding: "10px 14px", color: "var(--studio-muted)", fontSize: "0.82rem" }}>
                   {formatAdvances(outcome)}

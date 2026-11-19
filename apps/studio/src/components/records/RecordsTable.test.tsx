@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CanvasData } from "../../types";
 import { buildRecords } from "../../lib/records";
 import { RecordsTable } from "./RecordsTable";
+import { UNSCORED_LABEL } from "../../lib/odi";
 
 const tableProps = {
   selectedKey: null,
@@ -33,7 +34,7 @@ describe("RecordsTable", () => {
   it("says unscored rather than showing a number it did not get", () => {
     const rows = buildRecords(canvas({ outcomes: [{ id: "O-1", importance: 8, satisfaction: 4 }] }));
     const { container } = render(<RecordsTable rows={rows} {...tableProps} />);
-    expect(screen.getByText("unscored")).toBeInTheDocument();
+    expect(screen.getByText(UNSCORED_LABEL)).toBeInTheDocument();
     expect(container.textContent).not.toContain("12");
   });
 

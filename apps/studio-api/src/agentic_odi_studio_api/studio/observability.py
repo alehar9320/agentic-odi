@@ -34,9 +34,22 @@ SENSITIVE_KEYS = frozenset(
     }
 )
 
+#: Keys that contain a sensitive-looking substring ("token") but are not
+#: secrets: they are counts. Checked before the substring heuristic, so the
+#: turn line can carry what a turn cost without the redactor eating it.
+NON_SENSITIVE_KEYS = frozenset(
+    {
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+    }
+)
+
 
 def _is_sensitive(key: str) -> bool:
     lowered = key.lower()
+    if lowered in NON_SENSITIVE_KEYS:
+        return False
     if lowered in SENSITIVE_KEYS:
         return True
     return any(marker in lowered for marker in ("token", "secret", "password", "api_key"))

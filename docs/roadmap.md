@@ -1,195 +1,26 @@
+---
+title: Roadmap
+blurb: What has shipped, and what is queued.
+nav_group: Operate
+nav_order: 4
+slug: roadmap
+---
+
 # Roadmap
 
-A roadmap that says everything is done is not a roadmap. This page tracks three
-things: what has shipped (and where to verify it), what is open in review, and
-what is queued next. An entry is only "Shipped" when the pull request that built
-it is merged; the link is the proof.
+This page used to carry three hand-maintained lists — what shipped, what is in
+flight, and what is next. Every pull request that landed had to edit this file,
+and the lists drifted from the sources that already own the facts.
 
-## Shipped
+The lists are gone. The facts live where they always belonged:
 
-- [x] **One tool contract, exposed** — `ToolName` / `TOOL_SPECS` in `packages/core` are the single source of truth, and `get_capabilities` describes the surface from it ([PR #263](https://github.com/alehar9320/agentic-odi/pull/263)).
-- [x] **Generated capability manifest** — the CLI, MCP server, and Studio read the same capability manifest, and the CLI's local handlers are checked for parity ([PR #272](https://github.com/alehar9320/agentic-odi/pull/272)).
-- [x] **ODI write contract on every path** — every write path validates Job, Step, and Outcome rules instead of trusting the caller ([PR #270](https://github.com/alehar9320/agentic-odi/pull/270)).
-- [x] **A signal inbox that means something** — writes emit deduped, budgeted signals stored in the event log; the CLI, MCP clients, and the Studio bell read the same records ([PR #277](https://github.com/alehar9320/agentic-odi/pull/277)).
-- [x] **assistant-ui conversation runtime** — streaming, reasoning, tool calls, write approvals, sources, attachments, branches, and suggestions over the sidecar's existing SSE contract ([PR #266](https://github.com/alehar9320/agentic-odi/pull/266)).
-- [x] **Open on a guided conversation** — the first minute is one invitation, three starters, and one dismissible hint instead of a modal ([PR #268](https://github.com/alehar9320/agentic-odi/pull/268)).
-- [x] **Customize: one place for connectors** — installed connectors, curated picks, and the vendor marketplace, with tokens named but never stored ([PR #262](https://github.com/alehar9320/agentic-odi/pull/262)).
-- [x] **One banner system for every notice** — every failure, warning, and success uses the same notice shapes ([PR #264](https://github.com/alehar9320/agentic-odi/pull/264)).
-- [x] **Scheduled work, honestly recorded** — schedule, list, trigger, and cancel background work, with a stored record instead of a pretend scheduler ([PR #265](https://github.com/alehar9320/agentic-odi/pull/265)).
-- [x] **Evidence keeps a link back** — evidence records name their source, and a captured record can be promoted into a Job or an Outcome ([PR #261](https://github.com/alehar9320/agentic-odi/pull/261)).
-- [x] **A verifiable release** — version parity, a signed updater manifest, and the updater exercised in CI ([PR #275](https://github.com/alehar9320/agentic-odi/pull/275)).
-- [x] **Demo, seed, and simulated surfaces are labelled** — no surface presents fixture data as a customer's own ([PR #274](https://github.com/alehar9320/agentic-odi/pull/274)).
-- [x] **Pull request guardrails** — diff-shape, body-truth, and fabrication gates on the cumulative diff ([PR #273](https://github.com/alehar9320/agentic-odi/pull/273)).
-- [x] **Browser-level Studio suite** — the conversation, an outcome capture, the landscape, the workspace views, and the passthrough backend, driven against the real stack ([PR #267](https://github.com/alehar9320/agentic-odi/pull/267)).
-- [x] **Offline-first CLI and hosted Studio** — the terminal REPL with `/connect`, and the Living Studio served from a Cloudflare Worker ([v0.7.0](https://github.com/alehar9320/agentic-odi/releases/tag/v0.7.0)).
-- [x] **EvidenceDraft validation at ingest** — connector records conform before they enter the store ([PR #287](https://github.com/alehar9320/agentic-odi/pull/287)).
-- [x] **Tool spec validation on MCP startup** — the server refuses to serve a malformed registry ([PR #288](https://github.com/alehar9320/agentic-odi/pull/288)).
-- [x] **Keyboard navigation for the feed and job map** — phase cards, step rows, and both dialogs are operable without a mouse ([PR #297](https://github.com/alehar9320/agentic-odi/pull/297)).
-- [x] **`odi data export`** — back the ODI state up as JSON ([PR #293](https://github.com/alehar9320/agentic-odi/pull/293)).
-- [x] **Conversational first-run introduction** — the agent speaks first in five short turns and returns an editable brief, replacing the setup form ([PR #362](https://github.com/alehar9320/agentic-odi/pull/362)).
-- [x] **`odi connectors list-presets`** — discover and copy a preset from the terminal ([PR #290](https://github.com/alehar9320/agentic-odi/pull/290)).
+- **Shipped** is [the changelog](CHANGELOG.md) and the
+  [Releases](https://github.com/alehar9320/agentic-odi/releases) page. A thing is
+  shipped when its pull request is merged; the release is the proof.
+- **In flight** is the list of
+  [open pull requests](https://github.com/alehar9320/agentic-odi/pulls).
+- **Next** is the [ready-for-dev](https://github.com/alehar9320/agentic-odi/issues?q=is%3Aopen+is%3Aissue+label%3Aready-for-dev)
+  issue filter.
 
-## In flight
-
-Open pull requests that change a capability this milestone cares about. Each
-links to the pull request; a red or draft entry is stated as such rather than
-counted as done.
-
-- [ ] **A study, and the waves inside it** — a named pass over a job with a unique wave per `(job, name)`; outcomes scope to a study of their own job, and legacy rows keep belonging to no study (this change).
-- [ ] **A cold open under a second** — a deterministic 1,500-outcome study corpus, per-segment measurement, an incremental event replay instead of a full rescan, and a deferred landscape render; before/after recorded in `docs/development.md` (this change).
-- [ ] **The database checks itself on boot and closes cleanly** — a bounded `PRAGMA quick_check` at open, a `store_corrupt` failure page that names the file and the last backup and never touches the damaged file, a WAL checkpoint on idle and on clean shutdown, and a SIGTERM stop that leaves no `-wal` behind ([#598](https://github.com/alehar9320/agentic-odi/issues/598), part of [#348](https://github.com/alehar9320/agentic-odi/issues/348)).
-- [ ] **Agents reuse before they write** — the cost-ordered ladder and its bounds in `docs/architecture/reuse.md`, the behaviour skill in `.agents/skills/reuse-first/`, the Studio vendor ledger that `docs/architecture/vendor.md` promised but never had, and an advisory `Reuses:` check in `scripts/pr_guards.py body-truth`. The eight duplicates the audit named stay open as ordinary refactoring, one pull request each ([PR #602](https://github.com/alehar9320/agentic-odi/pull/602)).
-- [ ] **The landing page points at the sample** — the site's primary call to action opens a committed, read-only sample workspace generated from a fixture, labelled a sample on every row and rendering with no network ([PR #469](https://github.com/alehar9320/agentic-odi/pull/469)).
-- [ ] **Rate-limit the ingest sink** — a token bucket sheds a high-volume batch instead of exhausting memory ([PR #298](https://github.com/alehar9320/agentic-odi/pull/298)).
-- [ ] **Job validation at the model level** — name and description constraints live in `packages/core` ([PR #296](https://github.com/alehar9320/agentic-odi/pull/296)).
-- [ ] **MCP connection limits** — timeout and pool settings so a hanging connection is bounded ([PR #294](https://github.com/alehar9320/agentic-odi/pull/294)).
-- [ ] **Shared HTTP client for connectors** — configurable connection pools for ingest ([PR #292](https://github.com/alehar9320/agentic-odi/pull/292)).
-- [ ] **Merge candidate evidence into one outcome** — the review step for duplicate candidates ([PR #291](https://github.com/alehar9320/agentic-odi/pull/291)).
-- [ ] **`odi connectors health`** — every registered connector's health in one table ([PR #289](https://github.com/alehar9320/agentic-odi/pull/289)).
-- [ ] **MCP `/health` store probe** — the server reports whether its SQLite store is reachable ([PR #286](https://github.com/alehar9320/agentic-odi/pull/286)).
-- [ ] **Durable sessions and a real memory** — the conversation survives a reload ([PR #285](https://github.com/alehar9320/agentic-odi/pull/285)).
-- [ ] **Accept or reject a candidate without losing evidence** — the review half of candidate extraction ([PR #284](https://github.com/alehar9320/agentic-odi/pull/284)).
-- [ ] **Outcome-based segments and the strategy they imply** — the scored outcomes group into segments, and the recorded path names the ones it beat ([PR #367](https://github.com/alehar9320/agentic-odi/pull/367)).
-- [ ] **A vendor tree that cannot rot into app code** — copied markup lives in `src/vendor`, with lint and a resolving test on its imports ([PR #417](https://github.com/alehar9320/agentic-odi/pull/417)).
-- [ ] **Tailwind scoped to the copied components** — v4 styles `src/vendor` alone, the product keeps its own stylesheet ([PR #422](https://github.com/alehar9320/agentic-odi/pull/422)).
-- [ ] **Evidence becomes outcome proposals** — a stored record is mined into a scored, approvable desired outcome, and only a human approval writes it ([PR #438](https://github.com/alehar9320/agentic-odi/pull/438)).
-- [ ] **Evidence from a file at the terminal** — `evidence add --file` reads text (or stdin) on the Studio's attachment cap ([PR #415](https://github.com/alehar9320/agentic-odi/pull/415)).
-- [ ] **A traceability report: orphans, unfunded, drift** — an outcome names the V2MOM method or measure it advances, the link is refused if the target does not exist, and a read-only report names the orphans, the unfunded objectives, and the links the vision dropped (issue [#591](https://github.com/alehar9320/agentic-odi/issues/591)).
-- [ ] **Every conversation in one list, with its turn count** — `GET /api/conversations` returns each stored conversation newest-first with its turns, so the Studio can show a switcher ([PR #451](https://github.com/alehar9320/agentic-odi/pull/451)).
-
-## Next
-
-The open issues this milestone still has to answer, grouped by what they change.
-
-### Evidence becomes outcomes
-
-- [ ] **Evidence must become outcomes** — the mapping that turns a quote into a scored opportunity ([#80](https://github.com/alehar9320/agentic-odi/issues/80)).
-- [ ] **Outcome-based segments and the strategy they imply** — the missing half of ODI ([#85](https://github.com/alehar9320/agentic-odi/issues/85)).
-
-### Agents that actually run
-
-- [ ] **Background agents must actually run** — real triggers, real failures, and a morning briefing ([#95](https://github.com/alehar9320/agentic-odi/issues/95)).
-- [ ] **The local model must be real** — an honest routing tier with a true availability probe ([#94](https://github.com/alehar9320/agentic-odi/issues/94)).
-
-### Consent, access, and release integrity
-
-- [ ] **The agent must ask before it acts** — consent, escalation, and an audit trail ([#82](https://github.com/alehar9320/agentic-odi/issues/82)).
-- [ ] **The Studio has no front door** — auth, CSP, and secret handling ([#90](https://github.com/alehar9320/agentic-odi/issues/90)).
-- [ ] **A release must be verifiable** — version sync, a signed updater manifest, and the updater in CI ([#89](https://github.com/alehar9320/agentic-odi/issues/89)).
-- [ ] **Hold the line** — a coverage floor that fails the build ([#88](https://github.com/alehar9320/agentic-odi/issues/88)).
-
-### Reach and accessibility
-
-- [ ] **The Studio must fit in a pocket** — a real mobile shell with offline capture ([#93](https://github.com/alehar9320/agentic-odi/issues/93)).
-- [ ] **Usable without a mouse** — accessibility on the surfaces that actually ship ([#92](https://github.com/alehar9320/agentic-odi/issues/92)).
-
-### The docs stay true
-
-- [ ] **The docs must be the truth** — README, architecture, and a roadmap that tracks reality (this change).
-- [x] **Outcome sample and method** — every desired-outcome score carries `importance_n`, `satisfaction_n` and `score_method` (`estimate`, `survey`, `import`) through the model, service, SQLite replay, MCP tools, CLI and Studio API; an unknown count renders as `est.`, and an `estimate` that claims a sample above one is refused before the write ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
-
-- [x] **Score history** — every accepted score change is written as an append-only `ScoreSnapshot` alongside the score's sample and method, with an optional `note`. `desired-outcomes history`, `get_outcome_history` and `GET /api/outcomes/{id}/history` replay the trail; a rejected mutation writes no snapshot, so history never shows a change that did not happen. `desired-outcomes get` shows the latest accepted reason as a `note` line, so the detail view carries the same "why" as the history without inventing one ([PR #281](https://github.com/alehar9320/agentic-odi/pull/281)).
-
-- [x] **Survey import**: `odi survey import <csv>` parses a response file,
-  aggregates one mean per outcome and lands the mean, its sample (`n`) and a
-  bootstrap band computed from the real paired responses. The import is
-  all-or-nothing: an unresolved reference or a malformed row fails before any
-  outcome is written.
-- [x] **No row disappears without a report line**: `survey import` builds a
-  side-effect-free plan before it writes. `--dry-run` prints the match table and
-  writes nothing; every row is named by its 1-based CSV line (the record's
-  starting line when a quoted field spans several), so unmatched, ambiguous,
-  invalid and missing-field rows are listed rather than dropped. `--match`
-  proposes one normalized-exact candidate per unmatched reference and asks a
-  person to confirm each; a suggestion is never applied silently, a stale or
-  ambiguous confirmation cannot assign a row, and a run with any unresolved row
-  is refused whole, so a partial score write is impossible.
-- [x] **Reproducible bands**: A survey outcome stores `opportunity_low`/
-  `opportunity_high` with their provenance (`interval_n`, seed, confidence level,
-  computed-at). A score or method edit without a fresh band clears the stale one
-  in the same write, so a new number never carries an old range; an estimate
-  keeps the no-band placeholder rather than a fabricated width. The stored band
-  is readable through `get_outcome_interval`, `desired-outcomes get` and
-  `GET /api/outcomes/{id}/interval`; a no-band score reads as `no band` rather
-  than a zero-width range, and a band whose score a later snapshot moved is
-  marked `stale`.
-- [x] **Retained paired inputs (B3.1)**: an accepted survey import persists the
-  exact paired responses its band was bootstrapped from, in the append-only
-  event log behind a named provisional retention convention
-  (`survey-inputs-v1`). The set is de-identified — an opaque per-pair token and
-  the two numbers, never a name or an email — and carries a versioned
-  `input_ref` derived from its contents, so a stored band can name the exact
-  inputs it came from and the band can be reproduced bit for bit after a
-  restart. A dry run or a refused import retains nothing; a score or method edit
-  that clears a stale band deletes the inputs that described it in the same
-  write, so a later reader cannot reproduce a band for a score that no longer
-  exists. The read side, `get_outcome_inputs`, returns `null` when no set is
-  retained — a legacy or aggregate-only outcome — a distinct state from a
-  retained set and never an empty list that would read as "zero responses". It
-  is reachable through the tool, `GET /api/outcomes/{id}/inputs` and the CLI
-  local backend. The retention/deletion and study-lineage policy itself is still
-  not approved; the convention is named in one place and pinned by tests so it
-  stays swappable.
-- [x] **Honest ranking**: `classify_confidence` labels each outcome
-  `measured`/`thin`/`none` from its weakest dimension, and
-  `rank_outcomes_for_job` ranks within a section by the band's low end, so an
-  estimate can no longer outrank a measured score. `odi top` lists the measured
-  section (naming the thin and unscored it excluded) and `odi coverage` reports
-  the split; the landscape renders the same band and groups by confidence class.
-- [x] **Signed deltas**: `outcome_delta` reads the recorded snapshots and reports
-  the per-dimension and opportunity differences with an explicit `direction`,
-  never inferring an "improvement" from a bare number. `desired-outcomes history
-  --why` and `GET /api/outcomes/{id}/delta` expose it; a missing dimension stays
-  `null`, not `0`.
-- [x] **Thin-sample advisory (M2-14)**: one `MIN_MEANINGFUL_N = 20` constant and
-  one `n_advisory(outcome) -> Advisory | None` in `evaluation.py` warn when a
-  recorded sample is below the threshold. The advisory takes the smaller of the
-  two counts and names the dimension that triggered it, returns a single sentence
-  plus `{n, threshold, method, dimension}`, and is worded as "below the advisory
-  threshold" — a product warning, not a claim of statistical validity on either
-  side. It is a statement about the data, never a filter: the score still renders
-  and still ranks. `odi top` prints it as a footer line, `desired-outcomes get`
-  prints it as an `advisory` line, and the landscape shows an `n<20` chip with the
-  sentence on hover; an estimate or an unknown count produces no advisory rather
-  than a fabricated `n=0`.
-- [x] **Trust seams for the gated increments**: The remaining Pillar-2
-  increments wait on decisions that are not yet approved, so `agentic_odi_core.trust`
-  exposes their shapes and refuses when its inputs are absent: `retained_survey_inputs`
-  refuses when nothing was retained for an outcome rather than returning an empty
-  list that would read as "zero responses", and `persisted_interval` refuses when
-  no band is stored. Each raises `TrustContractPendingError` naming the blocking
-  decision instead of returning a fabricated band, class or direction. Where a
-  decision is still open, the increment runs on a named provisional convention
-  (see the B3.1 retention bullet above) rather than a fabricated default.
-- [x] **Pillar integration contract**: one fixture is imported with per-outcome
-  counts, persisted and replayed through SQLite, ranked without mixing absent
-  scores into zeroes, explained with recorded arithmetic/method, and shown with
-  its band and confidence class — while an invalid import leaves the prior state
-  unchanged and a score edit clears the stale band and the retained inputs that
-  described it. Pinned end to end by `test_trust_pillar.py`, which also
-  re-bootstraps the stored band from the retained inputs after a reopen and
-  asserts it matches bit for bit.
-- [x] **Alternatives inventory (M2-07)**: what a customer uses today is a
-  first-class record, not an inference from a score. `Alternative`
-  (`product|service|workaround|manual|nothing`) belongs to a Job, and
-  `AlternativeLink` carries the customer's own `adequacy` (1–10) and optional
-  `usage_n` against an Outcome. `has_existing_solution` returns the explicit
-  three-state result `yes | no_linked_nothing | no_link_at_all`, so "we asked and
-  there is nothing" is never confused with "we have not asked"; only `yes` means
-  a solution is recorded. The inventory is reachable through `add_alternative`,
-  `list_alternatives`, `link_alternative`, `get_outcome_alternatives` and
-  `get_has_existing_solution`, the `odi alternatives add|list|link|show` CLI, and
-  the Studio API. Deleting an alternative leaves its outcomes intact with no
-  orphan link; cross-job links and nonfinite or out-of-range adequacy are refused
-  before any event is written.
-- [x] **Alternatives presentation (M2-07.2)**: the inventory reaches the reader
-  without turning unknowns into facts. The outcome detail shows the recorded
-  alternatives with their adequacy and usage count and the three-state solution
-  sentence; the landscape gains an **Only workaround** facet that selects
-  outcomes whose only recorded solution is a workaround and never treats a
-  `nothing` row or an un-inventoried outcome as one. A whole Job's inventory is
-  one call — `list_alternative_links` / `GET /api/alternative-links` — so the
-  facet never issues a request per row, and a failed read disables the facet
-  rather than filtering every outcome away. The brief's *Underserved outcomes*
-  line consumes the shared `render_alternative_lines` entry point; the C1
-  renderer lives on the Pillar 3 branch, so that one line is the remaining seam.
+If a capability you care about is missing from all three, it is not queued —
+[open an issue](https://github.com/alehar9320/agentic-odi/issues/new) and say so.

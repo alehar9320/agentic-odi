@@ -5,6 +5,7 @@ import type { CanvasData } from "../../types";
 import { buildRecords, type RecordKind, type RecordRow } from "../../lib/records";
 import { RecordDetail } from "./RecordDetail";
 import { RecordsPanel } from "./RecordsPanel";
+import { UNSCORED_LABEL } from "../../lib/odi";
 
 const studio = vi.hoisted(() => ({
   canvas: null as CanvasData | null,
@@ -161,7 +162,7 @@ describe("RecordDetail stored fields", () => {
     );
     const values = Array.from(container.querySelectorAll("dd")).map((node) => node.textContent);
     expect(values).toContain("—");
-    expect(values).toContain("unscored");
+    expect(values).toContain(UNSCORED_LABEL);
     expect(container.textContent).not.toMatch(/Unknown|N\/A|TODO|undefined/);
   });
 
@@ -355,7 +356,7 @@ describe("RecordDetail editing an outcome's two estimates", () => {
       { outcomes: [{ id: "O-1", importance: 8, satisfaction: 4, opportunity_score: null }] },
       "outcome",
     );
-    expect(container.textContent).toContain("unscored");
+    expect(container.textContent).toContain(UNSCORED_LABEL);
     expect(container.textContent).not.toContain("12");
   });
 });

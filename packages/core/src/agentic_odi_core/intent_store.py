@@ -15,13 +15,7 @@ from agentic_odi_core.events import (
     new_event_id,
 )
 from agentic_odi_core.integrity import IntegrityResult, ensure_intact
-
-_COLUMNS = {
-    "event_id": "TEXT",
-    "workspace_id": "TEXT NOT NULL DEFAULT 'local'",
-    "device_id": "TEXT NOT NULL DEFAULT 'local'",
-    "server_seq": "INTEGER",
-}
+from agentic_odi_core.migrations import MIGRATIONS, migrate
 
 
 class IntentStore:
@@ -71,7 +65,10 @@ class IntentStore:
                 )
                 """
             )
-            self._migrate_events_table()
+            # Numbered, recorded schema changes. A fresh file is already at the
+            # current shape, so the ladder is a no-op and user_version records
+            # which build wrote it; a legacy file upgrades in one transaction.
+            migrate(self.conn, MIGRATIONS, label="Your database")
             self.conn.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS events_event_id ON events(event_id)"
             )
@@ -90,24 +87,6 @@ class IntentStore:
                     updated_at TEXT NOT NULL
                 )
                 """
-            )
-
-    def _migrate_events_table(self) -> None:
-        existing = {row[1] for row in self.conn.execute("PRAGMA table_info(events)").fetchall()}
-        for column, definition in _COLUMNS.items():
-            if column not in existing:
-                self.conn.execute(f"ALTER TABLE events ADD COLUMN {column} {definition}")
-
-        missing_ids = [
-            row[0]
-            for row in self.conn.execute(
-                "SELECT id FROM events WHERE event_id IS NULL OR event_id = ''"
-            ).fetchall()
-        ]
-        for row_id in missing_ids:
-            self.conn.execute(
-                "UPDATE events SET event_id = ? WHERE id = ?",
-                (new_event_id(), row_id),
             )
 
     def append(

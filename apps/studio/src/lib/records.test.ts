@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasData } from "../types";
 import { buildRecords, RECORD_SECTIONS } from "./records";
+import { UNSCORED_LABEL } from "./odi";
 
 function canvas(overrides: Partial<CanvasData> = {}): CanvasData {
   return { jobs: [], steps: [], outcomes: [], source: "local", ...overrides };
@@ -31,7 +32,7 @@ describe("buildRecords", () => {
       canvas({ outcomes: [{ id: "O-1", importance: 8, satisfaction: 4 }] }),
     );
     expect(row.cells[0]).toBe("—");
-    expect(row.cells[3]).toBe("unscored");
+    expect(row.cells[3]).toBe(UNSCORED_LABEL);
   });
 
   it("renders a stored score exactly as the server returned it", () => {

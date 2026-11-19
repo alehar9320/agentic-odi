@@ -1,33 +1,127 @@
 {
   "groups": [
     {
-      "title": "Get started",
       "guides": [
-        { "slug": "quick-start", "title": "Quick start", "source": null, "blurb": "From nothing to a running studio." },
-        { "slug": "installation", "title": "Installation", "source": "docs/installation.md", "blurb": "Binaries, the installer, and updates." },
-        { "slug": "studio", "title": "The Living Studio", "source": "docs/living-studio.md", "blurb": "The chat-first interface, its first run, and the desktop app." },
-        { "slug": "local-llm", "title": "Local LLM backend", "source": "docs/local-llm.md", "blurb": "Running a local model with tool calling." }
-      ]
+        {
+          "blurb": "From nothing to a running studio.",
+          "slug": "quick-start",
+          "source": null,
+          "title": "Quick start"
+        },
+        {
+          "blurb": "Binaries, the installer, and updates.",
+          "slug": "installation",
+          "source": "docs/installation.md",
+          "title": "Installation"
+        },
+        {
+          "blurb": "The chat-first interface, its first run, and the desktop app.",
+          "slug": "studio",
+          "source": "docs/living-studio.md",
+          "title": "The Living Studio"
+        },
+        {
+          "blurb": "Running a local OpenAI-compatible model with tool calling.",
+          "slug": "local-llm",
+          "source": "docs/local-llm.md",
+          "title": "Local LLM Backend"
+        }
+      ],
+      "title": "Get started"
     },
     {
-      "title": "Build",
       "guides": [
-        { "slug": "method", "title": "The method, stage by stage", "source": "docs/method.md", "blurb": "The eight job-map stages as a practitioner works them." },
-        { "slug": "cli", "title": "CLI reference", "source": "docs/cli.md", "blurb": "Backends, chat, entities, and scoring." },
-        { "slug": "connectors", "title": "Connectors", "source": "docs/connectors.md", "blurb": "The registry, the presets, and the protocol." },
-        { "slug": "mcp", "title": "MCP tool reference", "source": null, "blurb": "Every tool the server exposes." },
-        { "slug": "architecture", "title": "Architecture", "source": "docs/architecture/README.md", "blurb": "The workspace, the data flow, and the testing strategy." }
-      ]
+        {
+          "blurb": "The eight job-map stages as a practitioner works them.",
+          "slug": "method",
+          "source": "docs/method.md",
+          "title": "The Method, Stage by Stage"
+        },
+        {
+          "blurb": "Backends, chat, entities, and scoring.",
+          "slug": "cli",
+          "source": "docs/cli.md",
+          "title": "CLI Reference"
+        },
+        {
+          "blurb": "The registry, the presets, and the protocol.",
+          "slug": "connectors",
+          "source": "docs/connectors.md",
+          "title": "Connectors"
+        },
+        {
+          "blurb": "Every tool the server exposes.",
+          "slug": "mcp",
+          "source": null,
+          "title": "MCP tool reference"
+        },
+        {
+          "blurb": "The workspace, the data flow, and the testing strategy.",
+          "slug": "architecture",
+          "source": "docs/architecture/README.md",
+          "title": "Architecture"
+        },
+        {
+          "blurb": "Every test file and the one line it says about itself.",
+          "slug": "test-map",
+          "source": "docs/reference/test-map.md",
+          "title": "Test map"
+        },
+        {
+          "blurb": "What a turn cost, which tool was slow, and the one logging setup.",
+          "slug": "observability",
+          "source": "docs/architecture/observability.md",
+          "title": "Observability"
+        }
+      ],
+      "title": "Build"
     },
     {
-      "title": "Operate",
       "guides": [
-        { "slug": "deployment", "title": "Deployment", "source": "docs/deployment.md", "blurb": "The project site, the hosted server, and the Worker." },
-        { "slug": "development", "title": "Development", "source": "docs/development.md", "blurb": "Lint, types, frontend checks, and the coverage map." },
-        { "slug": "assistant-ui-ledger", "title": "The assistant-ui ledger", "source": "docs/assistant-ui-ledger.md", "blurb": "Every assistant-ui capability, and the one honest state it is in." },
-        { "slug": "agents", "title": "Agent assignment", "source": "docs/agents.md", "blurb": "Which agents take issues, how to claim one, and when a claim expires." },
-        { "slug": "roadmap", "title": "Roadmap", "source": "docs/roadmap.md", "blurb": "What has shipped, and what is queued." }
-      ]
+        {
+          "blurb": "The project site, the hosted server, and the Worker.",
+          "slug": "deployment",
+          "source": "docs/deployment.md",
+          "title": "Deployment"
+        },
+        {
+          "blurb": "Lint, types, frontend checks, and the coverage map.",
+          "slug": "development",
+          "source": "docs/development.md",
+          "title": "Development"
+        },
+        {
+          "blurb": "Every assistant-ui capability, and the one honest state it is in.",
+          "slug": "assistant-ui-ledger",
+          "source": "docs/assistant-ui-ledger.md",
+          "title": "The assistant-ui ledger"
+        },
+        {
+          "blurb": "Which agents take issues, how to claim one, and when a claim expires.",
+          "slug": "agents",
+          "source": "docs/agents.md",
+          "title": "Agent Assignment"
+        },
+        {
+          "blurb": "What has shipped, and what is queued.",
+          "slug": "roadmap",
+          "source": "docs/roadmap.md",
+          "title": "Roadmap"
+        },
+        {
+          "blurb": "Pi, OpenCode, and Freebuff integration.",
+          "slug": "superpowers",
+          "source": "docs/superpowers.md",
+          "title": "Superpowers"
+        },
+        {
+          "blurb": "Every environment variable, its default, and the form it accepts.",
+          "slug": "configuration",
+          "source": "docs/reference/configuration.md",
+          "title": "Configuration"
+        }
+      ],
+      "title": "Operate"
     }
   ]
 }

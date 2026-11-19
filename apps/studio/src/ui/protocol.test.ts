@@ -15,6 +15,7 @@ const DOMAIN_CARDS = [
   "decision-record",
   "segment-card",
   "strategy-card",
+  "finding-card",
 ];
 
 function expectOk(spec: unknown) {
@@ -236,6 +237,50 @@ describe("parseUiSpec", () => {
     });
     expect(node.props).not.toHaveProperty("outcomeIds");
     expect(node.props.id).toBe("SEG-1");
+  });
+
+  it("accepts a finding card with a metric and no step", () => {
+    const node = expectOk({
+      type: "finding-card",
+      props: {
+        kind: "key_finding",
+        headline: "Waiting on IT approval",
+        impact: "high",
+        detail: "The drop-off is internal waiting.",
+        metric: { label: "Drop-off at Step 2", value: "34%" },
+      },
+    });
+
+    expect(node.props.metric).toEqual({ label: "Drop-off at Step 2", value: "34%" });
+  });
+
+  it("drops an unknown finding kind and impact band without failing the card", () => {
+    // Both are optional, so a value the catalog does not know is stripped and
+    // the message still renders — a bad enum never blanks the tree.
+    const node = expectOk({
+      type: "finding-card",
+      props: {
+        kind: "vibes",
+        impact: "severe",
+        headline: "Waiting on IT approval",
+        detail: "The drop-off is internal waiting.",
+        metric: { label: "Drop-off at Step 2", value: "34%" },
+      },
+    });
+
+    expect(node.props).not.toHaveProperty("kind");
+    expect(node.props).not.toHaveProperty("impact");
+    expect(node.props.headline).toBe("Waiting on IT approval");
+  });
+
+  it("rejects a finding card with no measured number", () => {
+    const reason = expectReason({
+      type: "finding-card",
+      props: { headline: "Waiting on IT approval", detail: "Internal waiting." },
+    });
+
+    expect(reason).toContain("finding-card");
+    expect(reason).toContain("metric");
   });
 });
 

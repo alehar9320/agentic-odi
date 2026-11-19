@@ -4,9 +4,11 @@ import argparse
 import asyncio
 import hmac
 import json
+import logging
 import os
 import signal
 import sys
+import time
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,6 +43,7 @@ from agentic_odi_core import (
     capability_manifest,
     capability_summary,
     compute_opportunity_score,
+    configure_logging,
     error_envelope,
     evaluate_outcome_statement,
     invalid_strategy_request,
@@ -54,10 +57,13 @@ from agentic_odi_core import (
 from agentic_odi_core.errors import ValidationError as CoreValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
+from fastmcp.server.middleware import Middleware
 from pydantic import ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
+
+log = logging.getLogger(__name__)
 
 
 def _token_path() -> Path:
@@ -143,6 +149,70 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
 
 
 mcp = FastMCP("Agentic ODI", lifespan=_lifespan)
+
+
+class _ToolTimingMiddleware(Middleware):
+    """Emit one log line per tool call, so a slow tool is not a hung one.
+
+    A tool call previously left no trace: an operator could not tell a slow
+    call from a server that had stopped answering. This records the tool name,
+    how long it took, and whether it returned an error — the error case keys on
+    the same envelope code the client already branches on, so the log and the
+    wire agree on one vocabulary.
+    """
+
+    async def on_call_tool(self, context: Any, call_next: Any) -> Any:
+        name = getattr(context.message, "name", "unknown")
+        started = time.perf_counter()
+        try:
+            result = await call_next(context)
+        except Exception as exc:
+            log.warning(
+                "mcp.tool name=%s duration_ms=%d outcome=error code=%s",
+                name,
+                int((time.perf_counter() - started) * 1000),
+                error_envelope(exc)["code"],
+            )
+            raise
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        code = _envelope_code(result)
+        if code is not None:
+            log.warning(
+                "mcp.tool name=%s duration_ms=%d outcome=error code=%s",
+                name,
+                duration_ms,
+                code,
+            )
+        else:
+            log.info("mcp.tool name=%s duration_ms=%d outcome=ok", name, duration_ms)
+        return result
+
+
+def _envelope_code(result: Any) -> str | None:
+    """The error code a tool returned, or ``None`` when the tool succeeded.
+
+    Tools answer a failure by returning the ``_fail`` envelope as their content
+    rather than raising, so the timing line reads the same envelope a client
+    branches on instead of inventing a second vocabulary.
+    """
+    content = getattr(result, "content", None) or []
+    for item in content:
+        text = getattr(item, "text", None)
+        if not isinstance(text, str):
+            continue
+        try:
+            payload = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
+            code = payload["error"].get("code")
+            if isinstance(code, str):
+                return code
+    return None
+
+
+mcp.add_middleware(_ToolTimingMiddleware())
+
 
 jobs_db = _repo.jobs
 steps_db = _repo.steps
@@ -261,6 +331,7 @@ def add_outcome(
     score_method: ScoreMethod = "estimate",
     note: str | None = None,
     claim_check: dict[str, Any] | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     """Add a desired Outcome to a Job.
 
@@ -287,6 +358,10 @@ def add_outcome(
     estimate cannot have asked people.
     ``note`` (max 500 characters) records why the number was given; it is kept
     with the score snapshot.
+    ``objectives`` names the V2MOM methods and measures this outcome advances,
+    each as ``{"field": "method" | "measure", "text": "<objective text>"}``. The
+    text must match an entry the vision holds now; an unknown one is refused with
+    the entries that do exist. Omit it (or pass ``[]``) for an unlinked outcome.
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -317,6 +392,7 @@ def add_outcome(
             score_method=score_method,
             note=note,
             claim_check=claim_check,
+            objectives=objectives,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -327,6 +403,8 @@ def add_outcome(
     except ValueOutOfRangeError as exc:
         return _fail(exc)
     except ClaimCheckError as exc:
+        return _fail(exc)
+    except CoreValidationError as exc:
         return _fail(exc)
     except OutcomeStatementError as exc:
         return _fail(exc)
@@ -708,6 +786,7 @@ def update_outcome(
     satisfaction_n: int | None = None,
     score_method: ScoreMethod | None = None,
     note: str | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     """Update an Outcome's statement, scores, or sample metadata.
 
@@ -731,6 +810,8 @@ def update_outcome(
         updates["satisfaction_n"] = satisfaction_n
     if score_method is not None:
         updates["score_method"] = score_method
+    if objectives is not None:
+        updates["objectives"] = objectives
     try:
         updated = service.update_outcome(outcome_id, updates, note=note)
     except OutcomeNotFoundError:
@@ -738,6 +819,8 @@ def update_outcome(
     except OutcomeStatementError as exc:
         return _fail(exc)
     except SnapshotNoteError as exc:
+        return _fail(exc)
+    except CoreValidationError as exc:
         return _fail(exc)
     except ValueOutOfRangeError as exc:
         return _fail(exc)
@@ -938,6 +1021,9 @@ def delete_outcome(outcome_id: str) -> str:
     return f"Outcome deleted successfully: {outcome_id}"
 
 
+# impact and confidence are accepted per the add_evidence contract (impact:
+# high/medium/low, confidence: verified/claimed) but not yet stored;
+# persistence lands in issue #984.
 @mcp.tool
 async def add_evidence(
     ctx: Context,
@@ -951,6 +1037,8 @@ async def add_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    impact: str = "medium",
+    confidence: str = "claimed",
 ) -> str:
     await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
@@ -965,6 +1053,8 @@ async def add_evidence(
             job_id=job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
@@ -1022,6 +1112,7 @@ def promote_evidence(
     name: str | None = None,
     importance: float | None = None,
     satisfaction: float | None = None,
+    force: bool = False,
 ) -> str:
     try:
         artifact = service.promote_evidence(
@@ -1032,6 +1123,7 @@ def promote_evidence(
             name=name,
             importance=importance,
             satisfaction=satisfaction,
+            force=force,
         )
     except EvidenceNotFoundError as exc:
         return _evidence_not_found(evidence_id, exc.hint)
@@ -1312,6 +1404,99 @@ def reject_proposal(proposal_id: str) -> str:
     return json.dumps(proposal.model_dump(mode="json"))
 
 
+@mcp.tool
+def link_outcome(outcome_id: str, field: str, text: str) -> str:
+    """Link an Outcome to the V2MOM method or measure it advances.
+
+    ``field`` is ``method`` or ``measure`` and ``text`` must match an entry the
+    vision currently holds. Unknown text is refused with the entries that do
+    exist, never guessed or fuzzy-matched.
+    """
+    try:
+        outcome = service.link_outcome(outcome_id, field, text)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    except CoreValidationError as exc:
+        return _fail(exc)
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
+    """Remove one V2MOM link from an Outcome.
+
+    ``key`` is the frozen content key the link was stored with; removing a link
+    that is not there changes nothing.
+    """
+    try:
+        outcome = service.unlink_outcome(outcome_id, field, key)
+    except OutcomeNotFoundError as exc:
+        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
+    return json.dumps(outcome.model_dump(mode="json"))
+
+
+@mcp.tool
+def links_add(
+    source_type: str,
+    source_id: str,
+    target_type: str,
+    target_id: str,
+    relationship_type: str,
+    external_system: str | None = None,
+    external_id: str | None = None,
+    preview: dict | None = None,
+) -> str:
+    """Create a typed link between two entities. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_add is not yet implemented"),
+        "Error: links_add is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_list(
+    source_type: str | None = None,
+    source_id: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    relationship_type: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> str:
+    """List links, optionally filtered by source, target, or relationship type. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_list is not yet implemented"),
+        "Error: links_list is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_remove(link_id: str) -> str:
+    """Remove a link by ID. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_remove is not yet implemented"),
+        "Error: links_remove is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def get_outcome_alignments(outcome_id: str | None = None) -> str:
+    """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
+    return json.dumps(service.list_alignments(outcome_id))
+
+
+@mcp.tool
+def get_traceability_report() -> str:
+    """Report orphans, unfunded objectives, and links the vision dropped.
+
+    Orphans are outcomes that advance nothing; unfunded objectives are V2MOM
+    methods and measures no outcome advances; drift is a link whose objective
+    text is no longer in the vision. Read-only, and with no objectives defined
+    it says so rather than returning three empty sections.
+    """
+    return json.dumps(service.traceability_report().as_dict())
+
+
 DEFAULT_PORT = 8000
 
 
@@ -1398,6 +1583,7 @@ def main(argv: list[str] | None = None) -> None:
         help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
     )
     args = parser.parse_args(argv)
+    configure_logging()
     validate_at_startup()
     setup_graceful_shutdown()
     # Gate only a token a studio has already minted. Minting one here would 401
@@ -1431,55 +1617,3 @@ def setup_graceful_shutdown() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-@mcp.tool
-def link_outcome(outcome_id: str, field: str, text: str) -> str:
-    """Link an Outcome to the V2MOM method or measure it advances.
-
-    ``field`` is ``method`` or ``measure`` and ``text`` must match an entry the
-    vision currently holds. Unknown text is refused with the entries that do
-    exist, never guessed or fuzzy-matched.
-    """
-    try:
-        outcome = service.link_outcome(outcome_id, field, text)
-    except OutcomeNotFoundError as exc:
-        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
-    except CoreValidationError as exc:
-        return _fail(exc)
-    return json.dumps(outcome.model_dump(mode="json"))
-
-
-@mcp.tool
-def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
-    """Remove one V2MOM link from an Outcome.
-
-    ``key`` is the frozen content key the link was stored with; removing a link
-    that is not there changes nothing.
-    """
-    try:
-        outcome = service.unlink_outcome(outcome_id, field, key)
-    except OutcomeNotFoundError as exc:
-        return _fail(exc, f"Error: Outcome {outcome_id} not found.")
-    return json.dumps(outcome.model_dump(mode="json"))
-
-
-@mcp.tool
-def get_outcome_alignments(outcome_id: str | None = None) -> str:
-    """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
-    return json.dumps(service.list_alignments(outcome_id))
-
-
-@mcp.tool
-def get_traceability_report() -> str:
-    """Report orphans, unfunded objectives, and links the vision dropped.
-
-    Orphans are outcomes that advance nothing; unfunded objectives are V2MOM
-    methods and measures no outcome advances; drift is a link whose objective
-    text is no longer in the vision. Read-only, and with no objectives defined
-    it says so rather than returning three empty sections.
-    """
-    return json.dumps(service.traceability_report().as_dict())
-
-
-DEFAULT_PORT = 8000

@@ -78,7 +78,7 @@ jobs:
             # Human override: do-not-merge or needs human review cancels.
             LABELS="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels -q '.labels | map(.name) | join(",")')"
             case ",$LABELS," in
-              *,do-not-merge,*|*,needs human review,*)
+              *,do-not-merge,*|*,"needs human review",*)
                 {
                   echo "### AI merge act — PR #$PR_NUMBER"
                   echo

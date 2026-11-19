@@ -26,6 +26,8 @@ from agentic_odi_core.contract import (
     capability_summary,
 )
 from agentic_odi_core.errors import (
+    AlreadyPromotedError,
+    ConfigurationError,
     ConflictError,
     NotFoundError,
     OdiError,
@@ -49,6 +51,7 @@ from agentic_odi_core.evaluation import (
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.logging import configure_logging
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -70,8 +73,11 @@ from agentic_odi_core.messages import (
 )
 from agentic_odi_core.models import (
     ALTERNATIVE_SOURCE_KINDS,
+    CONFIDENCE_WEIGHTS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    LINK_RELATIONSHIP_TYPES,
+    OUTCOME_INPUT_MIN,
     V2MOM,
     Alternative,
     AlternativeKind,
@@ -87,7 +93,10 @@ from agentic_odi_core.models import (
     EvidenceItemType,
     Job,
     JobStage,
+    Link,
     Outcome,
+    OutcomeAlignment,
+    RelationshipType,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -105,6 +114,7 @@ from agentic_odi_core.models import (
     SurveyInputSet,
     ValueMetric,
     compute_opportunity_score,
+    confidence_weighted_inputs,
     create_job,
     job_stage_catalog,
     utc_now_iso,
@@ -116,7 +126,12 @@ from agentic_odi_core.remote import (
     parse_tool_result,
     tool_result_text,
 )
-from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.repository import (
+    InMemoryRepository,
+    Repository,
+    compute_promotion_fingerprint,
+    normalize_quote_text,
+)
 from agentic_odi_core.router import LocalOpenAIEngine, ModelRouter, ModelTier, RoutingMode
 from agentic_odi_core.schema import odi_schema
 from agentic_odi_core.segmentation import (
@@ -202,10 +217,12 @@ __all__ = [
     "BusinessImpactCategory",
     "BusinessValue",
     "CAPABILITIES",
+    "CONFIDENCE_WEIGHTS",
     "ClaimCheck",
     "ClaimCheckError",
     "ClaimSkip",
     "ConflictError",
+    "AlreadyPromotedError",
     "CustomerOutcome",
     "ALTERNATIVE_SOURCE_KINDS",
     "Alternative",
@@ -229,6 +246,7 @@ __all__ = [
     "JobStage",
     "JOB_STAGE_INDEX",
     "JOB_STAGE_ORDER",
+    "Link",
     "MCPConnectionConfig",
     "ModelRouter",
     "ModelTier",
@@ -236,9 +254,11 @@ __all__ = [
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
+    "OUTCOME_INPUT_MIN",
     "OdiError",
     "OnDeviceLLMEngine",
     "Outcome",
+    "OutcomeAlignment",
     "OutcomeNotFoundError",
     "OutcomeProposal",
     "OutcomeStatementError",
@@ -250,11 +270,17 @@ __all__ = [
     "AdvisoryDimension",
     "advisory_for",
     "n_advisory",
+    "Objective",
+    "RelationshipType",
     "ProposalStatus",
     "ProposalStrategy",
     "HeuristicProposalStrategy",
+    "Link",
+    "RelationshipType",
+    "LINK_RELATIONSHIP_TYPES",
     "LocalOpenAIEngine",
     "RateLimitError",
+    "ConfigurationError",
     "RoutingMode",
     "ScoreMethod",
     "ScoreSnapshot",
@@ -298,9 +324,17 @@ __all__ = [
     "classify_confidence",
     "opportunity_interval",
     "outcome_delta",
+    "compute_traceability_report",
+    "compute_promotion_fingerprint",
+    "normalize_quote_text",
+    "normalize_objective",
+    "objective_key",
+    "objectives_from_v2mom",
     "Repository",
     "build_repository",
     "compute_opportunity_score",
+    "confidence_weighted_inputs",
+    "configure_logging",
     "create_job",
     "alternative_not_found",
     "customer_outcome_not_found",

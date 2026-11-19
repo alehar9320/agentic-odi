@@ -8,6 +8,7 @@ import type {
 } from "../../types";
 import { asStudioError } from "../../api/studioApi";
 import { isEndpointConfigured } from "../../lib/modelEndpoint";
+import { opportunityScore } from "../../lib/odi";
 import { BffError, notFound } from "../errors";
 import type { LocalStore } from "../store/types";
 import { LocalDataService } from "../data/localDataService";
@@ -847,7 +848,7 @@ export class ChatOrchestrator {
             const importance = Number(call.argumentsObj.importance);
             const satisfaction = Number(call.argumentsObj.satisfaction);
             output = {
-              score: importance + Math.max(importance - satisfaction, 0),
+              score: opportunityScore(importance, satisfaction),
             };
             break;
           }

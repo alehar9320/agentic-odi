@@ -532,7 +532,7 @@ def parse_added_lines(diff: str) -> list[tuple[str, int, str]]:
     return added
 
 
-_TEST_DEF_RE = re.compile(r"^\s*(?:def\s+test_|it\(|test\()")
+_TEST_DEF_RE = re.compile(r"^\s*(?:async\s+)?(?:def\s+test_|it\(|test\()")
 
 
 def count_tests_added(added_lines: Sequence[tuple[str, int, str]]) -> int:
@@ -546,7 +546,9 @@ def count_tests_added(added_lines: Sequence[tuple[str, int, str]]) -> int:
 def _git(*args: str) -> str:
     import subprocess
 
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout
+    return subprocess.run(
+        ["git", *args], capture_output=True, text=True, errors="replace", check=True
+    ).stdout
 
 
 def _release_lookup(base_ref: str) -> ReleaseLookup:

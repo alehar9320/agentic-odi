@@ -1585,6 +1585,22 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
     )
 
 
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, request: Request) -> dict:
+    """Remove one thread and its turns; an unknown id is a 404, not a no-op."""
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+                suggestion="Refresh the history and try again.",
+            )
+        ) from exc
+    return {"ok": True}
+
+
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
 def patch_conversation(
     conversation_id: str, body: UpdateConversationRequest, request: Request
@@ -1922,6 +1938,8 @@ async def promote_evidence(
             args["importance"] = body.importance
         if body.satisfaction is not None:
             args["satisfaction"] = body.satisfaction
+        if body.force:
+            args["force"] = True
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.PROMOTE_EVIDENCE.value,
@@ -1937,6 +1955,7 @@ async def promote_evidence(
             name=body.name,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            force=body.force,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc

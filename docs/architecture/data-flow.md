@@ -155,6 +155,27 @@ server is a normal state the picker explains.
 The studio memory is a separate SQLite file, not an ODI repository. It never
 feeds the canvas; it only supplies bounded context to the next chat turn.
 
+### Schema migrations
+
+A schema change is a new numbered migration, never an edit to an old one. Both
+stores run the same ledger, `agentic_odi_core.migrations`: an ordered tuple of
+`Migration(version, description, apply)` steps, `PRAGMA user_version` as the
+record of what has run, and a runner that applies every step newer than the
+stored version in one transaction and writes the new version in that same
+transaction. A crash leaves the file at its previous version, not
+half-migrated, and a database already at the target version is a no-op.
+`odi.db` uses `migrations.MIGRATIONS`; `studio.db` uses
+`studio.memory.STUDIO_MIGRATIONS`. `tests/scripts/test_migrations_registry.py`
+fails when the current version is raised without a registered step, and
+`packages/core/tests/test_migrations.py` opens a pre-change fixture and asserts
+its rows survive.
+
+This replaced an older shape where each store compared `PRAGMA table_info`
+against a column list on every open and ran `ALTER TABLE` for each missing one.
+That could only express an additive column, and it left no record of what had
+already run. Only additive steps live in the ledger today; the first destructive
+migration (a backfill, a table rebuild, a dropped column) is its own change.
+
 ### Store open and close
 
 Both SQLite files are gated the same way at open. `IntentStore` and
@@ -235,11 +256,17 @@ GET   /api/conversations                       -> every thread, last touch first
 GET   /api/conversations/latest                -> thread + turns (resume)
 GET   /api/conversations/{id}/tree             -> branch tree + head
 PATCH /api/conversations/{id} {"head_id"}      -> record the visible branch
+DELETE /api/conversations/{id}                 -> drop the thread and its turns
 ```
 
 A conversation written before ids existed has none, so the tree endpoint
 synthesises a linear chain and old threads still open. `apps/studio` never
 invents a branch the sidecar cannot reproduce.
+
+A delete removes the thread and its turns in one transaction, and an unknown
+id answers 404 rather than a silent success. The SPA asks before it sends the
+request and clears the stage when the thread it was reading is the one that
+went.
 
 ## Read Paths
 

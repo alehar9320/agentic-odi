@@ -117,6 +117,9 @@ def _evidence_out(record: Evidence) -> dict[str, Any]:
         "content": record.content,
         "url": record.url,
         "outcome_id": record.outcome_id,
+        # Location is part of the artifact's meaning; the raw payload is not.
+        "job_id": record.job_id,
+        "step_id": record.step_id,
     }
 
 
