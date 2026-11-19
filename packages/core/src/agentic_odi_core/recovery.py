@@ -66,14 +66,18 @@ def latest_backup(db_path: str, *, directory: Path | None = None) -> Path | None
 
 
 def format_backup_time(backup: Path) -> str:
-    """Read the UTC time out of a backup filename, as ``HH:MM`` when possible."""
+    """Read the UTC time out of a backup filename, as local ``HH:MM``.
+
+    The filename stamp is UTC by construction; the message sits beside the
+    reader's clock, so it is converted for display rather than shown raw.
+    """
     stem = backup.stem
     _, _, stamp = stem.partition("-")
     try:
-        parsed = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ")
+        parsed = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
     except ValueError:
         return backup.name
-    return parsed.strftime("%H:%M")
+    return parsed.astimezone().strftime("%H:%M")
 
 
 def corrupt_store_message(error: StoreCorrupt, *, backup: Path | None = None) -> str:
@@ -87,7 +91,7 @@ def corrupt_store_message(error: StoreCorrupt, *, backup: Path | None = None) ->
     if resolved is None:
         backup_line = "No backup exists yet."
     else:
-        backup_line = f"Last backup: {format_backup_time(resolved)} ({resolved.name})."
+        backup_line = f"Last backup: {format_backup_time(resolved)} local ({resolved.name})."
     return (
         f"{error.label} failed its integrity check: {error.path}. "
         f"{backup_line} The file has been left untouched — restore a backup before opening it again."
