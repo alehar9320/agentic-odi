@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
@@ -334,6 +335,39 @@ def get_diagnostics(request: Request) -> dict[str, Any]:
         },
         "migrations": {"events": "current"},
         "capabilities": [capability.model_dump(mode="json") for capability in capabilities],
+    }
+
+
+@router.get("/data/status")
+def get_data_status(request: Request) -> dict[str, Any]:
+    """Report the resolved paths and sizes of the sidecar's two SQLite stores.
+
+    Metadata only: no entity rows, no credentials, no record counts. A store
+    whose file does not yet exist reports its resolved configuration path with
+    unavailable size and modification time rather than inventing values.
+    """
+    service = _service(request)
+    memory = _memory(request)
+
+    def store_status(path) -> dict[str, Any]:
+        p = Path(path) if path is not None else None
+        if p is None:
+            return {"path": ":memory:", "bytes": None, "lastModified": None}
+        try:
+            info = p.stat()
+            return {
+                "path": str(p),
+                "bytes": info.st_size,
+                "lastModified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(),
+            }
+        except OSError:
+            return {"path": str(p), "bytes": None, "lastModified": None}
+
+    return {
+        "stores": [
+            {"id": "odi", **store_status(getattr(service.repo, "db_path", None))},
+            {"id": "studio", **store_status(memory.db_path)},
+        ]
     }
 
 
