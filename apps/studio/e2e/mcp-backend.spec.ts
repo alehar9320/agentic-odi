@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
-import { lens, openStudio } from "./helpers";
+import { banners, lens, openStudio } from "./helpers";
 
 /**
  * The Studio against its MCP passthrough backend.
@@ -21,14 +21,18 @@ const MCP_URL = "http://127.0.0.1:8000/mcp";
 const JOB_NAME = `E2E MCP Job ${Date.now()}`;
 
 test.describe("the Studio on the MCP backend", () => {
-  test.beforeAll(async ({ request }) => {
+  // Seeded per test rather than once per file: the suite's auto fixture empties
+  // the shared canvas before every test, so a job created in `beforeAll` would
+  // be gone by the time the first assertion ran. A fixture runs before the
+  // spec's own hooks, so this lands after the reset.
+  test.beforeEach(async ({ request }) => {
     const created = await request.post("/api/jobs", {
       data: { name: JOB_NAME, description: "Seeded over MCP", mcp_url: MCP_URL },
     });
     expect(created.ok()).toBeTruthy();
   });
 
-  test("shows the jobs the MCP server holds", async ({ page }) => {
+  test("shows the jobs the MCP server holds", { tag: "@smoke" }, async ({ page }) => {
     await openStudio(page);
 
     // The job picker is rendered from the canvas. Only a canvas hydrated
@@ -52,7 +56,7 @@ test.describe("the Studio on the MCP backend", () => {
       .getByLabel("Desired outcome")
       .fill("Minimize the time to propagate secrets when rotating credentials");
     await panel.getByRole("button", { name: "Record outcome" }).click();
-    await expect(page.locator(".banner").filter({ hasText: "Outcome captured" })).toBeVisible();
+    await expect(banners(page).filter({ hasText: "Outcome captured" })).toBeVisible();
 
     // The outcome really landed in the MCP server.
     const canvas = await request.get(`/api/canvas?mcp_url=${encodeURIComponent(MCP_URL)}`);
@@ -90,6 +94,6 @@ test.describe("the Studio on the MCP backend", () => {
     await openStudio(page);
 
     await page.getByRole("button", { name: "Map the job" }).click();
-    await expect(lens(page)).toHaveAttribute("aria-label", "Universal job map");
+    await expect(lens(page, "Universal job map")).toBeVisible();
   });
 });

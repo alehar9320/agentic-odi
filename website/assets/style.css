@@ -1165,6 +1165,45 @@ html[data-theme="light"] .theme-toggle__moon {
   font-size: 0.9375rem;
 }
 
+.run__downloads {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.run__download-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.badge-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+.badge-link img {
+  display: block;
+  height: 28px;
+  border-radius: 4px;
+  transition: opacity 0.15s var(--ease-tactile), transform 0.15s var(--ease-tactile);
+}
+
+.badge-link:hover img {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.badge-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
 .copy-btn--inline {
   position: static;
   flex: none;

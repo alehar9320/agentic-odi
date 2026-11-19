@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -15,13 +17,7 @@ from agentic_odi_core.events import (
     new_event_id,
 )
 from agentic_odi_core.integrity import IntegrityResult, ensure_intact
-
-_COLUMNS = {
-    "event_id": "TEXT",
-    "workspace_id": "TEXT NOT NULL DEFAULT 'local'",
-    "device_id": "TEXT NOT NULL DEFAULT 'local'",
-    "server_seq": "INTEGER",
-}
+from agentic_odi_core.migrations import MIGRATIONS, migrate
 
 
 class IntentStore:
@@ -71,7 +67,10 @@ class IntentStore:
                 )
                 """
             )
-            self._migrate_events_table()
+            # Numbered, recorded schema changes. A fresh file is already at the
+            # current shape, so the ladder is a no-op and user_version records
+            # which build wrote it; a legacy file upgrades in one transaction.
+            migrate(self.conn, MIGRATIONS, label="Your database")
             self.conn.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS events_event_id ON events(event_id)"
             )
@@ -90,24 +89,6 @@ class IntentStore:
                     updated_at TEXT NOT NULL
                 )
                 """
-            )
-
-    def _migrate_events_table(self) -> None:
-        existing = {row[1] for row in self.conn.execute("PRAGMA table_info(events)").fetchall()}
-        for column, definition in _COLUMNS.items():
-            if column not in existing:
-                self.conn.execute(f"ALTER TABLE events ADD COLUMN {column} {definition}")
-
-        missing_ids = [
-            row[0]
-            for row in self.conn.execute(
-                "SELECT id FROM events WHERE event_id IS NULL OR event_id = ''"
-            ).fetchall()
-        ]
-        for row_id in missing_ids:
-            self.conn.execute(
-                "UPDATE events SET event_id = ? WHERE id = ?",
-                (new_event_id(), row_id),
             )
 
     def append(
@@ -145,6 +126,25 @@ class IntentStore:
         if row[2] != workspace_id:
             raise ConflictError(f"event_id {resolved_id} already belongs to another workspace")
         return self._to_event(row)
+
+    @contextmanager
+    def write_transaction(self) -> Iterator[None]:
+        """Serialize a read-check-append sequence across connections.
+
+        ``BEGIN IMMEDIATE`` takes the database write lock before the first read,
+        so a caller that replays the snapshot, decides, and appends cannot be
+        overtaken by another connection between the read and the append.
+        ``append`` commits the transaction it runs inside, which is what
+        releases the lock.
+        """
+        self.conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+            self.conn.commit()
+        except BaseException:
+            if self.conn.in_transaction:
+                self.conn.rollback()
+            raise
 
     def get_stream(
         self,

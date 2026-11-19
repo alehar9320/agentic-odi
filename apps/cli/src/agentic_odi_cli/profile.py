@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
@@ -43,12 +44,28 @@ class Baseline:
             "core_problem": self.core_problem,
             "current_focus": self.current_focus,
             "confidence": self.confidence,
+            "inferred": self.inferred,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> Baseline:
-        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}  # type: ignore[attr-defined]
-        return cls(**kwargs)
+        fields = set(cls.__dataclass_fields__)  # type: ignore[attr-defined]
+        unknown = sorted(k for k in d if k not in fields)
+        if unknown:
+            raise ValueError(
+                f"Baseline.from_dict: unknown key(s) {unknown}; valid fields: {sorted(fields)}"
+            )
+        return cls(**{k: v for k, v in d.items() if k in fields})
+
+
+_CLEARABLE_PROFILE_FIELDS = (
+    "product_name",
+    "domain",
+    "primary_user",
+    "business_model",
+    "core_problem",
+    "current_focus",
+)
 
 
 def config_dir() -> Path:
@@ -81,7 +98,7 @@ def load_baseline() -> Baseline | None:
     if not baseline_exists():
         return None
     try:
-        with open(baseline_file()) as f:
+        with open(baseline_file(), encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise ValueError(f"Failed to parse baseline file: {e}") from e
@@ -102,7 +119,7 @@ def save_baseline(b: Baseline) -> Path:
     )
     target = baseline_file()
     tmp = target.with_name(target.name + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(b.to_dict()))
     os.replace(tmp, target)
     return target
@@ -180,7 +197,7 @@ def load_llm_profile() -> LLMProfile | None:
     if not llm_profile_exists():
         return None
     try:
-        with open(llm_profile_file()) as f:
+        with open(llm_profile_file(), encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise ValueError(f"Failed to parse LLM profile file: {e}") from e
@@ -222,7 +239,7 @@ def save_llm_profile(p: LLMProfile) -> Path:
     d["updated_at"] = now
     target = llm_profile_file()
     tmp = target.with_name(target.name + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(d))
     os.replace(tmp, target)
     return target
@@ -231,6 +248,14 @@ def save_llm_profile(p: LLMProfile) -> Path:
 # ---------------------------------------------------------------------------
 # Typer Commands for profile & setup
 # ---------------------------------------------------------------------------
+
+
+def _profile_display_value(value: str | None) -> str:
+    if value is None:
+        return "—"
+    if value == "":
+        return "(empty)"
+    return value
 
 
 @app.command("show")
@@ -248,14 +273,14 @@ def show_profile(
     if as_json:
         typer.echo(json.dumps(b.to_dict(), indent=2))
         return
-    typer.echo(f"Product Name: {b.product_name or ''}")
-    typer.echo(f"Product URL:  {b.product_url or ''}")
-    typer.echo(f"Domain:       {b.domain or ''}")
-    typer.echo(f"Primary User: {b.primary_user or ''}")
-    typer.echo(f"Business:     {b.business_model or ''}")
-    typer.echo(f"Core Problem: {b.core_problem or ''}")
-    typer.echo(f"Focus:        {b.current_focus or ''}")
-    typer.echo(f"Confidence:   {b.confidence or ''}")
+    typer.echo(f"Product Name: {_profile_display_value(b.product_name)}")
+    typer.echo(f"Product URL:  {_profile_display_value(b.product_url)}")
+    typer.echo(f"Domain:       {_profile_display_value(b.domain)}")
+    typer.echo(f"Primary User: {_profile_display_value(b.primary_user)}")
+    typer.echo(f"Business:     {_profile_display_value(b.business_model)}")
+    typer.echo(f"Core Problem: {_profile_display_value(b.core_problem)}")
+    typer.echo(f"Focus:        {_profile_display_value(b.current_focus)}")
+    typer.echo(f"Confidence:   {b.confidence if b.confidence is not None else '—'}")
 
 
 @app.command("path")
@@ -272,8 +297,28 @@ def set_profile(
     business_model: str | None = typer.Option(None, help="Business model"),
     core_problem: str | None = typer.Option(None, help="Core problem solved"),
     current_focus: str | None = typer.Option(None, help="Current focus"),
+    clear: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--clear",
+            help=(
+                "Field to unset (repeatable): product_name, domain, primary_user, "
+                "business_model, core_problem, current_focus"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Set profile values non-interactively."""
+    clear_fields = clear or []
+    valid_clear_fields = _CLEARABLE_PROFILE_FIELDS
+    for name in clear_fields:
+        if name not in valid_clear_fields:
+            typer.echo(
+                f"Unknown field to clear: {name}. Valid names: {', '.join(valid_clear_fields)}",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
     b = load_baseline() or Baseline(schema_version=1, source="cli")
     if product_name is not None:
         b.product_name = product_name
@@ -287,6 +332,9 @@ def set_profile(
         b.core_problem = core_problem
     if current_focus is not None:
         b.current_focus = current_focus
+    # Apply --clear after set-options so `--core-problem x --clear core_problem` ends unset.
+    for name in clear_fields:
+        setattr(b, name, None)
     p = save_baseline(b)
     typer.echo(f"Profile saved to {p}")
 
