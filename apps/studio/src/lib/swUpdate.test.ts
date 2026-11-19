@@ -60,10 +60,16 @@ class FakeRegistration implements RegistrationLike {
   }
 }
 
+/** One `controllerchange` listener and the options it was registered with. */
+interface ContainerListener {
+  listener: () => void;
+  options?: { once?: boolean };
+}
+
 class FakeContainer implements ContainerLike {
   controller: unknown = null;
   readonly addListenerCalls: Array<{ listener: () => void; options?: { once?: boolean } }> = [];
-  private readonly listeners = new Set<() => void>();
+  readonly listeners: ContainerListener[] = [];
 
   addEventListener(
     _type: "controllerchange",
@@ -71,7 +77,7 @@ class FakeContainer implements ContainerLike {
     options?: { once?: boolean },
   ): void {
     this.addListenerCalls.push({ listener, options });
-    this.listeners.add(listener);
+    this.listeners.push({ listener, options });
   }
 
   async register(): Promise<RegistrationLike> {
@@ -80,8 +86,23 @@ class FakeContainer implements ContainerLike {
 
   /** Fire the controllerchange event the browser raises once a new worker leads. */
   changed(): void {
-    for (const listener of this.listeners) {
-      listener();
+    for (const entry of [...this.listeners]) {
+      entry.listener();
+      if (entry.options?.once) {
+        this.listeners.splice(this.listeners.indexOf(entry), 1);
+      }
+    }
+  }
+
+  /**
+   * Invoke every registered listener, ignoring `once`.
+   *
+   * Models a duplicate dispatch that arrives before the browser deregisters the
+   * listener, which is what the `reloaded` flag guards.
+   */
+  dispatchAll(): void {
+    for (const entry of [...this.listeners]) {
+      entry.listener();
     }
   }
 }
@@ -245,6 +266,55 @@ describe("activateWaiting", () => {
     expect(started).toBe(false);
     expect(container.addListenerCalls).toHaveLength(0);
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("asks the container to fire the reload listener once", () => {
+    const registration = new FakeRegistration();
+    registration.waiting = new FakeWorker();
+    const container = new FakeContainer();
+
+    activateWaiting(registration, container, vi.fn());
+
+    expect(container.listeners).toHaveLength(1);
+    expect(container.listeners[0].options).toEqual({ once: true });
+  });
+
+  it("reloads once even if the container dispatches twice", () => {
+    const registration = new FakeRegistration();
+    registration.waiting = new FakeWorker();
+    const container = new FakeContainer();
+    const reload = vi.fn();
+
+    activateWaiting(registration, container, reload);
+    container.dispatchAll();
+    container.dispatchAll();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves no listener behind for a later update to fire", () => {
+    const registration = new FakeRegistration();
+    registration.waiting = new FakeWorker();
+    const container = new FakeContainer();
+    const reload = vi.fn();
+
+    activateWaiting(registration, container, reload);
+    container.changed();
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    // A second update that day raises controllerchange again; the stale
+    // listener from the first reload must not be there to answer it.
+    expect(container.listeners).toHaveLength(0);
+    container.changed();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attach a listener when nothing is waiting", () => {
+    const container = new FakeContainer();
+
+    activateWaiting(new FakeRegistration(), container, vi.fn());
+
+    expect(container.listeners).toHaveLength(0);
   });
 });
 
