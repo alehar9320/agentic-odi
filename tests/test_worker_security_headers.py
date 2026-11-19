@@ -46,9 +46,12 @@ def test_every_required_header_is_declared() -> None:
 def test_hsts_is_https_only_with_a_year_max_age_and_no_preload() -> None:
     source = _source()
     assert '"Strict-Transport-Security": "max-age=31536000; includeSubDomains"' in source
-    assert "preload" not in source.split('"Strict-Transport-Security"')[1].split('"Cross-Origin-Opener-Policy"')[0], (
-        "HSTS must not commit to preload"
-    )
+    assert (
+        "preload"
+        not in source.split('"Strict-Transport-Security"')[1].split('"Cross-Origin-Opener-Policy"')[
+            0
+        ]
+    ), "HSTS must not commit to preload"
 
 
 def test_coop_and_corp_are_same_origin() -> None:
