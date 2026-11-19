@@ -12,6 +12,7 @@ from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
+    CandidateSolution,
     CustomerOutcome,
     Evidence,
     Job,
@@ -180,6 +181,7 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    candidates: dict[str, CandidateSolution]
     v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
     links: dict[str, Link]
@@ -278,6 +280,10 @@ class Repository(Protocol):
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution: ...
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None: ...
+    def list_candidates(self) -> list[CandidateSolution]: ...
+    def update_candidate(self, candidate_id: str, updates: dict) -> CandidateSolution | None: ...
     def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
@@ -311,6 +317,8 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: Stage 6's candidates: proposed solutions linked to the outcomes they serve.
+        self.candidates: dict[str, CandidateSolution] = {}
         #: The store holds one vision; it is keyed by a fixed name rather than a
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
@@ -815,6 +823,28 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution:
+        self._append_event()
+        self.candidates[candidate.id] = candidate
+        return candidate
+
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None:
+        return self.candidates.get(candidate_id)
+
+    def list_candidates(self) -> list[CandidateSolution]:
+        return list(self.candidates.values())
+
+    def update_candidate(self, candidate_id: str, updates: dict) -> CandidateSolution | None:
+        candidate = self.candidates.get(candidate_id)
+        if candidate is None:
+            return None
+        self._append_event()
+        current = candidate.model_dump()
+        current.update(updates)
+        new_candidate = candidate.model_validate(current)
+        self.candidates[candidate_id] = new_candidate
+        return new_candidate
+
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         self.v2mom[V2MOM_ID] = v2mom
         return v2mom
@@ -836,6 +866,7 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.candidates.clear()
         self.v2mom.clear()
         self.links.clear()
 

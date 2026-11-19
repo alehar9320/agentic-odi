@@ -9,6 +9,8 @@ from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
+    CandidateSolution,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -817,3 +819,35 @@ def test_a_concurrent_duplicate_link_is_rejected(tmp_path, monkeypatch) -> None:
     for repo in repos:
         repo.close()
     reopened.close()
+
+
+def _candidate(id: str = "cand-1") -> CandidateSolution:
+    return CandidateSolution(
+        id=id,
+        title="Guided setup checklist",
+        hypothesis="A checklist will reduce the time to first value.",
+        outcome_ids=["o-1", "o-2"],
+        strategy_path=StrategyKind.DIFFERENTIATED,
+        evidence_ids=["e-1"],
+    )
+
+
+def test_candidates_survive_a_reload_from_the_event_log(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="job-1", name="Rotate a leaked secret"))
+    repo.add_candidate(_candidate())
+
+    assert repo.update_candidate("cand-1", {"status": "accepted"}) is not None
+
+    reopened = SQLiteRepository(db_path=db)
+    restored = reopened.get_candidate("cand-1")
+    assert restored is not None
+    assert restored.title == "Guided setup checklist"
+    assert restored.hypothesis == "A checklist will reduce the time to first value."
+    assert restored.outcome_ids == ["o-1", "o-2"]
+    assert restored.status is CandidateStatus.ACCEPTED
+    assert restored.strategy_path is StrategyKind.DIFFERENTIATED
+    assert restored.evidence_ids == ["e-1"]
+    assert [candidate.id for candidate in reopened.list_candidates()] == ["cand-1"]
+    assert reopened.get_candidate("missing") is None
