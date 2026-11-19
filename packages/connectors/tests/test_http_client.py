@@ -87,6 +87,13 @@ def test_a_zero_timeout_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
         get_http_client()
 
 
+def test_a_nan_timeout_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "nan")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_TIMEOUT"):
+        get_http_client()
+
+
 def test_a_negative_pool_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "-1")
 

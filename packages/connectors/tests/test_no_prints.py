@@ -33,8 +33,19 @@ def test_malformed_config_emits_a_warning_and_nothing_else(
 ) -> None:
     monkeypatch.setenv("AGENTIC_ODI_CONNECTORS_CONFIG", str(_bad_config_path()))
     caplog.set_level(logging.WARNING, logger="agentic_odi_connectors")
-    with pytest.raises(SystemExit):
-        _load_and_validate_presets()
+    # A prior test (the CLI suite calls ``configure_logging``) can leave a root
+    # handler bound to a stream pytest has since closed. When this warning
+    # propagates to that stale handler the stdlib prints a "Logging error"
+    # traceback to the *current* stderr, so isolate the root logger to the
+    # capture handler for the call under test.
+    root = logging.getLogger()
+    stale_handlers = root.handlers[:]
+    root.handlers = [caplog.handler]
+    try:
+        with pytest.raises(SystemExit):
+            _load_and_validate_presets()
+    finally:
+        root.handlers = stale_handlers
     assert any("invalid connector preset" in r.message for r in caplog.records)
     captured = capsys.readouterr()
     assert captured.out == ""
