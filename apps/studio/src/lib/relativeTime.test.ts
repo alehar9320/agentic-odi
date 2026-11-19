@@ -34,6 +34,30 @@ describe("formatRelativeTime", () => {
   it("says Recently instead of crashing on an unparseable value", () => {
     expect(formatRelativeTime("not a date")).toBe("Recently");
   });
+
+  it("says what a future moment is, not that it just happened", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+
+    expect(formatRelativeTime("2026-10-22T12:30:00Z")).toBe("in 30m");
+    expect(formatRelativeTime("2026-10-25T12:00:00Z")).toBe("in 3d");
+  });
+
+  it("rises past days into weeks, months and years", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+
+    expect(formatRelativeTime("2026-09-12T12:00:00Z")).toBe("1mo ago");
+    expect(formatRelativeTime("2024-07-01T12:00:00Z")).toBe("2y ago");
+  });
+
+  it("still rounds a sub-minute either way to Just now", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+
+    expect(formatRelativeTime("2026-10-22T11:59:30Z")).toBe("Just now");
+    expect(formatRelativeTime("2026-10-22T12:00:30Z")).toBe("Just now");
+  });
 });
 
 describe("history day buckets (#694 D13)", () => {

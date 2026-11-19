@@ -14,6 +14,7 @@ def test_schema_exposes_every_odi_entity() -> None:
         "CustomerOutcome",
         "Evidence",
         "V2MOM",
+        "Link",
     } <= set(schema)
 
 
@@ -23,3 +24,11 @@ def test_schema_is_json_schema_shaped() -> None:
     assert job_schema["type"] == "object"
     assert "name" in job_schema["properties"]
     assert "id" in job_schema["properties"]
+
+
+def test_schema_includes_the_candidate_solution_entity() -> None:
+    candidate_schema = odi_schema()["CandidateSolution"]
+
+    assert "title" in candidate_schema["properties"]
+    assert "outcome_ids" in candidate_schema["properties"]
+    assert "proposed" in candidate_schema["$defs"]["CandidateStatus"]["enum"]

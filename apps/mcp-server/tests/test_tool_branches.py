@@ -245,7 +245,7 @@ def _capture_uvicorn(monkeypatch) -> list[dict]:
         lambda app, **kwargs: calls.append({"app": app, **kwargs}),
     )
     monkeypatch.setattr(server, "_configured_token", lambda: "test-token")
-    # The merged entry point builds its own store (ADR 0006); the test serves the
+    # The merged entry point builds its own store (ADR 0011); the test serves the
     # module's server so no repository is opened on disk.
     monkeypatch.setattr(server, "create_server", lambda: server.mcp)
     return calls
@@ -286,7 +286,7 @@ async def test_open_study_reports_a_missing_job_as_an_envelope(
 
 
 def test_main_builds_the_store_before_serving(mcp, monkeypatch) -> None:
-    """The entry point is where the store is built (ADR 0006), before validation."""
+    """The entry point is where the store is built (ADR 0011), before validation."""
     calls: list[object] = []
 
     def _create_server() -> object:

@@ -4,9 +4,11 @@ import argparse
 import asyncio
 import hmac
 import json
+import logging
 import os
 import signal
 import sys
+import time
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -40,6 +42,7 @@ from agentic_odi_core import (
     capability_manifest,
     capability_summary,
     compute_opportunity_score,
+    configure_logging,
     error_envelope,
     evaluate_outcome_statement,
     invalid_strategy_request,
@@ -53,10 +56,13 @@ from agentic_odi_core import (
 from agentic_odi_core.errors import ValidationError as OdiValidationError
 from fastapi.responses import JSONResponse
 from fastmcp import Context, FastMCP
+from fastmcp.server.middleware import Middleware
 from pydantic import ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
+
+log = logging.getLogger(__name__)
 
 
 def _token_path() -> Path:
@@ -173,7 +179,9 @@ def create_server(repository: Repository | None = None) -> FastMCP:
     global _active_store
     repo = build_repository() if repository is None else repository
     _active_store = _Store(repository=repo, service=ODIService(repo))
-    return FastMCP(SERVER_NAME, providers=[mcp.local_provider], lifespan=_lifespan)
+    server = FastMCP(SERVER_NAME, providers=[mcp.local_provider], lifespan=_lifespan)
+    server.add_middleware(_ToolTimingMiddleware())
+    return server
 
 
 def shutdown_store() -> None:
@@ -188,6 +196,66 @@ async def _lifespan(_server: FastMCP) -> AsyncIterator[None]:
         yield
     finally:
         shutdown_store()
+
+
+class _ToolTimingMiddleware(Middleware):
+    """Emit one log line per tool call, so a slow tool is not a hung one.
+
+    A tool call previously left no trace: an operator could not tell a slow
+    call from a server that had stopped answering. This records the tool name,
+    how long it took, and whether it returned an error — the error case keys on
+    the same envelope code the client already branches on, so the log and the
+    wire agree on one vocabulary.
+    """
+
+    async def on_call_tool(self, context: Any, call_next: Any) -> Any:
+        name = getattr(context.message, "name", "unknown")
+        started = time.perf_counter()
+        try:
+            result = await call_next(context)
+        except Exception as exc:
+            log.warning(
+                "mcp.tool name=%s duration_ms=%d outcome=error code=%s",
+                name,
+                int((time.perf_counter() - started) * 1000),
+                error_envelope(exc)["code"],
+            )
+            raise
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        code = _envelope_code(result)
+        if code is not None:
+            log.warning(
+                "mcp.tool name=%s duration_ms=%d outcome=error code=%s",
+                name,
+                duration_ms,
+                code,
+            )
+        else:
+            log.info("mcp.tool name=%s duration_ms=%d outcome=ok", name, duration_ms)
+        return result
+
+
+def _envelope_code(result: Any) -> str | None:
+    """The error code a tool returned, or ``None`` when the tool succeeded.
+
+    Tools answer a failure by returning the ``_fail`` envelope as their content
+    rather than raising, so the timing line reads the same envelope a client
+    branches on instead of inventing a second vocabulary.
+    """
+    content = getattr(result, "content", None) or []
+    for item in content:
+        text = getattr(item, "text", None)
+        if not isinstance(text, str):
+            continue
+        try:
+            payload = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
+            code = payload["error"].get("code")
+            if isinstance(code, str):
+                return code
+    return None
 
 
 def _fail(exc: BaseException, sentence: str | None = None) -> str:
@@ -293,6 +361,7 @@ def add_outcome(
     satisfaction: float | None = None,
     step_id: str | None = None,
     claim_check: dict[str, Any] | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     """Add a desired Outcome to a Job.
 
@@ -311,6 +380,11 @@ def add_outcome(
 
     Each skip needs a reason. To record an outcome before you have asked, omit
     both scores: an unscored outcome is legal, a bare number is not.
+
+    ``objectives`` names the V2MOM methods and measures this outcome advances,
+    each as ``{"field": "method" | "measure", "text": "<objective text>"}``. The
+    text must match an entry the vision holds now; an unknown one is refused with
+    the entries that do exist. Omit it (or pass ``[]``) for an unlinked outcome.
     """
     if _service().get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -338,6 +412,7 @@ def add_outcome(
             satisfaction=satisfaction,
             step_id=step_id,
             claim_check=claim_check,
+            objectives=objectives,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
@@ -346,6 +421,8 @@ def add_outcome(
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
     except ClaimCheckError as exc:
+        return _fail(exc)
+    except OdiValidationError as exc:
         return _fail(exc)
     except OutcomeStatementError as exc:
         return _fail(exc)
@@ -585,6 +662,7 @@ def update_outcome(
     importance: float | None = None,
     satisfaction: float | None = None,
     step_id: str | None = None,
+    objectives: list[dict[str, str]] | None = None,
 ) -> str:
     updates: dict = {}
     if statement is not None:
@@ -595,11 +673,15 @@ def update_outcome(
         updates["satisfaction"] = satisfaction
     if step_id is not None:
         updates["step_id"] = step_id
+    if objectives is not None:
+        updates["objectives"] = objectives
     try:
         updated = _service().update_outcome(outcome_id, updates)
     except OutcomeNotFoundError:
         return _outcome_not_found(outcome_id)
     except OutcomeStatementError as exc:
+        return _fail(exc)
+    except OdiValidationError as exc:
         return _fail(exc)
     except ValueOutOfRangeError as exc:
         return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
@@ -628,6 +710,8 @@ async def add_evidence(
     job_id: str | None = None,
     step_id: str | None = None,
     outcome_id: str | None = None,
+    impact: str = "medium",
+    confidence: str = "claimed",
 ) -> str:
     await ctx.report_progress(0, 2, "Validating the evidence links")
     try:
@@ -642,6 +726,8 @@ async def add_evidence(
             job_id=job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
     except JobNotFoundError:
         return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
@@ -1025,6 +1111,50 @@ def unlink_outcome(outcome_id: str, field: str, key: str) -> str:
 
 
 @mcp.tool
+def links_add(
+    source_type: str,
+    source_id: str,
+    target_type: str,
+    target_id: str,
+    relationship_type: str,
+    external_system: str | None = None,
+    external_id: str | None = None,
+    preview: dict | None = None,
+) -> str:
+    """Create a typed link between two entities. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_add is not yet implemented"),
+        "Error: links_add is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_list(
+    source_type: str | None = None,
+    source_id: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    relationship_type: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> str:
+    """List links, optionally filtered by source, target, or relationship type. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_list is not yet implemented"),
+        "Error: links_list is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
+def links_remove(link_id: str) -> str:
+    """Remove a link by ID. Not yet implemented."""
+    return _fail(
+        NotImplementedError("links_remove is not yet implemented"),
+        "Error: links_remove is not yet implemented. The Link model and repository are in progress.",
+    )
+
+
+@mcp.tool
 def get_outcome_alignments(outcome_id: str | None = None) -> str:
     """List the V2MOM links recorded on Outcomes, optionally for one outcome."""
     return json.dumps(_service().list_alignments(outcome_id))
@@ -1129,7 +1259,8 @@ def main(argv: list[str] | None = None) -> None:
         help=f"Port to listen on (default: $AGENTIC_ODI_MCP_PORT or {DEFAULT_PORT}).",
     )
     args = parser.parse_args(argv)
-    # The store is built here, not at import (ADR 0006), so `main()` serves exactly
+    configure_logging()
+    # The store is built here, not at import (ADR 0011), so `main()` serves exactly
     # the server `create_server()` built.
     server = create_server()
     validate_at_startup(server)

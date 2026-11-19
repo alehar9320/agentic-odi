@@ -30,6 +30,7 @@ import {
   deleteConnector as apiDeleteConnector,
   deleteJob as apiDeleteJob,
   deleteObservation as apiDeleteObservation,
+  deleteConversation as apiDeleteConversation,
   deleteEvidence as apiDeleteEvidence,
   deleteOutcome as apiDeleteOutcome,
   deleteStep as apiDeleteStep,
@@ -54,6 +55,7 @@ import {
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
+  renameConversation as apiRenameConversation,
   setConversationHead as apiSetConversationHead,
   streamChat,
   updateJob as apiUpdateJob,
@@ -83,7 +85,7 @@ import {
   type ProbeBreaker,
   type ProbeOutcome,
 } from "./probeBreaker";
-import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { clearSession, loadSession, saveSession, SESSION_SCHEMA_VERSION, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -105,6 +107,7 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Outcome,
   Segment,
   Signal,
   SignalSubjectKind,
@@ -126,6 +129,13 @@ import {
   useNoticesActions,
   type ToastKind,
 } from "./notices/NoticesContext";
+import {
+  CanvasActionsContext,
+  CanvasProvider,
+  CanvasStateContext,
+  type CanvasActionsValue,
+  type CanvasStateValue,
+} from "./canvas/CanvasContext";
 
 /**
  * The visible path of a persisted conversation: from the head back to the root.
@@ -390,6 +400,13 @@ export interface StudioContextValue {
   regenerateFrom: (messageId: string | null) => Promise<void>;
   /** Replace the user turn before `messageId`, as a sibling branch. */
   editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
+  /**
+   * Forget a failed send (#405). `messageId` is the failed reply; the question
+   * it answered and any notices that hung off it go with it, so the row leaves
+   * the transcript instead of sitting there unretryable forever. The text is
+   * the caller's to restore to the composer.
+   */
+  dismissFailedTurn: (messageId: string | null) => void;
   /** Take the branch the runtime switched to as the visible conversation. */
   switchBranch: (messages: ChatMessage[]) => void;
   /** Answer a paused write. The turn resumes on its own stream. */
@@ -415,6 +432,16 @@ export interface StudioContextValue {
   refreshConversations: () => Promise<void>;
   /** Open a past thread by loading its turns; never a conversation without them. */
   openConversation: (conversationId: string) => Promise<void>;
+  /**
+   * Remove one thread and its turns. Deleting the open thread returns the stage
+   * to the empty state; a failure leaves the history untouched.
+   */
+  deleteConversation: (conversationId: string) => Promise<boolean>;
+  /**
+   * Give one thread a new name. The row is renamed in place, and the list is
+   * re-read so ordering follows the touch; a failure leaves the old name.
+   */
+  renameConversation: (conversationId: string, title: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -438,10 +465,13 @@ export interface StudioContextValue {
   deleteJob: (jobId: string) => Promise<void>;
   updateStep: (stepId: string, payload: { name?: string; order?: number }) => Promise<void>;
   deleteStep: (stepId: string) => Promise<void>;
+  /** Resolves with the outcome the server returned, or `null` when the write
+   * failed — the failure is already surfaced as a toast, and the caller may keep
+   * the editor open on the values it holds. */
   updateOutcome: (
     outcomeId: string,
     payload: { statement?: string; importance?: number; satisfaction?: number },
-  ) => Promise<void>;
+  ) => Promise<Outcome | null>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
@@ -554,7 +584,39 @@ export interface StudioContextValue {
   focusEvidence: (evidenceId: string) => void;
 }
 
-const StudioContext = createContext<StudioContextValue | null>(null);
+/**
+ * The canvas fields a component reads through its own context (#505). They are
+ * named here once so the composite type can exclude them: a canvas refresh must
+ * not rebuild the object every other surface subscribes to.
+ */
+export type CanvasContextFields =
+  | "canvas"
+  | "canvasLoading"
+  | "canvasCached"
+  | "canvasState"
+  | "canvasError"
+  | "refreshCanvas"
+  | "addStep"
+  | "addOutcome"
+  | "createJob"
+  | "updateJob"
+  | "deleteJob"
+  | "updateStep"
+  | "deleteStep"
+  | "updateOutcome"
+  | "deleteOutcome"
+  | "deleteEvidence"
+  | "promoteEvidence";
+
+/**
+ * Everything the composite value still carries. The canvas fields are excluded
+ * because they now live in `CanvasContext`; `useStudio()` merges them back in so
+ * no caller changes, while a narrow reader can subscribe to the canvas alone.
+ */
+export type StudioCompositeValue = Omit<StudioContextValue, CanvasContextFields>;
+
+
+const StudioContext = createContext<StudioCompositeValue | null>(null);
 
 /**
  * Whether an edit moved what the studio talks to. The theme is stored beside the
@@ -588,6 +650,7 @@ function loadFocusedSubject(): FocusSubject | null {
 
 function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
   return {
+    schema_version: SESSION_SCHEMA_VERSION,
     job_id: kind === "job" ? id : null,
     step_id: kind === "step" ? id : null,
     outcome_id: kind === "outcome" ? id : null,
@@ -1403,30 +1466,53 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     setDismissedSidecarNotice(true);
   }, [setDismissedSidecarNotice]);
 
+  /**
+   * The in-flight canvas read, shared by every concurrent caller (#505).
+   * A turn, a mutation, and a manual refresh can all ask for the board at the
+   * same moment; the point of the single-flight promise is that they join one
+   * request instead of racing three.
+   */
+  const canvasRefreshRef = useRef<Promise<void> | null>(null);
+
   const refreshCanvas = useCallback(async () => {
-    // The inbox is re-read alongside the board: every path that reaches this
-    // function either just changed the store or is checking what changed, and
-    // a canvas that fails to load must not leave the bell showing stale counts.
-    void refreshSignals();
-    // Segments and the strategy are the other things a turn can create, and the
-    // rail counts them, so they are re-read on the same beat.
-    void refreshSegments();
-    setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
-    try {
-      const data = await fetchCanvas(settings.mcp_url);
-      const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
-      setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
-      setCanvasCached(false);
+    // Join a read already on the wire rather than starting a second one. The
+    // promise clears in a `finally` so a failed read does not wedge the guard.
+    if (canvasRefreshRef.current) {
+      return canvasRefreshRef.current;
+    }
+    const run = (async () => {
+      // The inbox is re-read alongside the board: every path that reaches this
+      // function either just changed the store or is checking what changed, and
+      // a canvas that fails to load must not leave the bell showing stale counts.
+      void refreshSignals();
+      // Segments and the strategy are the other things a turn can create, and the
+      // rail counts them, so they are re-read on the same beat.
+      void refreshSegments();
+      setCanvasState((prev) => ({ kind: "loading", data: prev.data }));
       try {
-        localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
-      } catch {
-        /* storage unavailable */
+        const data = await fetchCanvas(settings.mcp_url);
+        const isEmpty = !data.jobs.length && !data.steps.length && !data.outcomes.length;
+        setCanvasState({ kind: isEmpty ? "empty" : "ready", data });
+        setCanvasCached(false);
+        try {
+          localStorage.setItem(CANVAS_KEY, JSON.stringify(data));
+        } catch {
+          /* storage unavailable */
+        }
+      } catch (error) {
+        // A failed canvas is a failure, not an empty canvas: the studio shows
+        // what went wrong instead of a zeroed-out board.
+        const problem = asStudioError(error);
+        setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
       }
-    } catch (error) {
-      // A failed canvas is a failure, not an empty canvas: the studio shows
-      // what went wrong instead of a zeroed-out board.
-      const problem = asStudioError(error);
-      setCanvasState((prev) => ({ kind: "error", error: problem, data: prev.data }));
+    })();
+    canvasRefreshRef.current = run;
+    try {
+      await run;
+    } finally {
+      if (canvasRefreshRef.current === run) {
+        canvasRefreshRef.current = null;
+      }
     }
   }, [settings.mcp_url, refreshSignals, refreshSegments]);
 
@@ -1522,7 +1608,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     async (
       outcomeId: string,
       payload: { statement?: string; importance?: number; satisfaction?: number },
-    ) => {
+    ): Promise<Outcome | null> => {
       try {
         const outcome = await apiUpdateOutcome(outcomeId, {
           ...payload,
@@ -1530,8 +1616,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         });
         pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
+        return outcome;
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+        return null;
       }
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -1608,6 +1696,31 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     }
     saveSession(sessionForSubject(kind, id));
   }, []);
+
+  /**
+   * The one entry to the right region (#735), with a card's detail target
+   * resolved through the lens map (#739): a subject the lenses know decides the
+   * panel, the panel the action named is the fallback, and the record is marked
+   * focused so the lens opens on it rather than on a generic view.
+   */
+  const openDetail = useCallback(
+    (panel: WorkspacePanelId, subject?: { kind: string; id: string }) => {
+      if (!subject) {
+        regions.openDetail(panel);
+        return;
+      }
+      const wired = Object.prototype.hasOwnProperty.call(PANEL_FOR_SUBJECT, subject.kind);
+      if (wired) {
+        focusSubject(subject.kind as SignalSubjectKind, subject.id);
+        if (subject.kind === "evidence") {
+          setFocusedEvidenceId(subject.id);
+        }
+      }
+      const lens = wired ? PANEL_FOR_SUBJECT[subject.kind as SignalSubjectKind] : undefined;
+      regions.openDetail(lens ?? panel, subject);
+    },
+    [focusSubject, regions.openDetail],
+  );
 
   /**
    * Stop speaking for the screen. The session slot goes with the selection, so a
@@ -1910,19 +2023,71 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         ];
       };
 
+      // A streamed reply arrives one delta at a time, and a render per delta is
+      // a render per token. Prose is therefore published once per frame: the
+      // accumulated `content` and `parts` are read when the frame fires, not
+      // when the delta lands. Everything else — a citation, a tool row, the
+      // terminal frame — publishes immediately, and cancels the pending frame
+      // first so nothing is rendered out of order.
+      let frame: number | null = null;
+      let frameKind: "raf" | "timeout" | null = null;
+
+      const flush = () => {
+        frame = null;
+        frameKind = null;
+        setMessages((prev) => {
+          const index = prev.findIndex((message) => message.id === assistantId);
+          if (index === -1) {
+            return prev;
+          }
+          // Only the streaming message is replaced; every settled message keeps
+          // its identity, so a memoised reader of the settled transcript is not
+          // asked to render again.
+          const next = prev.slice();
+          next[index] = {
+            ...prev[index],
+            content,
+            parts: [...parts],
+            ...(failure ? { error: failure, retryText: trimmed } : {}),
+          };
+          return next;
+        });
+      };
+
+      const cancelFrame = () => {
+        if (frame === null) {
+          return;
+        }
+        if (frameKind === "raf") {
+          cancelAnimationFrame(frame);
+        } else {
+          clearTimeout(frame);
+        }
+        frame = null;
+        frameKind = null;
+      };
+
+      /** Batch a streamed delta into the next frame; at most one per frame. */
+      const publishStream = () => {
+        if (frame !== null) {
+          return;
+        }
+        if (typeof requestAnimationFrame === "function") {
+          frameKind = "raf";
+          frame = requestAnimationFrame(flush);
+        } else {
+          // A frame is a wall-clock idea; without rAF the same batching still
+          // holds, on the shortest timer that stands in for one.
+          frameKind = "timeout";
+          frame = setTimeout(flush, 16) as unknown as number;
+        }
+      };
+
       const publish = () => {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId
-              ? {
-                  ...message,
-                  content,
-                  parts: [...parts],
-                  ...(failure ? { error: failure, retryText: trimmed } : {}),
-                }
-              : message,
-          ),
-        );
+        // An immediate publish supersedes any pending frame: the same content
+        // is rendered now, once, rather than twice.
+        cancelFrame();
+        flush();
       };
 
       const handleEvent = (event: RawSseEvent) => {
@@ -1938,12 +2103,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           }
           case "reasoning": {
             appendReasoning(String(event.data.text ?? ""));
-            publish();
+            publishStream();
             break;
           }
           case "delta": {
             appendText(String(event.data.text ?? ""));
-            publish();
+            publishStream();
             break;
           }
           case "source": {
@@ -2128,6 +2293,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
           // An abort is the user's own doing: drop the empty placeholder, keep
           // the question, and report no failure — the assistant did not break.
           stopped = true;
+          // The deltas that arrived before the abort are still in the closure,
+          // not yet in a frame. Publishing flushes them synchronously — and
+          // cancels the pending frame — so the partial answer is what stays on
+          // screen, and the empty placeholder is the only thing dropped.
+          publish();
           setMessages((prev) =>
             prev.filter((message) => message.id !== assistantId || message.content !== ""),
           );
@@ -2278,6 +2448,47 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [messages, runTurn, streaming],
   );
 
+  /**
+   * Drop a failed send from the transcript (#405).
+   *
+   * A failed reply is a row the person can retry; it is also a row they should
+   * be able to put down. Today the only way out is to send something new, so the
+   * dead row and its question stay on screen forever. This removes the failed
+   * reply and the user turn it answered together — the pair is one send — plus
+   * any notice that hung off the reply, so the thread reads as though the send
+   * never left. It never touches a turn that did not fail, and it never touches
+   * the composer: the caller decides whether to offer the text back.
+   */
+  const dismissFailedTurn = useCallback(
+    (messageId: string | null) => {
+      if (!messageId) {
+        return;
+      }
+      setMessages((prev) => {
+        const failed = prev.find((message) => message.id === messageId);
+        if (!failed || failed.role !== "assistant" || !failed.error) {
+          return prev;
+        }
+        const doomed = new Set<string>([messageId]);
+        // The question this reply answered is part of the same send.
+        if (failed.parentId) {
+          const question = prev.find((message) => message.id === failed.parentId);
+          if (question?.role === "user") {
+            doomed.add(question.id);
+          }
+        }
+        // Notices the reply produced are commentary on it, not history.
+        for (const message of prev) {
+          if (message.role === "notice" && message.parentId && doomed.has(message.parentId)) {
+            doomed.add(message.id);
+          }
+        }
+        return prev.filter((message) => !doomed.has(message.id));
+      });
+    },
+    [],
+  );
+
   const switchBranch = useCallback(
     (next: ChatMessage[]) => {
       setMessages(next);
@@ -2415,6 +2626,63 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       void refreshConversations();
     },
     [refreshConversations],
+  );
+
+  /**
+   * Remove one thread and its turns, then re-read the history.
+   *
+   * Deleting the thread that is open leaves nothing on the stage, so the stage
+   * is cleared to the empty state rather than left pointing at a row that is
+   * gone. A failed delete changes nothing the person can see.
+   */
+  const deleteConversation = useCallback(
+    async (targetId: string) => {
+      try {
+        await apiDeleteConversation(targetId);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't delete that conversation.");
+        return false;
+      }
+      if (targetId === conversationId) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        turnQueueRef.current?.clear();
+        setStreaming(false);
+        setThinkingPhase(null);
+        setOfflineReplyFor(null);
+        setToolActivity([]);
+        setMessages([]);
+        setConversationId(null);
+      }
+      await refreshConversations();
+      return true;
+    },
+    [conversationId, pushToast, refreshConversations],
+  );
+
+  /**
+   * Give one thread a new name, and re-read the history.
+   *
+   * The list is re-read rather than patched in place so the renamed thread
+   * moves to the top — its `updated_at` was just touched — exactly as a reload
+   * would show it. A failed rename changes nothing the person can see.
+   */
+  const renameConversation = useCallback(
+    async (targetId: string, title: string) => {
+      try {
+        await apiRenameConversation(targetId, title);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't rename that conversation.");
+        return false;
+      }
+      await refreshConversations();
+      return true;
+    },
+    [pushToast, refreshConversations],
   );
 
   const clearChat = useCallback(() => {
@@ -2631,6 +2899,48 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const canvasLoading = canvasState.kind === "loading";
   const canvasError = canvasState.kind === "error" ? canvasState.error : null;
 
+  /**
+   * The canvas's two values (#505), split so a reader and a writer never share
+   * a dependency. The state value changes when the board changes; the actions
+   * value keeps its identity across those changes because every mutator below
+   * is a `useCallback` whose own dependencies are settings, toasts, and the
+   * refresh itself — none of which move when a refresh lands.
+   */
+  const canvasStateValue = useMemo<CanvasStateValue>(
+    () => ({ canvas, canvasLoading, canvasCached, canvasState, canvasError }),
+    [canvas, canvasLoading, canvasCached, canvasState, canvasError],
+  );
+  const canvasActionsValue = useMemo<CanvasActionsValue>(
+    () => ({
+      refreshCanvas,
+      addStep,
+      addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
+    }),
+    [
+      refreshCanvas,
+      addStep,
+      addOutcome,
+      createJob,
+      updateJob,
+      deleteJob,
+      updateStep,
+      deleteStep,
+      updateOutcome,
+      deleteOutcome,
+      deleteEvidence,
+      promoteEvidence,
+    ],
+  );
+
   // Re-probe after the person restored a backup: a clean answer clears the boot
   // page and re-hydrates the studio in place.
   const recheckBoot = useCallback(async () => {
@@ -2672,7 +2982,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [capabilities, capabilitiesCheckedAt],
   );
 
-  const value = useMemo<StudioContextValue>(
+  const value = useMemo<StudioCompositeValue>(
     () => ({
       settings,
       saveSettings,
@@ -2683,12 +2993,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setupOpen,
       openSetup,
       closeSetup,
-      canvas,
-      canvasLoading,
-      canvasCached,
-      canvasState,
-      canvasError,
-      refreshCanvas,
       llmHealth,
       probeRetry,
       models,
@@ -2711,6 +3015,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -2721,6 +3026,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2730,17 +3037,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      addStep,
-      addOutcome,
-      promoteEvidence,
-      createJob,
-      updateJob,
-      deleteJob,
-      updateStep,
-      deleteStep,
-      updateOutcome,
-      deleteOutcome,
-      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -2799,7 +3095,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusedEvidenceId,
       focusEvidence,
       detail: regions.detail,
-      openDetail: regions.openDetail,
+      openDetail,
       closeDetail: regions.closeDetail,
       drawerOpen: regions.drawerOpen,
       toggleDrawer: regions.toggleDrawer,
@@ -2815,12 +3111,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       setupOpen,
       openSetup,
       closeSetup,
-      canvas,
-      canvasLoading,
-      canvasCached,
-      canvasState,
-      canvasError,
-      refreshCanvas,
       llmHealth,
       probeRetry,
       models,
@@ -2843,6 +3133,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -2853,6 +3144,8 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       conversations,
       refreshConversations,
       openConversation,
+      deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -2862,17 +3155,6 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       clearMemory,
       pushNotice,
       offlineReplyFor,
-      addStep,
-      addOutcome,
-      promoteEvidence,
-      createJob,
-      updateJob,
-      deleteJob,
-      updateStep,
-      deleteStep,
-      updateOutcome,
-      deleteOutcome,
-      deleteEvidence,
       activePanel,
       openPanel,
       closePanel,
@@ -2931,7 +3213,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       focusedEvidenceId,
       focusEvidence,
       regions.detail,
-      regions.openDetail,
+      openDetail,
       regions.closeDetail,
       regions.drawerOpen,
       regions.toggleDrawer,
@@ -2939,7 +3221,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
+  return (
+    <CanvasProvider state={canvasStateValue} actions={canvasActionsValue}>
+      <StudioContext.Provider value={value}>{children}</StudioContext.Provider>
+    </CanvasProvider>
+  );
 }
 
 export function StudioProvider({ children }: { children: ReactNode }) {
@@ -2952,10 +3238,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The composite view every existing caller uses. It merges the canvas's own
+ * context back into the rest, so this issue changes no component: the canvas
+ * fields are read from `CanvasContext` rather than carried in the composite
+ * `useMemo`, which is what keeps a refresh from rebuilding that object (#505).
+ */
 export function useStudio(): StudioContextValue {
   const context = useContext(StudioContext);
-  if (!context) {
+  const canvas = useContext(CanvasStateContext);
+  const canvasActions = useContext(CanvasActionsContext);
+  if (!context || !canvas || !canvasActions) {
     throw new Error("useStudio must be used within a StudioProvider");
   }
-  return context;
+  return useMemo(
+    () => ({ ...context, ...canvas, ...canvasActions }),
+    [context, canvas, canvasActions],
+  );
 }

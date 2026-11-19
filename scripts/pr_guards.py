@@ -532,7 +532,7 @@ def parse_added_lines(diff: str) -> list[tuple[str, int, str]]:
     return added
 
 
-_TEST_DEF_RE = re.compile(r"^\s*(?:def\s+test_|it\(|test\()")
+_TEST_DEF_RE = re.compile(r"^\s*(?:async\s+)?(?:def\s+test_|it\(|test\()")
 
 
 def count_tests_added(added_lines: Sequence[tuple[str, int, str]]) -> int:

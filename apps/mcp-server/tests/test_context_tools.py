@@ -131,6 +131,7 @@ async def test_evidence_lifecycle_over_mcp(
                 "name": "feedback",
                 "content": "Onboarding took two hours",
                 "job_id": job_id,
+                "confidence": "verified",
             },
         )
         evidence_id = _payload(created.content[0].text)["id"]  # type: ignore[index]

@@ -3,9 +3,22 @@ import { expect, type APIRequestContext, type Page } from "@playwright/test";
 /**
  * Shared helpers for the Living Studio end-to-end suite.
  *
- * Every locator in this suite binds to what a user perceives — a role, a
- * label, or visible text. The Studio exposes enough accessible names for
- * that, so no `data-testid` attributes are needed in the application.
+ * Every locator in this suite binds to what a user perceives — a role, a label,
+ * or visible text. The Studio exposes enough accessible names for that, so no
+ * `data-testid` attributes are needed in the application.
+ *
+ * Two consequences are load-bearing, and both were learned the hard way (#1118):
+ *
+ *   - A locator that also requires a CSS class (`.lens`, `.message--assistant`)
+ *     reports "not visible" when a class moves, which names the symptom and not
+ *     the promise the test was making.
+ *   - A locator that asserts an attribute the shell happens to set
+ *     (`aria-label` on the docked lens, which uses `aria-labelledby` instead)
+ *     passes on one viewport and fails on the other.
+ *
+ * So: role, label, visible text, or an ARIA role selector where composition
+ * needs one. The only structural handles left are the pre-JavaScript shell —
+ * which has no roles by definition, because it paints before any script runs.
  */
 
 /** The composer the user types into. */
@@ -13,6 +26,21 @@ export const COMPOSER = "Message the studio";
 
 /** The transcript of the conversation. */
 export const CONVERSATION = "Conversation";
+
+/**
+ * How long the shell may take to become interactive before the boot is called
+ * broken. It is generous on purpose: this is the budget for a cold CI runner
+ * serving a production build, not for an assertion about app speed.
+ */
+const READY_TIMEOUT_MS = 15_000;
+
+/**
+ * How long to wait for the connector suggestion before deciding a fresh studio
+ * is not offering one. The offer renders with the studio's first paint rather
+ * than on a timer, so this is a settle window for a slow boot, not a sleep that
+ * every test pays.
+ */
+const SUGGESTION_SETTLE_MS = 2_000;
 
 /**
  * Open the Studio with the first-run wizard and the setup conversation out of
@@ -33,15 +61,75 @@ export async function openStudio(page: Page): Promise<void> {
     window.localStorage.setItem("studio.setupDismissed", "1");
   });
   await page.goto("/?flags=firstRunWizard:off");
-  // The composer is present in both the empty and the active conversation
-  // states, so it is the one landmark that means the Studio is ready.
-  await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
-  const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
-  await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
-  if (await suggestion.isVisible()) {
-    await suggestion.getByRole("button", { name: "Not now" }).click();
-    await expect(suggestion).toBeHidden();
+  await waitForStudioReady(page);
+}
+
+/**
+ * Wait until the app — not the document — is on screen.
+ *
+ * `#boot` is the shell that paints before any module loads, and React removes
+ * it on mount. Waiting for the composer alone would accept the shell's own
+ * composer-shaped placeholder if one is ever added; waiting for both is the
+ * statement these tests mean: the application has taken over.
+ *
+ * An empty studio — which is every studio whose state the fixture just
+ * cleared — opens the connector offer over the composer, and a modal hides
+ * everything behind it, so the composer cannot be what we wait for first. The
+ * offer is answered here, the way a person answers it, because it is part of
+ * what "ready" means: a spec that had to remember to dismiss it itself is how
+ * the offer ended up blocking a spec that forgot (#1118).
+ */
+export async function waitForStudioReady(page: Page): Promise<void> {
+  await expect(page.locator("#boot")).toHaveCount(0, { timeout: READY_TIMEOUT_MS });
+
+  const composer = page.getByRole("textbox", { name: COMPOSER });
+  // One of the two is what first paint puts on screen; which one is the app's
+  // decision, and it depends on whether the studio has a context yet.
+  await expect(composer.or(connectorSuggestion(page))).toBeVisible({
+    timeout: READY_TIMEOUT_MS,
+  });
+  // Also covers an offer that renders after its listing arrives, rather than
+  // with the first paint, which would otherwise open over the next click.
+  await dismissConnectorSuggestion(page);
+
+  await expect(composer).toBeVisible({ timeout: READY_TIMEOUT_MS });
+}
+
+/**
+ * The connector suggestion dialog, whichever offer it is showing.
+ *
+ * It renders through the shared `Dialog` primitive (#1004), so its accessible
+ * name is the offer's own title ("Connect a suggested system" for an agent
+ * suggestion, "Give the studio something to read" for an empty studio). Match
+ * the one action every offer carries instead of either title, so the locator
+ * survives the copy changing.
+ */
+export function connectorSuggestion(page: Page) {
+  return page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("button", { name: "Not now" }) });
+}
+
+/**
+ * Dismiss the connector suggestion if a fresh studio is offering one. That is
+ * real product behavior, so it is dismissed the way a person would.
+ */
+export async function dismissConnectorSuggestion(page: Page): Promise<void> {
+  const suggestion = connectorSuggestion(page);
+  // One bounded wait, then one decision. `isVisible()` alone reads the DOM at
+  // whatever instant it is called and turns a slow boot into a dialog that
+  // opens over the next click.
+  const offered = await suggestion
+    .waitFor({ state: "visible", timeout: SUGGESTION_SETTLE_MS })
+    .then(
+      () => true,
+      () => false,
+    );
+  if (!offered) {
+    return;
   }
+  await suggestion.getByRole("button", { name: "Not now" }).click();
+  await expect(suggestion).toBeHidden();
 }
 
 /** The workbench rail — the list of views the user can open. */
@@ -49,25 +137,56 @@ export function rail(page: Page) {
   return page.getByRole("navigation", { name: "Your work" });
 }
 
-/** The docked view (the "lens") that a rail item opens. */
-export function lens(page: Page) {
+/**
+ * The docked view (the "lens") that a rail item opens, by its accessible name.
+ *
+ * The docked lens is labelled with `aria-labelledby` and the mobile sheet with
+ * `aria-label`; both resolve to the panel's title, so a role query is the one
+ * handle that works in either shell — and it asserts the name a user hears
+ * rather than the attribute a particular shell happens to write.
+ */
+export function lens(page: Page, name: string) {
   // The guidance line is also an `aside` with an accessible name, so it is
-  // complementary too; scope to the docked lens itself.
-  return page.getByRole("complementary").and(page.locator(".lens"));
+  // complementary too; the name keeps the two apart.
+  return page.getByRole("complementary", { name, exact: true });
+}
+
+/**
+ * Whichever lens is open, without naming it.
+ *
+ * For assertions about the shell rather than the view — "close the lens",
+ * "something opened" — where the caller does not know or care which panel it
+ * is. The chrome's close control is what makes an `aside` a lens rather than
+ * another complementary region.
+ */
+export function openLens(page: Page) {
+  return page
+    .getByRole("complementary")
+    .filter({ has: page.getByRole("button", { name: "Close workspace view" }) });
+}
+
+/**
+ * Every banner on screen.
+ *
+ * The banner is a Radix toast row, and Radix renders each toast twice: the row
+ * a person sees and dismisses, and a visually hidden announcer that mirrors its
+ * text for screen readers. Both carry `role="status"` (or `"alert"` when the
+ * banner is urgent), so the role alone resolves to two elements and every
+ * assertion on "the banner" fails strict mode. The row is the one with actions
+ * in it; the announcer is text and nothing else.
+ */
+export function banners(page: Page) {
+  return page
+    .locator('[role="status"], [role="alert"]')
+    .filter({ has: page.getByRole("button") });
 }
 
 /**
  * The offline notice, which offers the by-hand routes when no model is
  * reachable.
- *
- * It is a live region — `status` while the notice is quiet, `alert` once the
- * banner system marks it urgent — and it is the only place outside the hero
- * that offers "Capture an outcome", so scoping to it keeps the two apart.
  */
 export function offlineNotice(page: Page) {
-  // Radix also mirrors toast text into a hidden live region, so match the
-  // rendered banner itself rather than any element that carries the words.
-  return page.locator(".banner").filter({ hasText: "Working by hand" });
+  return banners(page).filter({ hasText: "Working by hand" });
 }
 
 /** Send a message through the composer and wait for the reply to land. */
@@ -78,15 +197,26 @@ export async function sendMessage(page: Page, text: string): Promise<void> {
 }
 
 /**
+ * The assistant replies in the transcript, oldest first.
+ *
+ * User messages, assistant replies, and notices are all `article` elements, so
+ * the role alone does not separate them. The copy action does: it renders only
+ * once a reply has finished streaming, which is exactly the set of replies this
+ * suite waits for.
+ */
+export function assistantReplies(page: Page) {
+  return page
+    .getByRole("log", { name: CONVERSATION })
+    .getByRole("article")
+    .filter({ has: page.getByRole("button", { name: "Copy reply" }) });
+}
+
+/**
  * The text of the most recent assistant reply in the transcript.
  */
 export async function lastReply(page: Page): Promise<string> {
-  const replies = page.getByRole("log", { name: CONVERSATION }).locator(".message--assistant");
-  const reply = replies.last();
+  const reply = assistantReplies(page).last();
   await expect(reply).toBeVisible();
-  // The streaming placeholder is an assistant article too, so wait for the
-  // finished state: the copy action only renders once the stream has ended.
-  await expect(reply.getByRole("button", { name: "Copy reply" })).toBeVisible();
   return (await reply.innerText()).trim();
 }
 
@@ -96,17 +226,92 @@ export async function lastReply(page: Page): Promise<string> {
  * The sidecar and its repository are shared by the whole run, so a test that
  * left data behind would change what the next one sees. Deleting a job
  * removes the steps and outcomes that belong to it, so clearing the jobs is
- * enough.
+ * enough. A job that is already gone is not a failure — the fixture may run
+ * twice for one file, and a retry inherits whatever the failed attempt left.
  */
-export async function resetRepository(request: APIRequestContext): Promise<void> {
-  const response = await request.get("/api/canvas");
-  expect(response.ok()).toBeTruthy();
+export async function resetRepository(
+  request: APIRequestContext,
+  toolUrl = "",
+): Promise<void> {
+  const query = toolUrl ? `?mcp_url=${encodeURIComponent(toolUrl)}` : "";
+  const response = await request.get(`/api/canvas${query}`);
+  expect(response.ok(), `GET /api/canvas -> ${response.status()}`).toBeTruthy();
   const canvas = (await response.json()) as { jobs: { id: string }[] };
 
   for (const job of canvas.jobs) {
-    const deleted = await request.delete(`/api/jobs/${encodeURIComponent(job.id)}`);
-    expect(deleted.ok()).toBeTruthy();
+    const deleted = await request.delete(`/api/jobs/${encodeURIComponent(job.id)}${query}`);
+    expect(
+      deleted.ok() || deleted.status() === 404,
+      `DELETE /api/jobs/${job.id} -> ${deleted.status()}`,
+    ).toBeTruthy();
   }
+}
+
+/**
+ * Forget the conversation the Studio restores on boot.
+ *
+ * The app opens the most recent thread, so a spec that leaves one behind
+ * changes what the next spec sees: a `/brief` command lands inside a stranger's
+ * conversation, and the first-run hero never appears. Only `first-run.spec.ts`
+ * used to clear this, which made every other spec depend on it having run
+ * (#1118).
+ */
+async function resetMemory(request: APIRequestContext): Promise<void> {
+  const response = await request.delete("/api/memory");
+  expect(
+    response.ok() || response.status() === 404,
+    `DELETE /api/memory -> ${response.status()}`,
+  ).toBeTruthy();
+}
+
+/**
+ * Dismiss every signal the store raised.
+ *
+ * Signals outlive the jobs that produced them, so deleting the canvas does not
+ * empty the catch-up inbox; a test that reads "1 unread" inherits yesterday's
+ * bump. A backend without a signal inbox answers 404 and nothing needs clearing.
+ */
+async function resetSignals(request: APIRequestContext, toolUrl: string): Promise<void> {
+  // Only unread signals can raise the bell, and the endpoint pages at 50 by
+  // default, so ask for the whole unread set in one read.
+  const query = [`unread_only=true`, "limit=1000"];
+  if (toolUrl) {
+    query.push(`mcp_url=${encodeURIComponent(toolUrl)}`);
+  }
+  const response = await request.get(`/api/signals?${query.join("&")}`);
+  if (response.status() === 404) {
+    return;
+  }
+  expect(response.ok(), `GET /api/signals -> ${response.status()}`).toBeTruthy();
+  const body = (await response.json()) as { signals?: { id: string }[] } | { id: string }[];
+  const signals = Array.isArray(body) ? body : (body.signals ?? []);
+
+  for (const signal of signals) {
+    const dismissed = await request.post(`/api/signals/${encodeURIComponent(signal.id)}/dismiss`, {
+      // The route's only field: the passthrough backend needs a tool URL to
+      // act on, and the local backend ignores it.
+      data: { mcp_url: toolUrl },
+    });
+    expect(
+      dismissed.ok() || dismissed.status() === 404,
+      `POST /api/signals/${signal.id}/dismiss -> ${dismissed.status()}`,
+    ).toBeTruthy();
+  }
+}
+
+/**
+ * Return the shared studio to the state a first visit finds.
+ *
+ * `e2e/fixtures.ts` runs this before every test, so no spec has to remember it
+ * and no spec inherits another's writes.
+ */
+export async function resetStudioState(
+  request: APIRequestContext,
+  toolUrl = "",
+): Promise<void> {
+  await resetRepository(request, toolUrl);
+  await resetMemory(request);
+  await resetSignals(request, toolUrl);
 }
 
 export interface SeededOutcome {
@@ -130,7 +335,7 @@ export async function seedOutcomes(
   const job = await request.post("/api/jobs", {
     data: { name: "Deploy a service safely", description: "Platform engineers", mcp_url: "" },
   });
-  expect(job.ok()).toBeTruthy();
+  expect(job.ok(), `POST /api/jobs -> ${job.status()}`).toBeTruthy();
   // The local backend answers with the artifact itself; the passthrough wraps
   // it in `result`. Accept either so the seed does not depend on the backend.
   const jobBody = (await job.json()) as { id?: string; result?: { id: string } };
@@ -141,7 +346,7 @@ export async function seedOutcomes(
     const created = await request.post("/api/outcomes", {
       data: { mcp_url: "", job_id: jobId, ...outcome },
     });
-    expect(created.ok()).toBeTruthy();
+    expect(created.ok(), `POST /api/outcomes -> ${created.status()}`).toBeTruthy();
   }
 
   return jobId as string;

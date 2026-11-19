@@ -1,3 +1,11 @@
+---
+title: Architecture
+blurb: The workspace, the data flow, and the testing strategy.
+nav_group: Build
+nav_order: 4
+slug: architecture
+---
+
 # Repository Architecture
 
 Agentic ODI is a uv workspace with a single root `pyproject.toml` for shared tooling. Python distributions are imported by their stable `agentic_odi_*` package names; directory layout does not leak into imports.
@@ -13,6 +21,7 @@ flowchart LR
     subgraph machine["The user's machine"]
         CLI["CLI: agentic-odi"]
         SPA["Studio SPA: browser or Tauri webview"]
+        BFF["Studio BFF: local IndexedDB (primary data path)"]
         SHELL["Tauri shell: spawns the sidecar, self-updates"]
         MCP["MCP server — :8000/mcp, loopback, unauthenticated"]
         SIDECAR["Studio API sidecar — 127.0.0.1:8100, loopback, unauthenticated"]
@@ -24,7 +33,8 @@ flowchart LR
         CLI -->|"--backend mcp"| MCP
         CLI --> CFG
         MCP --> ODI
-        SPA -->|"/api/*, SSE"| SIDECAR
+        SPA -->|"local BFF (primary)"| BFF
+        SPA -.->|"optional, when reachable"| SIDECAR
         SHELL -.->|launches| SIDECAR
         SHELL -.->|loads| SPA
         SIDECAR --> ODI
@@ -86,7 +96,16 @@ graph BT
     agentic_odi_studio_api --> agentic_odi_connectors
     agentic_odi_cli --> agentic_odi_core
     agentic_odi_cli --> agentic_odi_connectors
+    %% agentic_odi_studio (SPA) -.->|optional runtime| agentic_odi_studio_api
 ```
+
+The Studio SPA (browser or Tauri webview) uses its local IndexedDB BFF as the
+primary data path for reads and writes. The sidecar (`agentic_odi_studio_api`)
+is optional at runtime: the SPA opens and functions with the sidecar process
+completely absent. The sidecar is consulted only for elevation capabilities —
+LLM proxy, connector ingestion, MCP passthrough, desktop shell integration, and
+update checks. This optional runtime dependency is not a compile-time import and
+is not represented as a solid arrow in the diagram above.
 
 This picture is a contract, not an illustration. `tests/test_architecture.py`
 reads the arrows above and asserts they equal both the `[project] dependencies`
@@ -127,9 +146,9 @@ persistence group, which may not call the service door":
 | Group | Modules | Rule |
 |---|---|---|
 | **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `schedule.py`, `traceability.py`, `freshness.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `freshness.py` says whether a derived verdict was computed from the store's current revision, so a stale one never reads as today's answer. `traceability.py` reads the links an outcome carries and reports the three failures — orphans, unfunded objectives, drift. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
-| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `factory.py`, `integrity.py`, `recovery.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `funnel.py` appends the five onboarding counters to the same log and reads them back. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
+| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `factory.py`, `integrity.py`, `recovery.py`, `migrations.py`, `paths.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `migrations.py` is the numbered schema ledger both SQLite files run, `funnel.py` appends the five onboarding counters to the same log and reads them back, `paths.py` is the one place the two database files are resolved, so the CLI, the Studio sidecar, and the recovery helpers all agree on where they live. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
 | **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
-| **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
+| **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py`, `logging.py`, `settings.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. `logging.py` is the one logging configuration every entrypoint calls; it is here because anything may import it and it imports nothing from the package. `settings.py` declares every `AGENTIC_ODI_*` variable once, as a field with an alias, and fails fast on a value it cannot parse; `docs/reference/configuration.md` is its register. |
 
 `errors.py` is the exception hierarchy the whole package raises, so it is the one
 module any group may import.
@@ -151,7 +170,7 @@ module belongs to no group, which is how the table above would rot.
   `~/.agentic-odi/studio.db`, overridable with `AGENTIC_ODI_STUDIO_DB`. They are
   sidecar-local and never enter the ODI repository or the MCP contract.
 - `build_repository()` chooses SQLite by default and `InMemoryRepository` when `AGENTIC_ODI_DB=:memory:`, which is what tests use.
-- Neither runnable server imports a store: the sidecar builds one in `create_app(repo=...)` and the MCP server in `create_server(repository=...)`, each at process start (ADR 0006).
+- Neither runnable server imports a store: the sidecar builds one in `create_app(repo=...)` and the MCP server in `create_server(repository=...)`, each at process start (ADR 0011).
 - The CLI selects its backend with `--backend local|mcp` or `AGENTIC_ODI_BACKEND`.
 - The Studio API selects `local` (direct service calls) or `mcp` (passthrough) with `AGENTIC_ODI_BACKEND` or `create_app(backend=...)`.
 - The Studio keeps the last focused subject in `localStorage` under

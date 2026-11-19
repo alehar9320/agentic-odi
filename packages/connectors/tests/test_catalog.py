@@ -120,6 +120,15 @@ def test_recommended_presets_are_marked() -> None:
 
 
 def test_composio_preset_is_optional_and_oauth() -> None:
+    """Composio Connect's shared MCP URL is static and OAuth-authenticated.
+
+    Composio's docs distinguish two entry points: the Composio Connect shared
+    URL (``https://connect.composio.dev/mcp``, OAuth) that this preset encodes,
+    and a session-scoped MCP endpoint that is minted per user
+    (``POST /api/v3.1/tool_router/session``) and carries an ``x-api-key``
+    header. Only the former is a static URL, so the preset must stay OAuth with
+    no embedded credential.
+    """
     preset = get_preset("composio")
 
     assert preset.label == "Composio"

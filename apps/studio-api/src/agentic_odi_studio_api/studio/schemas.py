@@ -38,6 +38,18 @@ class LlmHealthResponse(BaseModel):
     cached: bool  # whether the answer was served from the TTL cache
 
 
+class SaveConfigRequest(BaseModel):
+    """Persist LLM connection settings so the sidecar reads them on restart.
+
+    The same fields the GET /config endpoint returns as ``defaults``.
+    """
+
+    base_url: str
+    api_key: str = ""
+    model_name: str
+    mcp_url: str = ""
+
+
 class ModelListRequest(BaseModel):
     """Which backend to ask for its model ids. The key travels in the body, not
     the query string, so it never lands in a URL or an access log."""

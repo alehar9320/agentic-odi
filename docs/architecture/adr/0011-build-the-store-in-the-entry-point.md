@@ -1,4 +1,4 @@
-# 0006 — Build the store in the entry point, not at import
+# 0011 — Build the store in the entry point, not at import
 
 - **Status:** accepted
 - **Date:** 2026-11-03
