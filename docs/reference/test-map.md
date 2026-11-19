@@ -43,6 +43,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
+| `apps/cli/tests/test_interviews_cli.py` | Tests for the interviews CLI group (A1). |
 | `apps/cli/tests/test_jobs_cli.py` | Tests for the Jobs CLI command group. |
 | `apps/cli/tests/test_mascot.py` | The Odi banner: shape, colour, and when it is allowed to appear. |
 | `apps/cli/tests/test_onboard.py` | Tests for first-run onboarding signal extraction and gating. |
@@ -72,6 +73,7 @@ isolation, and coverage rules stay in
 | `apps/mcp-server/tests/test_customer_outcomes.py` | Tests for Customer Outcome entities. |
 | `apps/mcp-server/tests/test_graceful_shutdown.py` | Tests for the MCP server's graceful shutdown path. |
 | `apps/mcp-server/tests/test_health.py` | The store health tool reports readiness without touching ODI data. |
+| `apps/mcp-server/tests/test_interviews.py` | MCP coverage for transcript import and the interview quote tools (A2). |
 | `apps/mcp-server/tests/test_odi.py` | — |
 | `apps/mcp-server/tests/test_parity.py` | — |
 | `apps/mcp-server/tests/test_port_config.py` | The MCP server port must be overridable for dev and multi-instance runs. |
@@ -336,6 +338,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_funnel.py` | Onboarding is measurable on this machine (ALH-147): five local counters. |
 | `packages/core/tests/test_funnel_service.py` | The funnel is counted by the paths a person actually walks. |
 | `packages/core/tests/test_intent_store.py` | Tests for the append-only Intent Store. |
+| `packages/core/tests/test_interview.py` | A1 — Interview records and quotes, persisted (ALH-14). |
 | `packages/core/tests/test_job_validation.py` | — |
 | `packages/core/tests/test_logging.py` | The shared logging configuration is idempotent and level-aware. |
 | `packages/core/tests/test_messages.py` | Tests for shared assistant messages and error helpers. |
@@ -348,6 +351,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_outcome_validation.py` | The outcome statement guard is enforced when an outcome is captured. |
 | `packages/core/tests/test_pagination.py` | Pagination on the list methods of both repositories and the service layer. |
 | `packages/core/tests/test_perf_cold_open.py` | Cold-open budget for a 1,500-outcome study. |
+| `packages/core/tests/test_persistence_parity.py` | Cross-repository parity harness (the epic's Persistence checklist). |
 | `packages/core/tests/test_promotion_identity.py` | One customer quote must not become three opportunities. |
 | `packages/core/tests/test_proposals.py` | Tests for proposal lifecycle (issue #80). |
 | `packages/core/tests/test_remote.py` | Tests for the shared MCP tool-result error parser. |
@@ -368,6 +372,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
 | `packages/core/tests/test_study.py` | A Study is one named pass over a Job, and running it again makes a wave. |
 | `packages/core/tests/test_traceability.py` | Traceability: orphans, unfunded objectives, and drift. |
+| `packages/core/tests/test_transcript.py` | A2 — transcript parsing (pure), ahead of persistence. |
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
