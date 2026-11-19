@@ -73,7 +73,7 @@ def test_cache_retains_no_secret_or_response_body(monkeypatch):
     assert "super-secret" not in result["message"]
 
     with probes._PROBE_CACHE_LOCK:
-        _, stored = probes._PROBE_CACHE[("http://probe-c/v1", "m")]
+        _, stored = probes._PROBE_CACHE[("http://probe-c/v1", "m", __import__("hashlib").sha256(b"super-secret").hexdigest()[:16])]
     assert "super-secret" not in stored.message
     assert stored.healthy is True
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import socket
 import threading
@@ -46,8 +47,18 @@ class ProbeResult(NamedTuple):
 #: (endpoint, model) -> (monotonic timestamp, ProbeResult). Keyed on the
 #: endpoint and model only -- never on a credential -- so concurrent tabs
 #: sharing an endpoint reuse a single probe.
-_PROBE_CACHE: OrderedDict[tuple[str, str], tuple[float, ProbeResult]] = OrderedDict()
+_PROBE_CACHE: OrderedDict[tuple[str, str, str], tuple[float, ProbeResult]] = OrderedDict()
 _PROBE_CACHE_LOCK = threading.Lock()
+
+_CONFIG_GENERATION = 0
+
+
+def invalidate_probe_cache() -> None:
+    """Drop every cached verdict after a settings change."""
+    global _CONFIG_GENERATION
+    with _PROBE_CACHE_LOCK:
+        _PROBE_CACHE.clear()
+        _CONFIG_GENERATION += 1
 
 
 def _iso_utc(ts: float) -> str:
@@ -195,7 +206,7 @@ async def probe_llm_health(
     on a credential -- and the map is bounded by TTL eviction and a size cap.
     """
 
-    key = (base_url, model_name)
+    key = (base_url, model_name, hashlib.sha256(api_key.encode()).hexdigest()[:16])
     t = now()
 
     with _PROBE_CACHE_LOCK:
