@@ -43,7 +43,9 @@ def _env_float(name: str, default: float, *, minimum: float) -> float:
         value = float(raw)
     except ValueError as exc:
         raise ValueError(f"{name} must be a number >= {minimum}, got {raw!r}") from exc
-    if value < minimum:
+    # ``nan`` compares false against every bound, so a plain ``value < minimum``
+    # would let it through; negate the comparison to reject it.
+    if not value >= minimum:
         raise ValueError(f"{name} must be a number >= {minimum}, got {value}")
     return value
 

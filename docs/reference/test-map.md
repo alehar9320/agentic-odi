@@ -320,6 +320,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_mapping.py` | — |
 | `packages/connectors/tests/test_marketplace.py` | Marketplace normalization, trust matching, caching, and fallback. |
 | `packages/connectors/tests/test_mcp_connector.py` | — |
+| `packages/connectors/tests/test_no_prints.py` | No library code in the connectors package prints to stdout or stderr. |
 | `packages/connectors/tests/test_rate_limit.py` | — |
 | `packages/connectors/tests/test_registry.py` | — |
 | `packages/connectors/tests/test_rest_connector.py` | — |
