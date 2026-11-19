@@ -1,6 +1,6 @@
 # PR Readiness Plan — ALL alehar9320 open PRs (newest → oldest)
 
-## Completed (17 of 30)
+## Completed (19 of 30)
 | # | PR | Head ref | Verdict |
 |---|----|----------|---------|
 | 1 | #875 Stop announcing supported state as outage | openhands/507-delete-supported-state-banners | READY — CLEAN, CI=SUCCESS |
@@ -21,12 +21,12 @@
 | 16 | #805 Context7 MCP connector preset | opencode/2026-11-06-context7-mcp-preset | READY — CLEAN, CI=SUCCESS |
 | 17 | #803 Consent domain invariant | openhands/issue-458 | READY — CLEAN, CI=SUCCESS |
 | 18 | #794 Fail site build on broken reference | openhands/571-broken-reference-build | READY — CLEAN, CI=SUCCESS |
+| 19 | #835 Answer and capture no sidecar | freebuff/2026-11-07-347 | READY — conflict resolved, pushed c3672664 |
+| 20 | #826 Settings five named sections | openhands/issue-530 | READY — conflict resolved, pushed ca29c424 |
 
-## Remaining (13 of 30)
+## Remaining (10 of 30)
 | # | PR | Head ref | Mergeable | CI | Age |
 |---|----|----------|-----------|----|-----|
-| 19 | #835 Answer and capture no sidecar | freebuff/2026-11-07-347 | CONFLICT | SUCCESS | Nov 7 09:46 |
-| 20 | #826 Settings five named sections | openhands/issue-530 | CONFLICT | FAILURE | Nov 7 00:58 |
 | 21 | #822 Export/import workspace new schema | openhands/issue-521 | CONFLICT | SUCCESS | Nov 7 00:21 |
 | 22 | #815 Capability probes tell the truth | freebuff/515-capability-probes | CONFLICT | SUCCESS | Nov 6 21:22 |
 | 23 | #806 Name each destination plain words | freebuff/637-navigation-names | CONFLICT | FAILURE | Nov 6 20:31 |
@@ -37,4 +37,4 @@
 | 28 | #788 Stop announcing missing model as outage | freebuff/5518dcbfa7d5167025bfce50 | CONFLICT | SUCCESS | Nov 6 18:42 |
 | 29 | #786 Remember why you came back ALH-146 | qoder/ALH-146-next-step | CONFLICT | FAILURE | Nov 6 15:57 |
 
-## In progress: #835 Answer and capture no sidecar (CONFLICT + CI=SUCCESS)
+## In progress: #822 Export/import workspace new schema (CONFLICT + CI=SUCCESS)

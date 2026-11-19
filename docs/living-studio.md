@@ -1,3 +1,11 @@
+---
+title: The Living Studio
+blurb: The chat-first interface, its first run, and the desktop app.
+nav_group: Get started
+nav_order: 2
+slug: studio
+---
+
 # Running The Living Studio
 
 **The Living Studio** is the conversational GUI for Outcome-Driven Innovation:
@@ -39,15 +47,16 @@ The Studio opens as a conversation, not a dashboard.
 |---|---|
 | **First paint** | The window opens already the right colour. `apps/studio/index.html` carries an inline `<style>` with the background and the shell grid (bar, rail, stage) and a short inline script that resolves the theme — the stored `studio.settings` choice, or `prefers-color-scheme` when nothing is stored — and sets the class on `<html>` before the module bundle parses. React replaces the shell on its first commit, so there is no white flash and no dark-then-light flip. The inline colours are copies of `--bg` and `--line` in `src/styles/theme.css`, and `src/styles/bootShell.test.ts` fails if the two drift apart. |
 | **First minute** | The studio opens on one question — what do you want to win — with three starters and the composer already focused. Nothing covers the stage: no tour, no form, no required step, and no warning about a server nothing you have done needs yet. After the first exchange, at most one quiet line suggests the next thing (add context, or capture the evidence a score is missing). It sits above the composer, never over the thread, and can be dismissed forever. |
-| **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and where the outcome lands. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. The last scene plots the scored sample outcome on the landscape beside two comparisons and names the evidence the sample is missing. It ends on one honest choice: **Start your own job** removes every record the tour made (and never a job you made), or **Keep the sample to poke at** leaves the sample marked. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → Replay the tour** starts it over. |
+| **Product tour** | An optional four-step tour: what the studio is, which ambition brought you here, the live state of your sidecar/MCP/model (with inline repair when the model is down), and where the outcome lands. The four doors are **I have one in mind**, **My boss handed me a priority**, **Help me find the next one**, and **Pressure-test a bet**; each starts the matching conversation. The last scene plots the scored sample outcome on the landscape beside two comparisons and names the evidence the sample is missing. It ends on one honest choice: **Start your own job** removes every record the tour made (and never a job you made), or **Keep the sample to poke at** leaves the sample marked. It never opens by itself: **Show me around** on the home stage opens it, and **Settings → About → Take the tour** opens it. |
 | **Context conversation** | Opened when you ask for it — the **Start with you and your team** starter, the context hint, `/start`, or Settings. A five-turn introduction in the chat, led by the agent: who you are and your team, who feels the problem first, what they are trying to win, where it breaks, and what you already have. One question at a time, examples shown as muted text, with **Skip this question** and **Explore on my own** always available. The five answers come back as an editable card, in your words; skipping stores nothing, and progress is kept as a draft. |
 | **Hero** | One headline above the composer. A first run holds a single invitation — *What do you want to win?* — and never changes while you think. With context or canvas data it becomes a quiet rotation: a greeting (time of day, plus your name if you set one in Settings), the product/job you set up, or what is already on the canvas. It stays still under `prefers-reduced-motion`. |
 | **Starter cards** | Above the composer, three canvas-aware conversation cards name a situation the person is actually in rather than one of our nouns: **Turn 40 interview notes into one bet**, **Find what the churn spike is telling you**, and **Inherit a roadmap without inheriting its assumptions**. An empty canvas always offers those three, in that order; once the canvas holds outcomes or jobs the second and third swap to **Pressure-test a bet** and **Capture what you heard**. Each card carries a subtitle and the artifact it produces (`artifact` on `StudioSuggestion`), which the card layout (#317) renders. Select one to start that prompt in the thread — the prompt is sent verbatim, and it opens with the material the person brings. **Opportunity landscape** remains a separate, quiet shortcut. |
 | **Composer** | Docked at the bottom of the transcript. `Enter` sends, `Shift`+`Enter` adds a line, `Cmd/Ctrl`+`K` focuses it, `/` opens the command palette, and the paperclip attaches a text file or an image. Files can also be dropped anywhere on the composer or pasted from the clipboard (a clipboard carrying both text and a file keeps the text and attaches the file), and each one is shown with a size (and a thumbnail, for images) plus a remove control before it is sent; a file whose format the studio does not accept is refused with the reason instead of becoming a chip that promises content the model will never see, and a file it accepts but cannot turn into content stays on the chip marked *Could not read this file*, with send disabled, until it is removed. The hint row's **Model** control lists the ids the configured backend reports and writes the choice through the same Settings store as the Base URL field. The send button becomes a stop button while a reply streams. Selecting prose in a reply shows **Quote**; one click puts the passage in the composer as a verbatim blockquote attributed to the reply, removable without touching the question you typed, and it is sent as part of the question. On an empty draft `↑` recalls the message you sent last — again for the one before it — and `↓` walks forward and finally restores the draft you were typing; inside a multi-line draft the arrows keep their native caret behavior. |
-| **Bar** | The only persistent chrome: home, **New thread**, catch-up, live model status, **Customize**, and settings. **New thread** shows its words above 720px and is named *Start a new thread* at every width; it is switched off with the reason *This thread is already new.* when there is nothing to leave, asks — *A reply is still coming. Stop it and start a new thread?* — only while a reply is in flight, and otherwise gives the thread back for ten seconds through **Undo** on the toast. Starting one creates no conversation until the first message, and moves nothing on the canvas. Home closes what is open and never discards the thread. There is no navigation drawer to compete with the thread. |
+| **Regions** | Three regions, one direction. The **drawer** (left) holds what you are working on, the **mainstage** (middle) holds the work itself, and the **right region** holds exactly one detail at a time. `openDetail(panel, subject?)` is the only way into the right region and it is reached from a mainstage element that offers it, so deeper is right and backing out is left; the top bar's settings, health, and version controls may open it directly because the bar is the system region, not a navigation region. Opening a detail closes nothing else, and no state exists in which two regions show the same subject. The contract is declared once in `src/state/regions.ts`. |
+| **Bar** | The only persistent chrome: home, **New thread**, catch-up, live model status, **Customize**, and settings. **New thread** shows its words above 720px and is named *Start a new thread* at every width; it is switched off with the reason *This thread is already new.* when there is nothing to leave, asks — *A reply is still coming. Stop it and start a new thread?* — only while a reply is in flight, and otherwise gives the thread back for ten seconds through **Undo** on the toast. Starting one creates no conversation until the first message, and moves nothing on the canvas. Home closes what is open and never discards the thread. |
 | **Customize** | The one place to manage connectors. It replaces the conversation while open (the bar stays, so leaving is one gesture) and shows three bands: what is installed, read from the same `connectors.json` the CLI uses; a handful of curated picks as non-gating examples; and the marketplace, populated from the trusted vendor registry so a listing can be added by id. Capability areas filter the shelf, a listing that needs a token names its environment variable and stores nothing, a listing that cannot be installed says why, and an unreachable marketplace is reported rather than shown as an empty list. A studio with nothing installed suggests a connector when one would help; dismissing the suggestion keeps it dismissed. |
 | **Rail** | Above the conversation, and only once the thread has produced something: `Landscape · N`, `Job map · N`, `Evidence · N`, `What I know · N`. Every item is derived from the canvas and the memory, so the strip is a record of the work rather than a fixed menu. |
-| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. Closing puts focus back on the chip that opened the lens, so `Esc` never drops the caret into the composer behind it — that only happens when nothing else is open. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. In the Records lens a row is a button: it opens that one record below the tables with every field the store holds, its id behind **Copy id**, and each parent that exists as a filter that narrows the tables without leaving the lens. Where the store knows nothing it says so — `—` for an absent value, `unscored` for an outcome with no score, and the plain line *This record stores only the fields above — no author and no timestamp.* |
+| **Lens** | A view docks to the right of the thread on wide screens and becomes a full-height sheet on narrow ones. The transcript and the composer stay on screen and stay usable; `Esc`, **Close**, or the rail chip closes it. The header names the detail and, when a real step backs it, its place in the job above the title — *Step 2 of 4 • Locate* — with **Expand**/restore and **Close** beside it; the width the person last chose comes back on the next open. Closing puts focus back on the chip that opened the lens, so `Esc` never drops the caret into the composer behind it — that only happens when nothing else is open. Every lens ends in one sentence that re-enters the conversation — *Ask which to chase*, *Walk me through the job*, *Weigh the evidence* — so leaving a view is never a return to a menu. Settings and catch-up use the same lens. In the Records lens a row is a button: it opens that one record below the tables with every field the store holds, its id behind **Copy id**, and each parent that exists as a filter that narrows the tables without leaving the lens. Where the store knows nothing it says so — `—` for an absent value, `unscored` for an outcome with no score, and the plain line *This record stores only the fields above — no author and no timestamp.* |
 
 Replies render Markdown (headings, lists, emphasis, inline and fenced code).
 While a turn has produced no text yet, an activity line names the phase (*Waking
@@ -80,7 +89,7 @@ handled in the SPA and never call the model, so they work when it is offline.
 | `/new` | New conversation |
 | `/home` | Return to the empty stage |
 | `/jobs` | Job summary, then the job map |
-| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/settings` | Open that lens beside the conversation |
+| `/landscape`, `/jobmap`, `/segments`, `/evidence`, `/records`, `/dashboard`, `/settings` | Open that lens beside the conversation |
 | `/brief` | Open the decision brief — the document a review reads, ready to download or print |
 | `/impact`, `/capture` | Start the conversation that produces the card. `/capture` falls back to the offline form when no model answers. |
 | `/status` | Model, MCP, context, and canvas status |
@@ -92,7 +101,8 @@ Unknown commands produce a transcript notice pointing at `/help`.
 The stage is the front door; the tour is an answer to "show me around", not a
 gate. It is skippable at every step (`Skip the tour` or `Escape`), resumable
 (progress is stored after every transition in `localStorage["studio.onboarding"]`),
-and replayable from Settings. Nothing opens it automatically, and a fresh
+and replayable from **Settings → About** with **Take the tour**. Nothing opens it
+automatically, and a fresh
 install writes no record until the person asks for it.
 
 Everything lives in `apps/studio/src/onboarding/`:
@@ -190,6 +200,12 @@ Studio says so in one place and keeps going:
   color, `aria-hidden` when a word already states the state, named by `label`
   when it stands alone. A `.studio-pill` is a label, not an indicator, so it
   carries no dot of its own.
+- Settings answers the same question with three words, and only claims what a
+  probe established: **available**, **unavailable**, or **configured, not
+  checked**. A model endpoint you have typed into Settings reads the third — it
+  never reads available until a health answer says so — and the MCP row is read
+  by the `POST` its route accepts, so a healthy sidecar no longer reports MCP
+  missing (`apps/studio/src/bff/capabilities/registry.ts`).
 - A reply that no model produced carries one line, on that reply: **Local draft,
   no model connected**. It is a button, and it opens Settings. It never repeats
   on the replies around it, and nothing about it covers the thread.
@@ -198,6 +214,20 @@ Studio says so in one place and keeps going:
   in IndexedDB, and the deterministic assistant answers ODI questions, creates
   jobs, records and re-scores outcomes, and renders the board with no server at
   all.
+- A write falls back the same way a read does. Every canvas write the UI offers —
+  job, step, outcome, score correction, and the evidence capture — goes through
+  `queuedWrite` in `apps/studio/src/api/studioApi.ts`: the sidecar first, and on
+  a transport failure the browser store, plus an outbox record so a later drain
+  can replay it. A sidecar that answers with an application error (400/401/409)
+  still surfaces as a failure — the fallback is for a sidecar that is not there,
+  not for one that refused.
+- A capture therefore never dies with the server. `addEvidence` and
+  `deleteEvidence` write to the browser's `evidence` store (schema v3 in
+  `apps/studio/src/bff/store/migrations.ts`) and return `ok`, and the canvas
+  overlay marks the record `pending` until the outbox drain acknowledges it. The
+  board then says **Kept by this browser · will sync** (`kept_by_browser` on the
+  canvas provenance) instead of letting the row read as though the server holds
+  it. A write the sidecar accepted sets none of this.
 - The outbox is shared by every tab in the origin, so two tabs would otherwise
   drain it and send each record twice. `apps/studio/src/bff/outbox.ts` takes a
   drain guard for the length of a run: `navigator.locks` where the browser has
@@ -211,6 +241,15 @@ Studio says so in one place and keeps going:
   registered step from the version the person has up to `DB_VERSION`, so a
   release that adds a store upgrades an existing database instead of failing to
   open it. A version bump with no migration is caught by a test before it ships.
+- A half-finished interview survives a reload. `apps/studio/src/assistant/interview/persistence.ts`
+  writes the conductor's draft — the answers and the question it was on — to the
+  browser's `interview_drafts` store (schema v4 in
+  `apps/studio/src/bff/store/migrations.ts`) on every transition, debounced to at
+  most one write per second, and deletes it once the interview reaches a terminal
+  state. On mount the most recent draft for the current job is read back and the
+  interview reopens at the same question; a draft for another job is ignored. A
+  store that throws leaves the interview usable in memory and raises no banner,
+  and a submitted interview leaves no draft behind.
 - When a second tab opens a newer schema, the first tab would otherwise hold the
   old connection and block the upgrade. `IndexedDbLocalStore` closes its
   connection on `versionchange` and sets `needsReload`, which the app can read
@@ -361,7 +400,15 @@ fixtures. Its real content is the store's signal inbox
 `/api/signals/unread-count`, the feed loads on boot, re-reads after every canvas
 refresh, and polls once a minute while the window is visible. Connector rows in Settings come from the real connector
 store, grouped by capability area; nothing is pre-listed as though it were
-already connected.
+already connected. The connector-install control explains a block in place: when
+the sidecar is known to be absent, **Add** stays disabled and a sentence beneath
+it says why, with one real next action (`Start the local service`), sourced from
+the single `blockedReason` table and tied to the button through
+`aria-describedby`. An unprobed capability is a wait rather than a failure, so
+nothing is explained for a host that has not answered yet. The table already
+carries wording for every capability the registry models, so a new capability
+cannot ship without it; wiring the remaining blocked controls (capture, agent
+send) and retiring the duplicate global banner are follow-ups.
 
 The Opportunity Matrix is held to the same rule. It plots a point only for an
 outcome the store actually scored — no default of 5 fills a missing importance
@@ -374,6 +421,26 @@ sampled from `2 × importance − satisfaction > 10` and drawn with its threshol
 line — so the region a point sits in and `isUnderserved` never disagree. The
 pill follows suit: a score the store never computed reads **Not scored**, never
 **Served**.
+
+The score is edited where it is read. **Adjust scores** on the card opens a
+score panel (`ScorePopover`) that holds the two assumptions — importance and
+satisfaction — as a slider and a number each, prints the arithmetic live as
+`importance + gap = opportunity` with the underserved verdict, and saves both in
+one `updateOutcome`. The stored score is shown beside the draft, and when it no
+longer matches the inputs it was made from the panel says so and offers
+**Recompute**; it never repairs the record on its own.
+
+A score that was computed also says how well it is backed. The card and the
+landscape's **Backed by** column read one derived helper, `scoreConfidence`, over
+the `claim_check` behind the score and the evidence records linked to it, and
+name one of three levels: **Verified** when every asked question was answered,
+**Partly verified** when answers exist but a question was skipped, and
+**Hypothesis** when there is no check or no answer — with a one-line basis
+(answered count, quote count, and the distinct sources). No confidence number is
+invented: the level is a function of records the store already holds, and a bare
+number with nothing behind it says so rather than borrowing a measured claim's
+look. On the card the indicator is itself the control that reveals the linked
+quotes, through the same reveal path the **Evidence** button drives.
 
 ### The thread is the room
 
@@ -396,15 +463,15 @@ without giving up the message model the sidecar already understands.
 
 | Capability | What it means here |
 |---|---|
-| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
+| **Streaming** | `delta` frames append to the open prose part; the send button becomes stop. Prose is published once per animation frame — deltas accumulate in the turn and one render shows them all — while a citation, a tool row, the terminal frame, a cancel, and an error publish immediately and cancel any pending frame. Before the first token, the last message shows the current phase with a shimmering label and dots. When you scroll away during a reply, a keyboard-accessible **Jump to latest** control names how much arrived (`3 new · Jump to latest`) and returns you to the live end without interrupting assistant-ui's follow behavior; a polite live region announces the count once per arrival, never once per token. Empty-thread starter cards pair each suggested move with its reason, then give way to the conversation after the first turn. |
 | **Silence** | A run that stops producing tokens for eight seconds shows *Still working · no new output for Ns* under the reply, while the Stop button keeps its meaning. The signal comes from assistant-ui's stall detection over text, reasoning, tool arguments, and tool results — never from a timer watching the DOM — so a long tool call reads as work, not a freeze. A dropped stream never shows it: that path ends in the failure panel. |
 | **Reasoning** | `reasoning` frames render in a disclosure that starts open while the model is thinking, then reads *Thought for Ns* and can be reopened. Never persisted, never counted as the answer. |
 | **Work** | What a turn did folds into one row: *Working… · 3 calls* while it runs, then *Worked for 12s · 3 calls*, closed and reopenable. Opening it is the turn's own record, not a paraphrase — the same reasoning disclosure and trace chips, in the order they arrived. A turn the browser did not watch from the start shows its calls with no duration. |
 | **Tools** | Each MCP call is a trace chip with its status and a short preview of what came back. |
-| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Decline**. A decline is a tool result, not an error: the model is told no and may propose something else. The ask is never folded into the work row — a question is not history. |
+| **Approval** | A writing tool (`add_`, `create_`, `update_`, `delete_`, `ingest_`, `remove_`) pauses the turn until you answer **Allow** or **Don't allow**. The card names the action, not the tool: one sentence of consequence (*This creates a job.*) from the pure map in `assistant/consequence.ts`, the model's arguments as a key/value list that scrolls past six rows with the raw JSON behind a **Raw arguments** disclosure, and — after **Don't allow** — an optional reason (280 characters) that travels with the refusal so the model can propose something else. A decline is a tool result, not an error. The ask is never folded into the work row — a question is not history. |
 | **Sources** | Every tool call that returned data emits a `source`, titled with the tool and a preview. Provenance is what the turn actually read; a citation is never invented. |
 | **Claims** | Each declarative sentence ends with an evidence marker, and the reply arrives with a validated claim list. A chip names the source and the record (`Gong · Call with Acme`), never the tool; `Hypothesis` tags an ungrounded guess; an unmarked sentence keeps its place with a dotted underline and the accessible name *Uncited claim*. A chip opens that row in the Evidence lens, and Escape returns focus to the chip. Claims are stored with the turn, so they survive a reload; a record deleted later keeps its snapshot label and stops being a link. A seeded demo reply labels its chips **Sample** and does not count as cited. |
-| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. A file that is accepted by name but whose bytes never become content — an interrupted read, a `.docx` that will not unpack — is reported before the turn is sent: the chip keeps its name, says "Could not read this file", and send stays disabled until that chip is removed, leaving the draft and every other attachment in place. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter — and the per-file limit is 20,000 characters: a text-like file longer than that is refused, not silently shortened, with the chip naming the file and the limit (a `.docx` over the cap has its cut announced in the extracted text instead). Nothing is stored server-side. |
+| **Attachments** | Attach from the paperclip, by dropping files on the composer, or by pasting a screenshot. The composer describes accepted text-like files (`.md`, `.mdx`, `.json`, `.csv`, `.yaml`, `.yml`, `.log`, `text/*`), Word documents (`.docx`, at most 25 MB), PDFs (`.pdf`, at most 25 MB), and images (PNG/JPEG/WebP/GIF, at most 5 MB); a drop or paste of anything else is refused with the reason, and a legacy `.doc` is refused with the sentence that says to save it as `.docx` or `.txt`. A turn carries at most five attachments, counting text and images together; a sixth is refused, naming the file and the limit, before the turn is sent. Chips show a name, size, an image preview, and a remove control. A file that is accepted by name but whose bytes never become content — an interrupted read, a `.docx` that will not unpack, a `.pdf` whose text layer is missing or locked — is reported before the turn is sent: the chip keeps its name, says why (a scanned PDF names the missing text layer, an encrypted one names the password), and send stays disabled until that chip is removed, leaving the draft and every other attachment in place. Text is extracted in the browser — `.docx` through mammoth's raw-text reader, never its HTML converter, and `.pdf` through `pdfjs-dist`'s text layer, with each page marked `[page N]` — and the per-file limit is 20,000 characters: a text-like file longer than that is refused, not silently shortened, with the chip naming the file and the limit (a `.docx` or `.pdf` over the cap has its cut announced in the extracted text instead, a PDF dropping whole pages so no sentence stops mid-thought). Nothing is stored server-side. |
 | **Model** | The hint row's picker asks the sidecar (`POST /api/models`) which ids the configured backend serves, keeps the configured model selectable even when the backend omits it, and saves the choice through `saveSettings`, so Settings and the composer never disagree. An unreachable or empty backend is explained in the menu rather than shown as an empty list. |
 | **Branching** | **Edit** a user turn or **Regenerate** a reply and both versions are kept as siblings. **Alternative 2 of 3** with `‹`/`›` steps between them, and the visible branch is saved as the conversation's `head_id`, so a reload reopens the branch you were reading. |
 | **Suggestions** | The empty-stage pills are chosen from the canvas and handed to the runtime as suggestion prompts. |
@@ -413,75 +480,80 @@ without giving up the message model the sidecar already understands.
 | **Dictation** | Where the shell supports speech recognition, the composer shows a microphone: it turns speech into text, marks the interim transcript as *Listening*, and commits one final sentence to the input. It never sends by itself, no audio leaves the browser, and nothing is stored. In a shell without the API — notably parts of Tauri's WebKit webview — there is no microphone at all. No fallback provider and no realtime voice. |
 | **Queue** | A follow-up sent while an answer still streams does not hit a wall: it joins a quiet lane above the composer and runs in the order it was sent once the live turn settles. Each row offers **Run now** — it jumps ahead of the other waiting follow-ups — and a remove that drops only that message. Stop stops the live turn and the lane waits for the next send; it never clears the queue. The lane is in-memory and dies with the page, and the sidecar still sees exactly one SSE turn at a time — the queue sequences, it never parallelises. |
 | **Read aloud** | A settled reply with prose offers **Read aloud** beside Copy, and becomes **Stop reading** while it speaks. Starting another reply stops the first; **Stop reading**, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken, and speech is never persisted. |
+| **Interview** | Three to five structured questions arrive as an **interview card** (`InterviewCard`): a short statement with the outcome format hint, a free-text answer, and a scale with a visible value and keyboard steps. Each question is a labelled group; a required one is marked and enforced on submit, and an empty required answer is refused with one plain sentence rather than a silent no-op. The card is presentation only — it takes the questions, the answers, and a submit callback as props and never reads the canvas or the sidecar. The conductor (`apps/studio/src/assistant/interview/conductor.ts`, #397) owns the work behind it: a pure reducer walks `idle → asking → collecting → submitting → done`, validates the required answers before it submits, and creates the records in order through the existing `createJob`/`addOutcome`/`addEvidence` actions — a failure stops the run and names the step that failed, leaving what already succeeded in place. Once the records are created, the card collapses into the record of the interview (#400): one line, `Answered · 3 of 3 · 2 outcomes, 1 evidence`, whose counts come from the records the store confirmed rather than from how many questions were answered. Expanding it shows each question with the answer given and a link to every outcome the answers created, routed through the existing focus action. An unfinished interview stays live and answerable, and a failed submission keeps the card with `Not saved — <reason>` on screen instead of a summary that claims a write that never happened. |
 
 #### What the runtime gives us, and what we did not take
 
 The full coverage ledger — every assistant-ui capability and its one honest
 state — is authored in [The assistant-ui ledger](assistant-ui-ledger.md),
-and `scripts/doc_check.py` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
+and `scripts/docs_index.py --check` fails if this projection drifts from it. Whatfollows is everything a person can use today (Adopted) plus what is used
 narrower than the library offers (Partial). A row is Adopted only when a test
 proves a person can use it, the named file exists, and the Delivered column
 cites the issue or PR that landed it.
 
+<!-- BEGIN GENERATED: living-studio-projection -->
 | Capability | Status | What it means here | Delivered |
 |---|---|---|---|
-| `useExternalStoreRuntime` | Adopted | The bridge: the sidecar's store, presented as a thread. | #238 |
+| `useExternalStoreRuntime` | Adopted | The bridge itself: the sidecar's store, presented as a thread. | #238 |
 | `AssistantRuntimeProvider` | Adopted | One provider, whole app. | #238 |
-| `convertMessage` (`toThreadMessageLike`) | Adopted | The only mapping between our messages and runtime messages. | #238 |
+| `convertMessage` (`toThreadMessageLike`) | Adopted | The only mapping between `ChatMessage`/`ChatPart` and runtime messages. | #238 |
 | `isRunning` | Adopted | Driven by `streaming`. | #238 |
-| `setMessages` (branch switch) | Adopted | Branch switch swaps the visible path; the sidecar keeps `head_id`. | #238 |
-| `onNew` | Adopted | Sending a message. | #238 |
-| `onEdit` | Adopted | Editing a user turn keeps the old path as a branch. | #238 |
-| `onReload` (regenerate) | Adopted | Regenerating a reply as a sibling branch. | #238 |
-| `onCancel` | Adopted | The stop button. | #238 |
-| `onRespondToToolApproval` | Adopted | Allow/Decline on a pending write. | #238 |
-| `adapters.attachments` | Adopted | Text capped at 20k chars, images at 5 MB, refusals explained. | #238 |
-| runtime `suggestions` | Adopted | Starter suggestions computed from canvas state. | #238 |
-| `queue` adapter | Adopted | The follow-up lane: a send while a reply runs joins the queue instead of the wall. | #410 |
-| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works; the dedicated adapter is unused, branches are inferred from parent ids. | — |
-| `groupPartByType` / `GroupedParts` | Partial | The work row groups through `GroupedParts` with our own `workGrouping`; the helper, which keys by part type alone, is unused. | — |
+| `setMessages` (branch switch) | Adopted | `switchBranch` swaps the visible path; the sidecar persists `head_id`. | #238 |
+| `onNew` | Adopted | `sendMessage`. | #238 |
+| `onEdit` | Adopted | `editFrom`. | #238 |
+| `onReload` (regenerate) | Adopted | `regenerateFrom`. | #238 |
+| `onCancel` | Adopted | `stopStreaming`. | #238 |
+| `onRespondToToolApproval` | Adopted | `respondToApproval`, the write gate. | #238 |
+| `adapters.attachments` | Adopted | Text refused above 20k chars (not shortened, #652), images at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. | #238 |
+| runtime `suggestions` | Adopted | `suggestionsFor`, computed from canvas state. | #238 |
+| `ExternalThreadBranchAdapter` (`getBranches`, `switchToBranch`) | Partial | Branching works through `setMessages` and `head_id`; the dedicated adapter is unused, so the runtime infers branches from parent ids. | — |
+| `queue` adapter | Adopted | Keeps a follow-up while a reply runs. | #410 |
+| `groupPartByType` / `GroupedParts` | Partial | The fallback fired: the turn's work groups through `GroupedParts` (see the message table), but with our own `workGrouping`. `groupPartByType` keys by part type or tool name alone, so a pending approval — a `tool-call` part — would be folded into the row. | — |
 | `ThreadPrimitive.Root` | Adopted | The transcript's shell. | #238 |
 | `ThreadPrimitive.Viewport` | Adopted | Scrolling; the jump-to-latest affordance reads its `isAtBottom`. | #238 |
 | `ThreadPrimitive.Messages` | Adopted | The message map. | #238 |
-| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data is adopted; the pills are hand-rolled because they carry the artifact-preview copy. | — |
-| `MessagePrimitive.Parts` | Adopted | Every part of a reply renders through the `components` map. | #238 |
-| `MessagePrimitive.GroupedParts` | Adopted | One collapsed row holds what a turn did — its reasoning and tool calls — and never hides a write that is still asking. | #392 |
+| `ThreadPrimitive.Suggestion` / `.Suggestions` | Partial | The data (`suggestions`) is adopted; the pills are hand-rolled because they carry the artifact-preview copy. Adopting the primitives would drop that copy; `SuggestionByIndex` is not an option since the list is computed from canvas state. | — |
+| `MessagePrimitive.Parts` | Adopted | With the `components` map. | #238 |
 | `MessagePrimitive.Attachments` | Adopted | User turns show what was sent. | #238 |
-| `MessagePrimitive.Root` | Partial | The wrapper is a hand-written article carrying `aria-busy` and the avatar. | — |
-| `MessagePrimitive.Quote` | Adopted | The quoted passage renders on the sent turn. | #435 |
-| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Custom text/file renderers, because claim chips and extraction state need them. | — |
+| `MessagePrimitive.Root` | Adopted | Every turn — user, assistant, and notice — renders its root through the primitive, which supplies the hover state the action bar reads and the top anchor. The `article`, the classes, the assistant avatar, and `aria-busy` ride on it unchanged. | #994 |
+| `MessagePrimitive.Quote` | Adopted | Renders the quoted passage on a sent turn. | #435 |
+| `MessagePrimitive.GroupedParts` | Adopted | The reasoning and tool calls of one run fold into a single disclosure; `indicator="never"` keeps the activity line and caret where the `components` map put them. | #392 |
+| `MessagePartPrimitive.Text` / `.Image` / `.File` | Partial | Rendered through the `components` map (custom `TextPart`, `FilePart`) rather than the bare primitives, which cannot show claim chips or extraction state. | — |
+| `thread` Element | Partial | The frame is copied in: the thread root, the scrolling viewport, and the viewport footer the composer docks into, so the empty stage and a running thread share one layout (#993). The Element's message, composer, attachment, markdown, reasoning, and tool-group sections are not taken — `Conversation`/`parts.tsx`, `ThreadComposer`, and `Markdown.tsx` own those, and the arrival count, branch picker, and part renderers are product concerns the Element would not carry. The copy's provenance header and `vendor.lock.json` entry record exactly what was dropped. | — |
+| `button` Element | Adopted | The one copy-in. Carries a provenance header and an entry in `vendor.lock.json`; the class-merger import is local. | #383 |
 | `ComposerPrimitive.Root` / `.Input` / `.Send` / `.Cancel` | Adopted | The composer's skeleton. | #238 |
-| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Paperclip and chips, bounded by the attachment adapter; each chip is an `AttachmentPrimitive.Root`. | #238 |
-| `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works through the composer's own handlers with the same accept rules. | — |
-| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`; extraction state, refusal reason and size ride inside `Root` as children, but the sent-turn chip in `parts.tsx` still writes its own markup. | — |
-| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | The quote shows above the input and can be cleared before send. | #435 |
-| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | The microphone, hidden where unsupported. | #433 |
-| `ComposerPrimitive.Queue` | Adopted | The pending lane rendered above the composer. | #410 |
-| `createMessageQueue(driver)` | Adopted | The queue's own driver hook: run with `steer`, optional cancel. | #410 |
-| `MessageQueueController` | Adopted | Busy/idle/cancelled signalling and hold/release — the reason the lane is not hand-rolled. | #410 |
-| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | One lane row: its text, Run now, and a remove that drops only that message. | #410 |
-| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | Quote, dictation, and queue state are read today — the follow-up lane is `composer.queue`; in-transit state arrives later. | — |
+| `ComposerPrimitive.AddAttachment` / `.Attachments` | Adopted | Bounded by `apps/studio/src/assistant/attachments.ts`. | #238 |
+| `ComposerPrimitive.AttachmentDropzone` | Partial | Dropping works: the composer has its own `onDragOver`/`onDrop` with the same accept rules as `attachmentRejection`. Adopting the primitive would only relocate the same logic. | — |
+| `ComposerPrimitive.Queue` | Adopted | Renders the pending lane. | #410 |
+| `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | Shows and clears the quote before send. | #435 |
+| `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | Dictation, hidden where unsupported. | #433 |
+| `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. | — |
 | `ActionBarPrimitive.Root` / `.Copy` / `.Edit` / `.Reload` | Adopted | The reply's own controls. | #238 |
-| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | **Read aloud** on a settled reply with prose, **Stop reading** while it speaks. Starting another reply stops the first; Stop reading, Escape inside the thread, and leaving the conversation end it. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken. A streaming reply is never spoken and speech is never persisted. | #432 |
-| `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation export is stronger than the per-reply primitive. | — |
-| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Alternative N of M, shown only when a branch exists. | #238 |
-| Attachment adapter (`AttachmentAdapter`) | Adopted | Browser-side extraction; nothing is stored server-side. | #238 |
-| Drop and paste | Adopted | The composer accepts exactly what the input accepts. | #238 |
-| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | Selecting prose in a reply offers Quote. | #435 |
-| `data-aui-quote-selectable="false"` | Adopted | Tool traces and generated surfaces are marked non-prose. | #435 |
-| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in the turn's metadata. | #435 |
-| `button` Element | Adopted | The one copy-in: a shadcn button under `src/vendor`, with a provenance header and a `vendor.lock.json` entry. It is not an assistant-ui primitive — it is a vendor decision, recorded here because the ledger audits the library and the alley is part of that audit. | #383 |
-| Structured turn failure | Adopted | The failure panel with retry copy. | #129 |
-| `unstable_useMessageStallDetection` | Adopted | "Still working · no new output for Ns", only when output stops moving. | #431 |
-| `useAuiState` | Adopted | Runtime state read across the transcript and composer. | #238 |
-| `useAui` | Adopted | Imperative composer actions. | #238 |
+| `ActionBarPrimitive.Speak` / `.StopSpeaking` | Adopted | Read a reply aloud, and **Stop reading** while it speaks. The runtime is given a `WebSpeechSynthesisAdapter` only where the shell has `speechSynthesis`, so the control is absent rather than broken; a streaming reply is never spoken and speech is never persisted. | #432 |
+| `ActionBarPrimitive.ExportMarkdown` | Partial | Whole-conversation Markdown export exists and also serialises generated surfaces. Adopting the primitive for one reply would produce a second, weaker export format. | — |
+| `BranchPickerPrimitive.Root` / `.Previous` / `.Next` / `.Count` / `.Number` | Adopted | Exposed only when `branchCount > 1`. Branching, editing, and regenerating round-trip through the sidecar's `head_id`. | #238 |
+| Attachment adapter (`AttachmentAdapter`) | Adopted | Text extraction refused above 20k chars (not shortened, #652), images capped at 5 MB, `.docx` and `.pdf` extracted in the browser (#393), refusals explained. | #238 |
+| Drop and paste | Adopted | The composer follows the same accept rules as the input. | #238 |
+| `AttachmentPrimitive.Root` / `.Name` / `.Remove` / `unstable_Thumb` | Partial | The composer chip composes the primitive inside `ComposerPrimitive.Attachments`, which scopes each chip to its own attachment; the extraction state, the refusal reason and the size ride inside `Root` as children, so the primitive shows more than a name. The sent-turn chip in `parts.tsx` still writes its own `attachment-chip` markup, so this is a partial slice of #859. | — |
+| `createMessageQueue(driver)` | Adopted | `driver.run(message, {steer})`, optional `driver.cancel`. | #410 |
+| `MessageQueueController` | Adopted | `notifyBusy` / `notifyIdle` / `notifyCancelled` / `hold` / `release` / `clear` / `subscribe` — the cancel pause is why we must not hand-roll. | #410 |
+| `QueueItemPrimitive.Text` / `.Steer` / `.Remove` | Adopted | One lane above the composer. | #410 |
+| Pending-call strip | Adopted | The running and awaiting-approval calls, below the last message. A summary, never a queue: no speculative "up next" rows. | #390 |
+| `SelectionToolbarPrimitive.Root` / `.Quote` | Adopted | Quote on select, inside one message. | #435 |
+| `data-aui-quote-selectable="false"` | Adopted | Marks tool traces, approval cards, and generated surfaces as non-prose; inline claim chips stay selectable. | #435 |
+| `QuoteInfo` (`{ text, messageId }`) / `useMessageQuote` | Adopted | The quote persists in `metadata.custom.quote` and renders on the sent turn. | #435 |
+| Structured turn failure | Adopted | `metadata.custom.error` / `retryText`, rendered by `FailurePanel`. | #129 |
+| `unstable_useMessageStallDetection` | Adopted | Speaks only when output stops moving. | #431 |
+| `useAuiState` | Adopted | Read across the transcript and composer. | #238 |
+| `useAui` | Adopted | Imperative actions. | #238 |
 | `AuiIf` | Adopted | The conditional idiom in use. | #238 |
-| `unstable_useComposerInputHistory` | Adopted | Up-arrow recalls what you sent last. | #430 |
-| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count is ours (`arrivalCount.ts`). | #245 |
-| Tool approval gate | Adopted | A pending write blocks the turn until you answer. | #238 |
-| Tool result rendering | Adopted | Each MCP call is a trace chip, gathered under the turn's work row. | #238 |
-| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | Only the validated catalog's `components.data.by_name` path is used. | — |
-| ODI surfaces as `data` parts | Adopted | A validated `UiNode` rides the transcript and renders through `UiRenderer`. | #55 |
+| `unstable_useComposerInputHistory` | Adopted | ArrowUp recall. | #430 |
+| `useThreadViewport` (viewport state) | Adopted | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count lives in `arrivalCount.ts`. | #245 |
+| Tool approval gate | Adopted | Plus the sidecar approval registry; a pending write blocks the turn. | #238 |
+| Tool result rendering | Adopted | `tools: { Fallback: ToolPart }`. | #238 |
+| `Tools` / `DataRenderers` / `useAssistantDataUI` | Partial | We use the `components.data.by_name` map for the validated ODI catalog and claims. The client-level `DataRenderers` scope would be a second registration path for the same thing. | — |
+| ODI surfaces as `data` parts | Adopted | Validated by a catalog manifest and rendered through the same `UiRenderer`. | #55 |
+<!-- END GENERATED: living-studio-projection -->
 
 #### Where the bridge lives
 
@@ -494,6 +566,8 @@ cites the issue or PR that landed it.
 | `apps/studio/src/assistant/claims.ts` | Hides claim markers (including one split across streamed chunks), cuts the reply so every chip lands after its own sentence, and counts citations without a seeded demo. The Markdown export reads a claim-bearing reply through this same parser, so the file cannot say something other than what the transcript showed. |
 | `apps/studio/src/components/chat/Conversation.tsx` | `MessagePrimitive.GroupedParts` with the turn's work grouped, the branch picker, the action bar, and the in-place edit composer. |
 | `apps/studio/src/components/chat/WorkBlock.tsx` | The work row itself: one line that counts the calls it holds, times only a run this browser watched, and opens on the turn's own record. |
+| `apps/studio/src/assistant/pending.ts` | The calls a turn is actually waiting on — running, or holding an unanswered approval. Pure over `ChatPart`, and never a speculative "up next" list. |
+| `apps/studio/src/components/chat/PendingCalls.tsx` | The pending strip below the last message: the calls in flight, with the store's own start time when it recorded one and no clock otherwise. |
 | `apps/studio/src/components/chat/workGrouping.ts` | Which parts of a reply are one run of work — the thinking and the answered calls together, a pending approval never folded in. Pure over the runtime's parts, so it needs no browser to test. |
 | `apps/studio/src/components/chat/ThreadComposer.tsx` | `ComposerPrimitive` plus the slash palette, connector chips, attachment drop/paste, and attachment-format/size guidance. |
 | `apps/studio/src/components/chat/ModelPicker.tsx` | The composer's model listbox: opens the sidecar's `/api/models`, keeps the configured id selectable, and saves through Settings. |
@@ -551,6 +625,15 @@ Each note is `suggested` or `confirmed`. Suggested notes appear first under
 confirmed notes can be edited or forgotten. The PM can also add a note by hand.
 Nothing is silently promoted: the agent may propose, but the person decides.
 
+A note may also name a **subject**: the job, step, outcome, or evidence it is
+about (`subject_type` plus `subject_id`). The panel renders that as the record's
+own words — its parent job, its id, and its title — and clicking it focuses the
+record on the canvas. A note that names no subject says so, and one whose subject
+is no longer on the canvas says that instead of showing a bare id. Repeating a
+note with the same text and subject updates the existing row rather than adding a
+duplicate. `GET /api/memory/observations` accepts `subject_type` and `subject_id`
+to return only the notes about one record.
+
 The agent writes notes through a `remember` tool during a normal reply. The
 sidecar applies it, emits a `memory` SSE event, and the panel updates without a
 refresh. Memory writes are best-effort — a database failure never turns a good
@@ -582,6 +665,13 @@ turns, and continues with the same `conversation_id` on the next message. **New
 conversation** starts a fresh one without touching the memory; **Forget
 everything** removes both. The composer stays usable while the restore is in
 flight, and a restore failure simply leaves the room empty.
+
+The history list is also where a thread gets its name. **Rename** on any row swaps
+the row into a field holding the current name: Enter or leaving the field commits
+it, Escape puts the old name back, and a blank name is refused without a request.
+The name is stored with the conversation, so it survives a reload. Renaming never
+opens the thread it renames and never touches the branch that was visible — a
+name is not a reason to move the person off the reply they were reading.
 
 ### Printing and export
 
@@ -711,11 +801,12 @@ The copilot does not only talk. When a surface carries the evidence better than 
 paragraph, the agent renders one **inline in the conversation**: a scored
 outcome, a ranked opportunity board, a before/after simulation of a bet, a
 customer quote with its lineage, the eight-stage job map, an opportunity thesis,
-a decision record, an outcome-based segment, or the strategy it implies.
+a decision record, an outcome-based segment, the strategy it implies, or a
+finding with the number and the step behind it.
 Three properties keep this safe and cheap to extend:
 
 - **The catalog is closed and owned by the SPA.**
-  `apps/studio/src/ui/catalog.ts` declares nine primitives and nine cards, their
+  `apps/studio/src/ui/catalog.ts` declares nine primitives and ten cards, their
   JSON Schema props, and the description the model reads. There is no HTML, no
   eval, and no third-party component in the path. Prose is rendered by the same
   `Markdown` component the transcript already used.
@@ -725,8 +816,10 @@ Three properties keep this safe and cheap to extend:
   result naming the exact violation, and the loop offers the tool again, so a
   fumbled prop is corrected in the same reply. A client that sends no catalog
   never sees the tool.
-- **Cards are views, never actors.** Every button is an `intent` string that the
-  agent receives as the user's next message — one authority, one audit trail.
+- **Cards are views, never actors.** An `intent` button is a string the agent
+  receives as the user's next message — one authority, one audit trail. A
+  `detail` button is the one exception: it opens the record the card names in the
+  right region and sends nothing, so inspecting a finding never costs a turn.
 
 A surface is one node tree, streamed as one event:
 
@@ -764,6 +857,14 @@ The strategy card carries Stage 6: the one path the evidence supports, the moves
 it proposes, and **every path it beat with the reason**. The catalog requires at
 least two rejected paths, so a strategy that records none cannot be validated.
 
+The finding card is the one sentence the agent will not bury: a headline claim,
+an impact band, the measured number behind it, and the real `Step.name` it
+happens on. It carries no score, so nothing on it is computed. The step line is
+read back from `canvas.steps` and omitted when the name does not resolve, a
+sample canvas badges the card, and every number is the agent's own formatted
+value. Its **View breakdown** action is a `detail` action: it opens the lens that
+holds the record, focused on that record, without sending a message.
+
 The conversation keeps the order the agent produced: a `delta` appends to the
 open prose part, a `ui` event opens a card, and the next `delta` opens a new
 paragraph after it. The opportunity score is computed from importance and
@@ -778,7 +879,10 @@ that fails validation is dropped whole, and the surrounding prose still reads.
 2. Register the component in `apps/studio/src/ui/registry.ts`.
 3. Implement it in `apps/studio/src/ui/cards.tsx` (domain shape) or
    `apps/studio/src/ui/primitives.tsx` (composition).
-4. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
+4. Add the card to `website/content/landing.json` and a macro in
+   `website/templates/_cards.html`. CI reads `catalog.ts` and fails when a card
+   is missing from the built site.
+5. Run `npm --prefix apps/studio test`. The `registry parity` test fails if the
    catalog and the registry drift apart.
 
 No server change is needed, and no new dependency.
@@ -824,6 +928,14 @@ The app spawns the MCP server and sidecar itself:
 npm --prefix apps/studio run tauri dev     # dev window
 npm --prefix apps/studio run tauri build   # bundles: .deb / .AppImage (Linux), .app / .dmg (macOS), .msi / .exe (Windows)
 ```
+
+The window opens at 1100 × 760 — a focused first frame rather than a
+full-desktop canvas — with a usable floor of 900 × 600 and `resizable: true`, so
+the person grows it rather than shrinking it. Size, position, and the maximized
+flag are restored on the next launch by `tauri-plugin-window-state`, so the
+small default only applies to the first run. Only those three are restored:
+decorations, fullscreen, and visibility stay the shell's business, and a stale
+`visible: false` would open a window nobody can see.
 
 > [!NOTE]
 > **Tauri prerequisites.** The desktop build needs the WebKitGTK toolchain and
@@ -872,19 +984,21 @@ returns to the foreground after that interval. A found update downloads in the
 background; the shell shows one quiet bar above the conversation with progress
 and a single action. macOS and Linux stage the update as soon as its signature
 verifies, so it also applies on the next ordinary launch. **Restart now** in the
-bar, **Settings → Software update**, or the version line in the sidebar applies
-it immediately. Windows needs the app to exit before its installer runs, so it
+bar, **Settings → Updates**, or the version line in the sidebar applies it
+immediately. Windows needs the app to exit before its installer runs, so it
 offers **Update & restart** instead. Dismissing the bar is safe: a staged update
-still applies on the next launch, and check failures are reported in Settings
-rather than interrupting the conversation. A failed check never borrows the
-last attempt's timestamp: Settings says plainly that the app could not check and
-names when it last reached the server successfully, or that it has not yet.
-Below that, **Recent update activity** lists the most recent updater actions of
-this session — checks, downloads, installs, skips and dismissals — newest first
-and capped, so a support conversation starts from what actually happened.
+still applies on the next launch, and check failures are reported in
+**Settings → Updates** rather than interrupting the conversation. A failed check
+never borrows the last attempt's timestamp: Settings says plainly that the app
+could not check and names when it last reached the server successfully, or that
+it has not yet. Below that, **Recent update activity** lists the most recent
+updater actions of this session — checks, downloads, installs, skips and
+dismissals — newest first and capped, so a support conversation starts from what
+actually happened.
 
 In-app updates are inactive in the browser build and in `tauri dev`; both say so
-in **Settings → Software update**.
+in **Settings → Updates**. The running version, commit, and build date live in
+**Settings → About**, not in the Updates row.
 
 `scripts/verify-desktop-update.sh` proves the path locally: it builds signed
 0.1.0 and 0.2.0 AppImages against a throwaway key and a local `latest.json`,
@@ -923,7 +1037,7 @@ Each row below names a state to reach and what is worth your own eyes.
 | Reasoning | A backend that streams `reasoning_content` or `reasoning` | The disclosure opens while it is written, settles to *Thought for Ns*, reopens on click, and never repeats the answer |
 | Work row | A model that emits real `tool_calls`, then a page reload | The row reads *Working… · N calls* while the turn runs and *Worked for Ns · N calls* at rest; opening it lists the calls in the order they arrived without shifting the answer; the same turn reopened from the store counts its calls and invents no duration |
 | Tool trace and sources | A model that emits real `tool_calls` | The dot pulses while the tool runs, the chip previews what came back, and the source names the tool the turn actually read |
-| Approval | The same, asking it to write ("add a step to …") | The turn pauses for **Allow**/**Decline**, the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
+| Approval | The same, asking it to write ("add a step to …") | The turn pauses on a card that states the consequence and lists the arguments; **Don't allow** offers an optional reason that reaches the model; the ask is never folded into the work row, a decline reads as a tool result and not an error, and a double click runs the tool once |
 | Model picker | **Model** in the hint row; open it twice; narrow the window first | The list matches the backend, the configured id stays selectable, arrows/Home/End/Enter/Escape work, an offline backend explains itself and its Settings button is reachable from the keyboard, and it probes once per backend |
 | Attachments | Paperclip, drag a file onto the composer, paste a screenshot, then drop a `.exe`; a read failure shows on the chip when the browser hands over a file it will not open (a locked transcript, or one the tab lost the handle to) | Thumbnail, name, size, and remove on the chip; the refused file never becomes a chip; the unreadable one stays as a chip marked *Could not read this file* with send disabled until it is removed, and the draft and any other attachment survive it; the sent turn shows the same; the paperclip has a visible focus ring |
 | Branches | Edit your own turn, then regenerate a reply | **Alternative N of M** with `‹`/`›`, and a reload reopens the branch you were reading |

@@ -71,6 +71,26 @@ def test_load_baseline_rejects_corrupt_json(monkeypatch, tmp_path):
         raise AssertionError("expected ValueError")
 
 
+def test_from_dict_rejects_unknown_keys(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    try:
+        profile.Baseline.from_dict({"product_name": "Acme", "made_up_field": 1})
+    except ValueError as exc:
+        assert "made_up_field" in str(exc)
+        assert "valid fields" in str(exc)
+    else:  # pragma: no cover - unknown keys must raise
+        raise AssertionError("expected ValueError for unknown keys")
+
+
+def test_from_dict_accepts_known_keys(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    b = profile.Baseline.from_dict({"product_name": "Acme", "schema_version": 1, "source": "url"})
+    assert b.product_name == "Acme"
+    assert b.schema_version == 1
+    assert b.source == "url"
+    assert b.inferred is False
+
+
 def test_save_sets_created_at_when_missing(monkeypatch, tmp_path):
     _isolate(monkeypatch, tmp_path)
 
@@ -90,6 +110,39 @@ def test_save_preserves_an_explicit_created_at(monkeypatch, tmp_path):
 
     assert loaded is not None
     assert loaded.created_at == "2026-01-01T00:00:00Z"
+
+
+def test_inferred_survives_a_save_and_load(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(
+        profile.Baseline(schema_version=1, source="wizard", product_name="Acme", inferred=True)
+    )
+    loaded = profile.load_baseline()
+    assert loaded is not None
+    assert loaded.inferred is True
+    assert loaded.schema_version == 1
+
+
+def test_inferred_defaults_to_false_through_a_save_and_load(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(profile.Baseline(product_name="Acme"))
+    loaded = profile.load_baseline()
+    assert loaded is not None
+    assert loaded.inferred is False
+
+
+def test_a_baseline_written_before_inferred_existed_still_loads(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"schema_version": 1, "product_name": "Acme"}')
+
+    loaded = profile.load_baseline()
+
+    assert loaded is not None
+    assert loaded.product_name == "Acme"
+    assert loaded.inferred is False
+    assert loaded.schema_version == 1
 
 
 def test_backup_baseline_returns_none_without_a_file(monkeypatch, tmp_path):

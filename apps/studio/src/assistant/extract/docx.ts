@@ -11,7 +11,10 @@
 
 import mammoth from "mammoth";
 
-import { capExtracted, type Extraction } from "./common";
+import { ExtractionError, capExtracted, type Extraction } from "./common";
+
+/** Re-exported so callers keep importing it from the module they know. */
+export { ExtractionError };
 
 /** The OOXML content type a browser reports for a `.docx`, when it reports one. */
 export const DOCX_CONTENT_TYPE =
@@ -55,14 +58,6 @@ export function isLegacyDoc(name: string, contentType: string): boolean {
     return true;
   }
   return contentType === LEGACY_DOC_CONTENT_TYPE;
-}
-
-/** Extraction failed for a reason the user can act on, named in a sentence. */
-export class ExtractionError extends Error {
-  constructor(public readonly sentence: string) {
-    super(sentence);
-    this.name = "ExtractionError";
-  }
 }
 
 /**

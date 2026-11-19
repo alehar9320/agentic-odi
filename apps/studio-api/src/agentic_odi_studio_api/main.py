@@ -8,9 +8,11 @@ write-ahead log behind for the next process to recover.
 """
 
 import uvicorn
+from agentic_odi_core import configure_logging
 
 
 def main() -> None:
+    configure_logging()
     uvicorn.run("agentic_odi_studio_api.app:create_app", factory=True, host="127.0.0.1", port=8100)
 
 

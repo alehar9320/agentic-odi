@@ -13,7 +13,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useAuiState } from "@assistant-ui/react";
 
 import { isCommandDraft, type StudioCommand } from "../../lib/commands";
-import { useMediaQuery } from "../../lib/useMediaQuery";
+import { useReducedMotion } from "../../lib/useReducedMotion";
 import { useStudio } from "../../state/StudioContext";
 import { detectPlatform, shortcutLabels } from "../../updater/platform";
 import { BoltIcon, CaptureIcon, CompassIcon, SparkIcon } from "../icons";
@@ -29,6 +29,7 @@ interface QuickPill {
   label: string;
   icon: ReactNode;
   run: () => void;
+  preview?: string;
 }
 
 /**
@@ -42,14 +43,7 @@ export function SuggestionPills() {
 
   const jobs = canvas?.jobs.length ?? 0;
 
-  const pills: QuickPill[] = suggestions.map((suggestion, index) => ({
-    id: `suggestion-${index}`,
-    label: suggestion.title ?? suggestion.prompt,
-    icon: PILL_ICONS[index % PILL_ICONS.length],
-    run: () => void sendMessage(suggestion.prompt),
-  }));
-
-  pills.push(
+  const landscape =
     jobs > 0 && llmHealth.healthy === false
       ? {
           id: "capture",
@@ -62,18 +56,40 @@ export function SuggestionPills() {
           label: "Opportunity landscape",
           icon: <CompassIcon size={15} />,
           run: () => openPanel("landscape"),
-        },
-  );
+        };
+
+  const cards: QuickPill[] = suggestions.map((suggestion, index) => ({
+    id: `suggestion-${index}`,
+    label: suggestion.title ?? suggestion.prompt,
+    icon: PILL_ICONS[index % PILL_ICONS.length],
+    run: () => void sendMessage(suggestion.prompt),
+    preview: (suggestion as { artifact?: string }).artifact,
+  }));
 
   return (
-    <div className="composer__pills" aria-label="Suggested next steps">
-      {pills.map((pill) => (
-        <button key={pill.id} type="button" className="suggestion" onClick={pill.run}>
-          {pill.icon}
-          {pill.label}
-        </button>
-      ))}
-    </div>
+    <>
+      <ul className="composer__starters" role="list" aria-label="Suggested next steps">
+        {cards.map((card) => (
+          <li key={card.id}>
+            <button
+              type="button"
+              className="suggestion suggestion--card"
+              aria-label={card.label}
+              onClick={card.run}
+            >
+              {card.icon}
+              <div className="suggestion__copy">
+                <div className="suggestion__title">{card.label}</div>
+                {card.preview && <div className="suggestion__description">{card.preview}</div>}
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="composer__starter--link" aria-label={landscape.label} onClick={landscape.run}>
+        {landscape.icon} {landscape.label}
+      </button>
+    </>
   );
 }
 
@@ -96,7 +112,7 @@ function PaletteOption({
   onChoose: () => void;
 }) {
   const ref = useRef<HTMLButtonElement | null>(null);
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!active) {

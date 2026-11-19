@@ -164,8 +164,8 @@ describe("FirstRunWizard", () => {
     );
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(studio.openSetup).not.toHaveBeenCalled();
-    // The finish is persisted once the dialog has closed, so the record lands a
-    // flush after the close, and a slow runner reads the previous step otherwise.
+    // The provider persists on an effect after the dialog closes, so read the
+    // stored record once it has flushed instead of racing it.
     await waitFor(() =>
       expect(stored()).toMatchObject({
         status: "done",
