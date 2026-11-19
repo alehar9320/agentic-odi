@@ -78,7 +78,7 @@ def _load_profile_fallback() -> dict[str, str]:
     if not profile_file.exists():
         return {}
     try:
-        with open(profile_file) as f:
+        with open(profile_file, encoding="utf-8") as f:
             return json.load(f)
     except Exception:  # noqa: BLE001
         return {}

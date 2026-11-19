@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
+    CandidateSolution,
     CustomerOutcome,
     Evidence,
     Job,
+    Link,
     Outcome,
     ScheduledWork,
     Segment,
@@ -23,6 +27,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: Characters a connector may wrap a quote in; stripped before fingerprinting so
+#: ``"Lost hours"`` and ``Lost hours`` identify the same customer sentence.
+_WRAPPING_QUOTES = "\"'“”‘’«»"
 
 #: A workspace has exactly one V2MOM, and the model carries no id, so the store
 #: keys it by this constant rather than a generated one.
@@ -52,6 +60,21 @@ def page(items: list[_Item], limit: int | None = None, offset: int = 0) -> list[
         raise ValueError("limit must be >= 0")
     sliced = items[offset:] if offset else items
     return sliced if limit is None else sliced[:limit]
+
+
+def link_identity(link: Link) -> tuple[str, str, str, str, str]:
+    """The five columns that make two links the same relationship.
+
+    Duplicates are a property of the endpoints and the relationship, not of the
+    generated id, so both repositories key on this tuple.
+    """
+    return (
+        link.source_type,
+        link.source_id,
+        link.target_type,
+        link.target_id,
+        link.relationship_type.value,
+    )
 
 
 def rank_signals(signals: list[Signal]) -> list[Signal]:
@@ -117,6 +140,36 @@ def compute_evidence_fingerprint(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def normalize_quote_text(text: str) -> str:
+    """Normalize quote text so two renderings of one quote share an identity.
+
+    Unicode NFC, collapsed whitespace, casefold, wrapping quotes removed, and
+    terminal punctuation stripped. A connector that re-renders the same
+    sentence — extra spaces, a smart quote, a trailing period — must not look
+    like a second customer.
+    """
+    normalized = unicodedata.normalize("NFC", text or "")
+    normalized = " ".join(normalized.split()).casefold()
+    while normalized and normalized[0] in _WRAPPING_QUOTES:
+        normalized = normalized[1:].lstrip()
+    while normalized and normalized[-1] in _WRAPPING_QUOTES:
+        normalized = normalized[:-1].rstrip()
+    normalized = normalized.rstrip(".!?,;:")
+    return normalized
+
+
+def compute_promotion_fingerprint(source_kind: str, source_name: str, content: str) -> str:
+    """Fingerprint a quote by what identifies it, not how it was labelled.
+
+    Hashes the source with the *normalized* content, joined by ``\\x1f`` the way
+    signals do. ``name`` and ``raw`` are deliberately excluded: connectors
+    relabel records and payloads carry fetch timestamps, so including them
+    would let one quote become several opportunities.
+    """
+    payload = "\x1f".join([source_kind or "", source_name or "", normalize_quote_text(content)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
@@ -128,8 +181,10 @@ class Repository(Protocol):
     scheduled_work: dict[str, ScheduledWork]
     segments: dict[str, Segment]
     strategies: dict[str, Strategy]
+    candidates: dict[str, CandidateSolution]
     v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
+    links: dict[str, Link]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -208,10 +263,27 @@ class Repository(Protocol):
     def get_study(self, study_id: str) -> Study | None: ...
     def list_studies(self, job_id: str | None = None) -> list[Study]: ...
     def update_study(self, study_id: str, updates: dict) -> Study | None: ...
+    def add_link(self, link: Link) -> Link: ...
+    def get_link(self, link_id: str) -> Link | None: ...
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]: ...
+    def remove_link(self, link_id: str) -> bool: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution: ...
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None: ...
+    def list_candidates(self) -> list[CandidateSolution]: ...
+    def update_candidate(self, candidate_id: str, updates: dict) -> CandidateSolution | None: ...
     def add_proposal(self, proposal: OutcomeProposal) -> OutcomeProposal: ...
     def get_proposal(self, proposal_id: str) -> OutcomeProposal | None: ...
     def list_proposals(self, status: ProposalStatus | None = None) -> list[OutcomeProposal]: ...
@@ -245,10 +317,13 @@ class InMemoryRepository:
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        #: Stage 6's candidates: proposed solutions linked to the outcomes they serve.
+        self.candidates: dict[str, CandidateSolution] = {}
         #: The store holds one vision; it is keyed by a fixed name rather than a
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.links: dict[str, Link] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
 
@@ -680,6 +755,49 @@ class InMemoryRepository:
         self.studies[study_id] = new_study
         return new_study
 
+    def add_link(self, link: Link) -> Link:
+        identity = link_identity(link)
+        if any(link_identity(existing) == identity for existing in self.links.values()):
+            raise ConflictError(
+                f"A {link.relationship_type.value} link already connects "
+                f"{link.source_type}:{link.source_id} to "
+                f"{link.target_type}:{link.target_id}."
+            )
+        self._append_event()
+        self.links[link.id] = link
+        return link
+
+    def get_link(self, link_id: str) -> Link | None:
+        return self.links.get(link_id)
+
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]:
+        items = [
+            link
+            for link in self.links.values()
+            if (source_type is None or link.source_type == source_type)
+            and (source_id is None or link.source_id == source_id)
+            and (target_type is None or link.target_type == target_type)
+            and (target_id is None or link.target_id == target_id)
+            and (relationship_type is None or link.relationship_type.value == relationship_type)
+        ]
+        return page(items, limit, offset)
+
+    def remove_link(self, link_id: str) -> bool:
+        if link_id not in self.links:
+            return False
+        self._append_event()
+        del self.links[link_id]
+        return True
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self._append_derived_event()
         self.strategies[strategy.id] = strategy
@@ -705,6 +823,28 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution:
+        self._append_event()
+        self.candidates[candidate.id] = candidate
+        return candidate
+
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None:
+        return self.candidates.get(candidate_id)
+
+    def list_candidates(self) -> list[CandidateSolution]:
+        return list(self.candidates.values())
+
+    def update_candidate(self, candidate_id: str, updates: dict) -> CandidateSolution | None:
+        candidate = self.candidates.get(candidate_id)
+        if candidate is None:
+            return None
+        self._append_event()
+        current = candidate.model_dump()
+        current.update(updates)
+        new_candidate = candidate.model_validate(current)
+        self.candidates[candidate_id] = new_candidate
+        return new_candidate
+
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         self.v2mom[V2MOM_ID] = v2mom
         return v2mom
@@ -726,7 +866,9 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.candidates.clear()
         self.v2mom.clear()
+        self.links.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

@@ -487,6 +487,7 @@ class PromoteEvidenceRequest(BaseModel):
     name: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    force: bool = False
     mcp_url: str = ""
 
 

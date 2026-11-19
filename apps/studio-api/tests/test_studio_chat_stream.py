@@ -108,6 +108,21 @@ def _tool_call(arguments: str, name: str = "get_jobs") -> Any:
     )
 
 
+def _usage_chunk(prompt: int, completion: int, total: int) -> Any:
+    """The final chunk an OpenAI-compatible backend sends when usage is on.
+
+    It carries counts and no choices, which is what the stream loop must expect.
+    """
+    return SimpleNamespace(
+        choices=[],
+        usage=SimpleNamespace(
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=total,
+        ),
+    )
+
+
 def _install(monkeypatch, streams: list[_FakeStream]) -> None:
     async def _healthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
         return True, "ok"
@@ -246,8 +261,127 @@ def test_an_approved_write_runs(monkeypatch) -> None:
     approval = next(data for name, data in events if name == "approval")
     assert approval["name"] == "add_job"
     assert approval["arguments"] == {"name": "Retention"}
-    assert approval["prompt"] == "Allow the assistant to add job?"
+    assert approval["prompt"] == 'Allow the assistant to Add Job "Retention"?'
+    assert approval["consequence"] == 'Add Job "Retention"'
     assert _Mcp.calls == [("add_job", {"name": "Retention"})]
+
+
+@pytest.mark.parametrize(
+    ("name", "arguments", "consequence"),
+    [
+        ("add_job", {"name": "Retention"}, 'Add Job "Retention"'),
+        ("delete_job", {"job_id": "JOB-1"}, 'Delete Job "JOB-1"'),
+        (
+            "update_outcome",
+            {"outcome_id": "O-2", "statement": "Reduce rework"},
+            'Update Outcome "Reduce rework"',
+        ),
+        ("schedule_work", {"name": "Weekly scan"}, 'Schedule work "Weekly scan"'),
+        ("mark_signal_read", {"signal_id": "SIG-9"}, 'Mark signal "SIG-9"'),
+        ("cancel_scheduled_work", {"work_id": "W-3"}, 'Cancel scheduled work "W-3"'),
+        (
+            "add_evidence",
+            {"source_name": "Support tickets"},
+            'Add evidence record "Support tickets"',
+        ),
+        ("add_step", {"job_id": "J-1"}, "Add a Step"),
+        ("add_connector", {}, "Add a connector"),
+        ("unknown_tool", {}, "Run unknown tool"),
+    ],
+)
+def test_the_prompt_names_the_artifact_and_its_value(
+    monkeypatch, name, arguments, consequence
+) -> None:
+    _install(
+        monkeypatch,
+        [
+            _FakeStream([_chunk(tool_calls=[_tool_call(json.dumps(arguments), name)])]),
+            _FakeStream([_chunk(content="Understood.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    approval = next(data for name_, data in events if name_ == "approval")
+    assert approval["name"] == name
+    assert approval["consequence"] == consequence
+    assert approval["prompt"] == f"Allow the assistant to {consequence}?"
+
+
+def test_a_long_argument_is_truncated_in_the_prompt(monkeypatch) -> None:
+    statement = "Minimize the time " + "x" * 200
+    _install(
+        monkeypatch,
+        [
+            _FakeStream(
+                [
+                    _chunk(
+                        tool_calls=[_tool_call(json.dumps({"statement": statement}), "add_outcome")]
+                    )
+                ]
+            ),
+            _FakeStream([_chunk(content="Understood.")]),
+        ],
+    )
+    events = _parse(
+        _collect_answering(
+            _request(approvals=True), ApprovalRegistry(), ApprovalDecision(approved=False)
+        )
+    )
+    consequence = next(data for name, data in events if name == "approval")["consequence"]
+    assert consequence.startswith('Add Outcome "Minimize the time')
+    assert consequence.endswith('…"')
+    assert len(consequence) < len(statement)
+
+
+def test_a_new_tool_gets_a_sentence_without_a_new_branch() -> None:
+    from agentic_odi_core.contract import TOOL_SPECS, ToolEffect, ToolSpec
+
+    write = ToolSpec(
+        name="add_widget", summary="Create a widget.", effect=ToolEffect.WRITE, arguments=("name",)
+    )
+    destructive = ToolSpec(
+        name="delete_widget",
+        summary="Delete a widget.",
+        effect=ToolEffect.DESTRUCTIVE,
+        arguments=("widget_id",),
+    )
+
+    assert chat._consequence_for("add_widget", {"name": "Alpha"}, write) == 'Add Widget "Alpha"'
+    assert (
+        chat._consequence_for("delete_widget", {"widget_id": "W-1"}, destructive)
+        == 'Delete Widget "W-1"'
+    )
+    # Unknown to TOOL_SPECS still names the tool rather than raising.
+    assert (
+        chat._consequence_for("future_tool", {}, TOOL_SPECS.get("future_tool")) == "Run future tool"
+    )
+
+
+def test_an_empty_or_absent_argument_names_the_kind_not_a_blank() -> None:
+    from agentic_odi_core.contract import TOOL_SPECS
+
+    assert chat._consequence_for("add_job", {"name": "   "}, TOOL_SPECS["add_job"]) == "Add a Job"
+    assert chat._consequence_for("delete_job", {}, TOOL_SPECS["delete_job"]) == "Delete a Job"
+    # add_connector is a local tool with no TOOL_SPECS entry; the override still
+    # names it rather than falling back to "Run add connector".
+    assert (
+        chat._consequence_for("add_connector", {}, TOOL_SPECS.get("add_connector"))
+        == "Add a connector"
+    )
+
+
+def test_the_consequence_never_dumps_raw_arguments() -> None:
+    from agentic_odi_core.contract import TOOL_SPECS
+
+    consequence = chat._consequence_for(
+        "add_job", {"name": "Retention", "description": "{'secret': 1}"}, TOOL_SPECS["add_job"]
+    )
+
+    assert consequence == 'Add Job "Retention"'
+    assert "{" not in consequence and "}" not in consequence
 
 
 def test_a_declined_write_never_runs_and_the_turn_still_ends(monkeypatch) -> None:
@@ -659,3 +793,84 @@ def test_the_persistence_warning_quotes_nothing_anyone_said(monkeypatch, caplog)
     assert logged
     assert secret_words not in logged
     assert "sk-supersecret" not in logged
+
+
+def _turn_payload(caplog) -> dict[str, Any]:
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "agentic_odi_studio_api.studio.observability"
+    ]
+    assert records, "expected one turn log line"
+    return json.loads(records[-1].getMessage())
+
+
+def test_a_usage_chunk_lands_in_the_turn_line(monkeypatch, caplog) -> None:
+    chat._USAGE_UNSUPPORTED.clear()
+    _install(
+        monkeypatch,
+        [_FakeStream([_chunk(content="Done."), _usage_chunk(120, 40, 160)])],
+    )
+
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        _collect(_request())
+
+    payload = _turn_payload(caplog)
+    assert payload["prompt_tokens"] == 120
+    assert payload["completion_tokens"] == 40
+    assert payload["total_tokens"] == 160
+    assert payload["model"] == "model"
+
+
+def test_a_backend_without_usage_records_null_counts(monkeypatch, caplog) -> None:
+    chat._USAGE_UNSUPPORTED.clear()
+    _install(monkeypatch, [_FakeStream([_chunk(content="Done.")])])
+
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        _collect(_request())
+
+    payload = _turn_payload(caplog)
+    assert payload["prompt_tokens"] is None
+    assert payload["completion_tokens"] is None
+    assert payload["total_tokens"] is None
+
+
+def test_a_rejected_include_usage_is_retried_without_it(monkeypatch, caplog) -> None:
+    """A backend that 400s on include_usage still completes, without counts."""
+    chat._USAGE_UNSUPPORTED.clear()
+    calls: list[dict[str, Any]] = []
+
+    class _Rejecting:
+        def __init__(self, **kwargs: Any) -> None:
+            self.chat = SimpleNamespace(completions=self)
+
+        async def create(self, **kwargs: Any) -> Any:
+            calls.append(kwargs)
+            if "stream_options" in kwargs:
+                raise _bad_request()
+            return _FakeStream([_chunk(content="Done.")])
+
+    def _bad_request() -> Any:
+        import httpx2
+
+        request = httpx2.Request("POST", "http://llm/v1/chat/completions")
+        response = httpx2.Response(400, request=request)
+        return chat.openai.BadRequestError("unsupported", response=response, body=None)
+
+    async def _healthy(*args: Any, **kwargs: Any) -> tuple[bool, str]:
+        return True, "ok"
+
+    monkeypatch.setattr(chat, "check_llm_health", _healthy)
+    monkeypatch.setattr(chat, "McpClient", _Mcp)
+    monkeypatch.setattr(chat, "is_endpoint_reachable", lambda url, timeout: True)
+    monkeypatch.setattr(chat, "AsyncOpenAI", lambda **kwargs: _Rejecting(**kwargs))
+
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        events = _parse(_collect(_request()))
+
+    assert any(name == "message" for name, _ in events)
+    assert "stream_options" in calls[0]
+    assert "stream_options" not in calls[1]
+    # The backend is remembered, so the probe is not repeated for this process.
+    assert "http://llm/v1" in chat._USAGE_UNSUPPORTED
+    assert _turn_payload(caplog)["total_tokens"] is None

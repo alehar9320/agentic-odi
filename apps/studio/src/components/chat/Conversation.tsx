@@ -32,7 +32,7 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
-import { formatClockTime, formatDayHeading, startsNewDay } from "../../lib/relativeTime";
+import { formatDayHeading, formatTurnTime, startsNewDay } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
@@ -43,7 +43,6 @@ import { PendingCalls } from "./PendingCalls";
 import { StallNotice } from "./StallNotice";
 import { WorkBlock } from "./WorkBlock";
 import { workGrouping } from "./workGrouping";
-import { LOCAL_MODE_LABEL } from "../../lib/brand";
 
 const PHASE_LABEL: Record<string, string> = {
   health_check: "Waking the model",
@@ -85,7 +84,12 @@ function useMessageStamp(): MessageStamp | null {
   if (!iso) {
     return null;
   }
-  return { iso, clock: formatClockTime(iso), previousIso: transcript.messages[index - 1]?.createdAt };
+  // Recent turns read as a summary ("14m ago"); older ones as a wall clock.
+  return {
+    iso,
+    clock: formatTurnTime(iso),
+    previousIso: transcript.messages[index - 1]?.createdAt,
+  };
 }
 
 /**
@@ -106,7 +110,7 @@ function DayDivider() {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, dismissFailedTurn } = useStudio();
   const id = useAuiState((state) => state.message.id);
   const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
@@ -127,20 +131,22 @@ function AssistantMessage() {
     <>
       <DayDivider />
       {/* `aria-busy` keeps a screen reader from announcing every streamed token;
-          it reads the reply once the turn settles. */}
-      <article className="message message--assistant" aria-busy={running}>
+          it reads the reply once the turn settles. The primitive owns the
+          wrapper — hover state and the top anchor come from it — and renders
+          the same `article` the turn had before. */}
+      <MessagePrimitive.Root
+        className="message message--assistant"
+        aria-busy={running}
+        render={<article />}
+      >
       <AssistantAvatar />
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
             said once instead of warned about in a strip above the work. */}
         {offlineReplyFor === id ? (
-          <button
-            type="button"
-            className="message__tag"
-            onClick={() => openPanel("settings")}
-          >
-            {LOCAL_MODE_LABEL}, no model connected
-          </button>
+          <span className="message__tag" aria-label="This reply came from the built-in assistant">
+            Built-in assistant
+          </span>
         ) : null}
 
         {/* One row for the work a turn did, and the answer on its own. The
@@ -193,6 +199,7 @@ function AssistantMessage() {
             error={error}
             retryText={retryText}
             onRetry={(text) => void sendMessage(text)}
+            onDelete={() => dismissFailedTurn(id)}
           />
         ) : null}
 
@@ -277,14 +284,20 @@ function AssistantMessage() {
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }
 
 function UserMessage() {
+  const { displayName } = useStudio();
   const copied = useAuiState((state) => state.message.isCopied);
   const stamp = useMessageStamp();
+  // One name source: the same `displayName` the greeting and settings use.
+  // Nobody has named themselves yet, so the turn says "You" rather than
+  // inventing a person (#737).
+  const name = displayName.trim() || "You";
+  const initial = name.slice(0, 1).toUpperCase();
 
   // A pasted document is a message, not the screen. The bubble starts clamped at
   // eight lines; when the text fits, the clamp and its control disappear. Copy
@@ -304,7 +317,9 @@ function UserMessage() {
   return (
     <>
       <DayDivider />
-      <article className="message message--user">
+      <MessagePrimitive.Root className="message message--user" render={<article />}>
+      <div className="message__column message__column--user">
+      <p className="message__byline">{name}</p>
       <div
         ref={bubbleRef}
         className={`message__bubble${clamped && !expanded ? " is-clamped" : ""}`}
@@ -363,7 +378,11 @@ function UserMessage() {
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
       </ActionBarPrimitive.Root>
-      </article>
+      </div>
+      <span className="message__avatar message__avatar--user" aria-hidden="true">
+        {initial}
+      </span>
+      </MessagePrimitive.Root>
     </>
   );
 }
@@ -372,9 +391,9 @@ function SystemMessage() {
   return (
     <>
       <DayDivider />
-      <article className="message message--notice">
+      <MessagePrimitive.Root className="message message--notice" render={<article />}>
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }

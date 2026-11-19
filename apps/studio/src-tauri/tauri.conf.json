@@ -14,15 +14,15 @@
       {
         "label": "main",
         "title": "Living Studio",
-        "width": 1440,
-        "height": 960,
-        "minWidth": 1024,
-        "minHeight": 720,
+        "width": 1100,
+        "height": 700,
+        "minWidth": 900,
+        "minHeight": 600,
         "resizable": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 http://localhost:8100 http://127.0.0.1:8100 ws://localhost:5173; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     }
   },
   "bundle": {
