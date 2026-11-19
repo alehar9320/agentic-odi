@@ -1,3 +1,9 @@
+/**
+ * The download helper defers blob-URL revocation (issue #1134).
+ *
+ * Safari and Firefox cancel an in-flight download when the object URL is
+ * revoked in the same turn as the click, so revocation waits one macrotask.
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { downloadFile } from "./download";
@@ -28,7 +34,6 @@ describe("downloadFile", () => {
     downloadFile("contents", "file.json");
     expect(revokeObjectURL).not.toHaveBeenCalled();
     vi.advanceTimersByTime(0);
-    // still not revoked synchronously within same turn assertion handled by not called before
   });
 
   it("revokes exactly once", () => {

@@ -252,6 +252,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/changelogRead.test.ts` | — |
 | `apps/studio/src/lib/commands.test.ts` | — |
 | `apps/studio/src/lib/dashboard.test.ts` | The days really held zero signals, so a flat zero line is honest here — |
+| `apps/studio/src/lib/download.test.ts` | The download helper defers blob-URL revocation (issue #1134). |
 | `apps/studio/src/lib/export.test.ts` | The list item lost its terminal punctuation, so the claim cannot be |
 | `apps/studio/src/lib/focus.test.ts` | — |
 | `apps/studio/src/lib/formula.test.ts` | The opportunity-score ratchet (issue #1087). |
