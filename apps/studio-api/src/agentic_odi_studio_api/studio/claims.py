@@ -37,8 +37,8 @@ _LIST_PREFIX = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _HEADING_PREFIX = re.compile(r"^\s*#{1,6}\s+")
 
 #: A period after one of these is punctuation inside the word, not a sentence end.
-#: Every entry is a word after which a period does not end a sentence. A wrongly
-#: added entry merges two claims, which is worse than splitting one.
+#: Every entry is a word after which a period does not end a sentence. A wrongly-added
+#: entry merges two claims, which is worse than splitting one.
 _ABBREVIATIONS: frozenset[str] = frozenset(
     {
         "ag",
