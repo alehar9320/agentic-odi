@@ -186,9 +186,7 @@ def test_prune_keeps_the_newest_n(monkeypatch, tmp_path):
     remaining = sorted(p.name for p in profile.config_dir().glob("baseline.json.bak-*"))
     assert len(remaining) == 3
     assert remaining == sorted(f"baseline.json.bak-{s}" for s in stamps[-3:])
-    assert sorted(p.name for p in removed) == sorted(
-        f"baseline.json.bak-{s}" for s in stamps[:5]
-    )
+    assert sorted(p.name for p in removed) == sorted(f"baseline.json.bak-{s}" for s in stamps[:5])
 
 
 def test_prune_never_removes_the_new_copy(monkeypatch, tmp_path):

@@ -163,9 +163,7 @@ def backup_baseline() -> Path | None:
     """
     if not baseline_exists():
         return None
-    backup_path = baseline_file().with_name(
-        f"{BASELINE_FILE_NAME}.bak-{_backup_timestamp()}"
-    )
+    backup_path = baseline_file().with_name(f"{BASELINE_FILE_NAME}.bak-{_backup_timestamp()}")
     shutil.copy2(baseline_file(), backup_path)
     if BASELINE_BACKUP_KEEP > 0:
         prune_baseline_backups()
