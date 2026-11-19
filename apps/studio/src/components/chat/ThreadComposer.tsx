@@ -288,7 +288,10 @@ function ComposerBody({
           canvas and inserts the record's own id, so the agent resolves the id
           or says it does not know it. An unknown `@id` is sent as typed. */}
       <ComposerPrimitive.TriggerPopover char="@" adapter={mentionAdapter} aria-label="Records">
-        <ComposerPrimitive.TriggerPopover.Directive formatter={mentionFormatter} />
+        <ComposerPrimitive.TriggerPopover.Directive
+          formatter={mentionFormatter}
+          onInserted={() => document.getElementById(inputId)?.focus()}
+        />
         <ComposerPrimitive.TriggerPopoverItems>
           {(items) =>
             items.map((item, index) => (
@@ -312,7 +315,13 @@ function ComposerBody({
         adapter={slashAdapter.adapter}
         aria-label="Commands"
       >
-        <ComposerPrimitive.TriggerPopover.Action {...slashAdapter.action} />
+        <ComposerPrimitive.TriggerPopover.Action
+          {...slashAdapter.action}
+          onExecute={(item) => {
+            slashAdapter.action.onExecute(item);
+            document.getElementById(inputId)?.focus();
+          }}
+        />
         <ComposerPrimitive.TriggerPopoverItems>
           {(items) =>
             items.map((item, index) => (

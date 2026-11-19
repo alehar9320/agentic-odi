@@ -587,6 +587,18 @@ describe("ThreadComposer @ mentions", () => {
     expect(input.value).not.toContain("Minimize the time to reconcile");
   });
 
+  it("selects the highlighted record with Tab and keeps composer focus", async () => {
+    const input = mentionComposer();
+
+    fireEvent.change(input, { target: { value: "@minimize" } });
+    await screen.findByRole("option", { name: /Minimize the time to reconcile/ });
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    await waitFor(() => expect(input.value).toBe("@O-1 "));
+    expect(document.activeElement).toBe(input);
+    expect(screen.queryByRole("listbox", { name: "Records" })).not.toBeInTheDocument();
+  });
+
   it("offers nothing to name when the canvas is empty", async () => {
     const input = mentionComposer({ canvas: null });
 
@@ -641,7 +653,7 @@ describe("ThreadComposer / commands", () => {
     const onCommand = vi.fn();
     const input = renderComposer({}, onCommand);
 
-    fireEvent.change(input, { target: { value: "/sta" } });
+    fireEvent.change(input, { target: { value: "/stat" } });
 
     const listbox = await screen.findByRole("listbox", { name: "Commands" });
     expect(input).toHaveAttribute("aria-expanded", "true");
@@ -650,6 +662,18 @@ describe("ThreadComposer / commands", () => {
     expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "status" }));
     await waitFor(() => expect(input.value).toBe(""));
     expect(listbox).not.toBeInTheDocument();
+  });
+
+  it("selects a command with Tab and keeps composer focus", async () => {
+    const onCommand = vi.fn();
+    const input = renderComposer({}, onCommand);
+
+    fireEvent.change(input, { target: { value: "/stat" } });
+    await screen.findByRole("option", { name: /Status/ });
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    expect(onCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "status" }));
+    expect(document.activeElement).toBe(input);
   });
 });
 
