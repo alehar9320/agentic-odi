@@ -17,21 +17,55 @@ const actionList: UiPropSchema = {
   type: "array",
   maxItems: UI_LIMITS.maxActions,
   description:
-    "Buttons rendered under the surface. Each one sends its `intent` back to you as the user's next message.",
+    "Buttons rendered under the surface. An intent button sends its `intent` back to you as the user's next message; a detail button opens the right region on a record and sends nothing.",
   items: {
-    type: "object",
-    properties: {
-      label: {
-        type: "string",
-        description: "Short imperative label, two to four words. e.g. \"Simulate this bet\"",
+    anyOf: [
+      {
+        type: "object",
+        properties: {
+          label: {
+            type: "string",
+            description: "Short imperative label, two to four words. e.g. \"Simulate this bet\"",
+          },
+          intent: {
+            type: "string",
+            description: "The full message to send when clicked, written as the user would say it.",
+          },
+          tone: { enum: ["primary", "ghost"], description: "Use primary at most once per surface." },
+        },
+        required: ["label", "intent"],
       },
-      intent: {
-        type: "string",
-        description: "The full message to send when clicked, written as the user would say it.",
+      {
+        type: "object",
+        properties: {
+          kind: { enum: ["detail"] },
+          label: {
+            type: "string",
+            description: "Short imperative label, two to four words. e.g. \"See the finding\"",
+          },
+          target: {
+            type: "object",
+            properties: {
+              panel: {
+                type: "string",
+                description: "The right-region lens to open. e.g. \"landscape\", \"jobmap\", \"evidence\".",
+              },
+              subject: {
+                type: "object",
+                properties: {
+                  kind: { type: "string", description: "The record kind. e.g. \"outcome\", \"job\"." },
+                  id: { type: "string", description: "The record id the lens should focus." },
+                },
+                required: ["kind", "id"],
+              },
+            },
+            required: ["panel"],
+          },
+          tone: { enum: ["primary", "ghost"], description: "Use primary at most once per surface." },
+        },
+        required: ["kind", "label", "target"],
       },
-      tone: { enum: ["primary", "ghost"], description: "Use primary at most once per surface." },
-    },
-    required: ["label", "intent"],
+    ],
   },
 };
 

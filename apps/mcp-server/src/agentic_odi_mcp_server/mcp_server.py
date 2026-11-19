@@ -275,10 +275,11 @@ def add_outcome(
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
-    for score in (importance, satisfaction):
+    for score, name in ((importance, "importance"), (satisfaction, "satisfaction")):
         if score is not None and not (1.0 <= score <= 10.0):
             return _fail(
-                ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
+                ValueOutOfRangeError(f"{name} must be between 1.0 and 10.0", field=name),
+                f"Error: {name} must be between 1.0 and 10.0",
             )
     scored = importance is not None or satisfaction is not None
     if scored and claim_check is None:
@@ -659,6 +660,7 @@ def promote_evidence(
     name: str | None = None,
     importance: float | None = None,
     satisfaction: float | None = None,
+    force: bool = False,
 ) -> str:
     try:
         artifact = service.promote_evidence(
@@ -669,6 +671,7 @@ def promote_evidence(
             name=name,
             importance=importance,
             satisfaction=satisfaction,
+            force=force,
         )
     except EvidenceNotFoundError as exc:
         return _evidence_not_found(evidence_id, exc.hint)

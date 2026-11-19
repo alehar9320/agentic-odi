@@ -188,6 +188,11 @@ def promote(
     name: str | None = typer.Option(default=None, help="Job name override"),
     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
     satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Promote a quote that already supports an outcome into a second one",
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Turn an evidence record into a Job or desired Outcome."""
@@ -202,6 +207,8 @@ def promote(
         args["importance"] = importance
     if satisfaction is not None:
         args["satisfaction"] = satisfaction
+    if force:
+        args["force"] = True
     noun = "Job" if to is PromoteTarget.JOB else "Outcome"
     typer.echo(
         render_saved("created", run_tool("promote_evidence", args), as_json=json_output, noun=noun)

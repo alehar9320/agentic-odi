@@ -1,0 +1,120 @@
+/* ------------------------------------------------------------------ */
+/* Interview card                                                      */
+/* ------------------------------------------------------------------ */
+/* The card is a form of questions in the thread. It reads like the other
+   lens content: a labelled stack, quiet guidance, and one submit that
+   states what it does. Colours come from the theme tokens only, so the
+   raw-colour gate measures what the card actually paints. */
+
+.interview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.interview__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.interview__submit {
+  padding: 7px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.interview__submit:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--bg));
+}
+
+.interview__submit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.interview__submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.questionnaire__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.questionnaire__legend {
+  padding: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.questionnaire__help {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.questionnaire__input,
+.questionnaire__textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.questionnaire__textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.questionnaire__input:focus-visible,
+.questionnaire__textarea:focus-visible,
+.questionnaire__range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.questionnaire__input[aria-invalid="true"],
+.questionnaire__textarea[aria-invalid="true"] {
+  border-color: var(--red);
+}
+
+.questionnaire__scale {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.questionnaire__range {
+  flex: 1;
+  min-width: 0;
+}
+
+.questionnaire__scale-value {
+  min-width: 3ch;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.questionnaire__error {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.72rem;
+}

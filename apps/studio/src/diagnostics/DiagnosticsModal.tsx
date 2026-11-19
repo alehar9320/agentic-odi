@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useFocusTrap } from "../lib/useFocusTrap";
 
@@ -17,7 +18,17 @@ export function DiagnosticsModal({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [copyMessage, setCopyMessage] = useState("");
-  useFocusTrap(dialogRef, true);
+  useFocusTrap(dialogRef, true, true);
+
+  // The confirmation is a receipt, not a state: it says the copy happened and
+  // then gets out of the way, leaving the dialog exactly as it was.
+  useEffect(() => {
+    if (!copyMessage) {
+      return;
+    }
+    const timer = window.setTimeout(() => setCopyMessage(""), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copyMessage]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -47,7 +58,7 @@ export function DiagnosticsModal({
     URL.revokeObjectURL(url);
   }
 
-  return (
+  return createPortal(
     <div className="diagnostics-overlay" role="presentation">
       <div
         ref={dialogRef}
@@ -118,6 +129,7 @@ export function DiagnosticsModal({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

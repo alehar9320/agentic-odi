@@ -76,6 +76,26 @@ filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
 
+### The cold-start bundle budget
+
+The first screen must not wait on everything the app can do, so the Vite build
+splits the assistant runtime, the markdown renderer, and the Tauri API out of the
+entry chunk with `build.rolldownOptions.output.codeSplitting` groups
+(`vite.config.ts`), and emits `dist/.vite/manifest.json` so the budget script can
+find the entry by role rather than by a hashed name.
+
+`scripts/check_bundle_budget.mjs` measures the entry chunk and every chunk a cold
+load pulls statically, and fails when the entry grows past the recorded baseline
+in `scripts/bundle-budget.json` plus a 20% tolerance. CI runs it right after
+`npm run build` in the `studio` job. After a deliberate change, re-record the
+baseline and say why in the pull request:
+
+```bash
+npm --prefix apps/studio run build
+node scripts/check_bundle_budget.mjs           # check
+node scripts/check_bundle_budget.mjs --update  # re-record the baseline
+```
+
 ### Copied components (`src/vendor`)
 
 Tailwind v4 styles `src/vendor/**` and nothing else (issue #385). The stylesheet
@@ -116,6 +136,7 @@ the pure count arithmetic:
 | `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
 | `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
+| `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | The landscape's honesty pass (#501): the plot draws a point only for a scored outcome, the underserved zone is sampled from `2 × importance − satisfaction > 10` (a boundary pair at one satisfaction lands on opposite sides), an unscored outcome appears under **Not scored (n)** with a **Score me** action that opens the score form without writing a rating |
 | `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
 | `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
 | `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
@@ -125,6 +146,7 @@ the pure count arithmetic:
 | `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
 | `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
 | `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
+| `apps/studio/src/assistant/pending.test.ts`, `src/components/chat/PendingCalls.test.tsx` | The pending-call strip (#390): only running and awaiting-approval calls appear, in transcript order, a settled call leaves the strip for the transcript, a clock is shown only when the store recorded a start, and the strip is never a second live region |
 | `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
 | `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
 | `apps/studio/src/assistant/speech.test.ts`, `src/components/chat/Speech.test.tsx` | The speech support gate, speaking a settled reply, stopping on request and on Escape, and the absence of the control where the API is missing |
@@ -151,6 +173,7 @@ the pure count arithmetic:
 | `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
 | `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
 | `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
+| `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation: `--font-display` and its fallback, five or more steps each of the type and spacing scales, the corner and leading scales, the light theme carries no `--font` override, the display face is self-hosted (no CDN) with `font-display: swap`, and `var(--font-display)` is applied at exactly four sites |
 | `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
 | `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
 | `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
@@ -174,6 +197,14 @@ uv run --directory website pytest tests/
 
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
+
+Every page that uses the shared shell gets **its own social card**: `build_site.py`
+calls `make_og.render_card()` with the page's own `og:title`, the docs nav group it
+sits under, and the one number the page itself renders (the landing page's stat, the
+MCP reference's tool count). Nothing is invented - a page with no number of its own
+is drawn without one - and a page that ends up with no card fails the build with
+`MissingCardError`. The cards land in the build output under `og/`, never in git.
+`website/tests/test_og_pages.py` asserts the contract.
 
 The landing page's primary call to action points at the **sample workspace**,
 `website/sample/index.html`. Unlike the rest of the site it *is* committed, so
@@ -325,25 +356,101 @@ executes pull request code.
 python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
 ```
 
+## AI merge trust and authorization labels
+
+Two labels work together to let an AI agent merge safe pull requests without
+human review:
+
+| Label | Meaning | Set by |
+|-------|---------|--------|
+| `ai-merge-safe` | The PR is non-disruptive and non-sensitive (AND-gated on risk, size, telemetry, sensitive areas, hygiene). | `pr-ai-merge.yml` |
+| `ai-merge-authorized` | CI is green and the PR carries `ai-merge-safe` + `ready-for-merge`; an AI agent may auto-merge it. | `pr-ai-authorize.yml` |
+
+### `ai-merge-safe` (labelling only — humans still merge)
+
+The [PR AI merge trust workflow](.github/workflows/pr-ai-merge.yml) applies
+`ai-merge-safe` only when every gate passes, and removes it when any gate
+fails. Deterministic — no LLM calls, no network beyond the GitHub API, no pull
+request code executed. Fork pull requests are skipped per-job.
+
+| Gate | Requirement |
+|------|-------------|
+| Low disruption | `safe to merge` (risk score ≤ 20) |
+| CI green, no conflicts | `ready-for-merge` |
+| Small enough | `size/XS` or `size/S` (< 250 lines changed) |
+| Clean telemetry | none of `breaking change`, `needs deep dive`, `telemetry invalid` |
+| Non-sensitive areas | no CI/infra/release path, no deleted protected file, no dependency change |
+| Hygiene | open, non-draft PR targeting `main` |
+
+```bash
+python3 scripts/pr_ai_merge.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_merge.py --managed            # list owned labels
+```
+
+### `ai-merge-authorized` (CI green → AI agent may auto-merge)
+
+The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
+applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
+combined status of the head commit is `success` (CI green), `ready-for-merge`
+is present (no merge conflicts), and hygiene passes (open, non-draft, targets
+`main`). It is removed when any gate fails.
+
+```bash
+python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_authorize.py --managed            # list owned labels
+```
+
+### Auto-merge (Phase 2)
+
+The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
+`gh pr merge --auto --squash` on any open PR carrying `ai-merge-authorized`,
+re-verifying CI green immediately before arming. Human override: `do-not-merge`
+or `needs human review` cancels auto-merge and a comment explains why.
+
+### Branch protection (enforced on `main`)
+
+A label is advisory; a status check is not. The `main-requires-ci-green`
+ruleset on `main` requires these checks, and nothing can bypass them:
+
+| Check / requirement | Purpose |
+|---------------------|---------|
+| `CI green` status check | Full CI matrix passes |
+| `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
+
+The `protect-main` ruleset adds the branch-level rules: no deletion, no
+non-fast-forward push, and every change arrives through a pull request.
+
+A ruleset cannot require a *label* — its rule types are checks, reviews, and push
+rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
+path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
+without it, and `pr-ai-merge-act.yml` arms auto-merge only on that label. A pull
+request can therefore satisfy both checks and still not be auto-merged; what stops
+it is the missing label and the `do-not-merge` / `needs human review` labels, not
+GitHub settings.
+
+Rulesets are repository settings, not files, so this cannot be enforced from the
+checkout. `tests/test_adr_index.py` checks the names the documents claim against
+the job names in `.github/workflows/ci.yml` and
+`.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
+that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
+for the decision and the deferred `label gate` check.
+
 ## Testing
+
+See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
+
+```bash
+uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
+uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
+uv run python scripts/verify.py --full      # full matrix (CI's job)
+```
+
+Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
+`--full`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
-cover, and every test runs from the repository root:
-
-```bash
-uv run pytest                        # everything
-uv run pytest apps/cli               # one app
-uv run pytest packages/core          # one package
-uv run pytest tests/contract         # cross-package contracts
-uv run pytest tests/scripts          # dev launcher
-```
-
-The pre-PR procedure is not "run everything". It is the **default** tier in
-[`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,
-plus type checking, plus the studio units. The full tier — the studio build
-and the browser e2e suite — is CI's job and is not asked of anyone before
-they open a pull request.
+cover.
 
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
@@ -564,7 +671,7 @@ uv run pytest \
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility and the per-page social cards, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the

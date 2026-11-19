@@ -495,6 +495,7 @@ class LocalBackend(Backend):
                 name=args.get("name"),
                 importance=args.get("importance"),
                 satisfaction=args.get("satisfaction"),
+                force=bool(args.get("force", False)),
             )
         except EvidenceNotFoundError as exc:
             raise BackendError(evidence_not_found(evidence_id, exc.hint)) from None

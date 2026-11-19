@@ -17,6 +17,7 @@ const harness = vi.hoisted(() => ({
     offlineReplyFor: null as string | null,
     openPanel: vi.fn<(panel: string) => void>(),
     canvas: null,
+    displayName: "",
     regenerateFrom: vi.fn(),
     editFrom: vi.fn(),
     switchBranch: vi.fn(),
@@ -568,5 +569,43 @@ describe("message timestamps (#694 D15)", () => {
 
     expect(screen.getByRole("group", { name: `Reply actions, ${clock}` })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: `Message actions, ${clock}` })).toBeInTheDocument();
+  });
+});
+
+describe("turn anatomy (#737)", () => {
+  it("names your own turn and draws your initial", () => {
+    harness.state.displayName = "Ada Lovelace";
+    renderTurn([
+      {
+        id: "u-1",
+        parentId: null,
+        role: "user",
+        content: "A question",
+        createdAt: new Date(2026, 9, 22, 9, 30).toISOString(),
+      },
+    ]);
+
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    const initial = document.querySelector(".message__avatar--user");
+    expect(initial).not.toBeNull();
+    expect(initial?.textContent).toBe("A");
+  });
+
+  it("says 'You' rather than inventing a name nobody gave", () => {
+    harness.state.displayName = "";
+    renderTurn([{ id: "u-1", parentId: null, role: "user", content: "A question" }]);
+
+    expect(screen.getByText("You")).toBeInTheDocument();
+    expect(document.querySelector(".message__avatar--user")?.textContent).toBe("Y");
+  });
+
+  it("renders no time element at all when a restored turn has none", () => {
+    harness.state.displayName = "Ada";
+    renderTurn([
+      { id: "u-1", parentId: null, role: "user", content: "A question" },
+      { id: "a-1", parentId: "u-1", role: "assistant", content: "An answer" },
+    ]);
+
+    expect(document.querySelectorAll("time.message__time")).toHaveLength(0);
   });
 });

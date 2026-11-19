@@ -14,6 +14,7 @@ flowchart LR
         CLI["CLI: agentic-odi"]
         SPA["Studio SPA: browser or Tauri webview"]
         SHELL["Tauri shell: spawns the sidecar, self-updates"]
+        BFF["Local BFF: IndexedDB in the browser"]
         MCP["MCP server — :8000/mcp, loopback, unauthenticated"]
         SIDECAR["Studio API sidecar — 127.0.0.1:8100, loopback, unauthenticated"]
         ODI[("odi.db — event log + snapshots")]
@@ -24,7 +25,8 @@ flowchart LR
         CLI -->|"--backend mcp"| MCP
         CLI --> CFG
         MCP --> ODI
-        SPA -->|"/api/*, SSE"| SIDECAR
+        SPA -->|"local BFF (primary)"| BFF
+        SPA -.->|"optional, when reachable"| SIDECAR
         SHELL -.->|launches| SIDECAR
         SHELL -.->|loads| SPA
         SIDECAR --> ODI
@@ -88,6 +90,14 @@ graph BT
     agentic_odi_cli --> agentic_odi_connectors
 ```
 
+The Studio SPA may run with zero sidecar reachable. Its local IndexedDB BFF is
+the primary data path for reads and writes in the browser-first direction;
+`apps/studio-api` is consulted only as an optional runtime elevation layer for
+sidecar-owned capabilities such as the LLM proxy, connectors, MCP passthrough,
+and the desktop shell. This optional SPA-to-sidecar relationship is not a
+compile-time workspace dependency, so it is intentionally omitted from the
+contract graph above.
+
 This picture is a contract, not an illustration. `tests/test_architecture.py`
 reads the arrows above and asserts they equal both the `[project] dependencies`
 each member declares and the imports the source actually contains, in both
@@ -126,7 +136,7 @@ persistence group, which may not call the service door":
 
 | Group | Modules | Rule |
 |---|---|---|
-| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `schedule.py`, `traceability.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `traceability.py` reads the links an outcome carries and reports the three failures — orphans, unfunded objectives, drift. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
+| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `schedule.py`, `traceability.py`, `freshness.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `freshness.py` says whether a derived verdict was computed from the store's current revision, so a stale one never reads as today's answer. `traceability.py` reads the links an outcome carries and reports the three failures — orphans, unfunded objectives, drift. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
 | **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `factory.py`, `integrity.py`, `recovery.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `funnel.py` appends the five onboarding counters to the same log and reads them back. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
 | **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
 | **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
@@ -192,11 +202,20 @@ branch is still visible:
 The logic lives in `scripts/pr_guards.py`; the YAML only gathers the diff.
 Unit tests are in `tests/scripts/test_pr_guards.py`.
 
-Repository ruleset `main-requires-ci-green` (id `25356329`) requires both
-`CI green` and `PR guardrails`, sets
-`strict_required_status_checks_policy: true`, and keeps the admin bypass only
-for pull requests (`bypass_mode: pull_request`). Rulesets are repository
-settings, not files; change them with `gh api` and record it here.
+Repository rulesets `main-requires-ci-green` (id `25356329`) and `protect-main`
+(id `25656413`) both target `~DEFAULT_BRANCH`, are `active`, and set
+`current_user_can_bypass: never`. The first requires the `CI green` and
+`PR guardrails` status checks (`strict_required_status_checks_policy: false`,
+`do_not_enforce_on_create: false`); the second adds `deletion`,
+`non_fast_forward`, and `pull_request` with `required_approving_review_count: 0`
+and `require_extra_approval_for_unattributed_changes: true`. A ruleset cannot
+require a label, so `ai-merge-safe` is a gate of the merge path, not of
+`main`: `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized` without it.
+Rulesets are repository settings, not files; change them with `gh api` and record
+the decision in
+[ADR 0007](adr/0007-branch-protection-enforces-checks-not-labels.md). The names
+these documents claim are checked against the workflow job names by
+`tests/test_adr_index.py`.
 
 ## Documents
 

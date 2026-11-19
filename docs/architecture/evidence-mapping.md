@@ -15,9 +15,11 @@ Three shapes, in order:
 2. **`IngestBatch`** — the connector name, its records, and any per-record
    errors.
 3. **`EvidenceDraft`** — the mapped record: `source_name`, `source_kind`,
-   `item_type`, `name`, `content`, `url`, `raw`, and optional
-   `job_id`/`step_id`/`outcome_id` (`mapping.py:17-29`). A draft deliberately has
-   no `id`; identity is the store's job.
+   `item_type`, `name`, `content`, `url`, `raw`, optional
+   `job_id`/`step_id`/`outcome_id`, plus the optional ratings `impact`
+   (`high`/`medium`/`low`, default `medium`) and `confidence`
+   (`verified`/`claimed`, default `claimed`) (`mapping.py:21-49`). A draft
+   deliberately has no `id`; identity is the store's job.
 
 `drafts_from_batch(batch, job_id=…, step_id=…, outcome_id=…)` walks the batch and
 maps each record field-for-field (`mapping.py:53-78`):
@@ -50,7 +52,7 @@ job (`services.py:507-547`). The result is evidence, not a draft.
 
 ## Promotion
 
-`promote_evidence` turns evidence into an ODI artifact (`services.py:589-622`):
+`promote_evidence` turns evidence into an ODI artifact (`services.py:852-963`):
 
 - `target="job"` creates a Job whose name is the evidence name and whose
   description is its content.
@@ -60,17 +62,38 @@ job (`services.py:507-547`). The result is evidence, not a draft.
   the evidence's `step_id`, is scored normally, and emits an
   `evidence_promoted` signal.
 
-The evidence itself is not copied into the artifact. There is no back-link from
-the Job/Outcome to the evidence record that produced it in the current model;
-only the signal names the new outcome.
+Promotion is idempotent per quote. A quote is identified by a **promotion
+fingerprint** — source kind, source name, and normalized content — computed by
+`compute_promotion_fingerprint` (`repository.py`). `normalize_quote_text` folds
+Unicode to NFC, collapses whitespace, drops wrapping quotes, and ignores case,
+so a re-import that relabels the record still resolves to the same quote.
 
-## Confidence
+- Promoting an already-promoted quote returns the outcome the first promotion
+  created instead of adding a second one. The repeat record is linked back to
+  that outcome, so the landscape counts the demand once.
+- `force=True` promotes again deliberately, creating a second outcome.
+- `require_unpromoted` raises `AlreadyPromotedError` (carrying the existing
+  outcome id) for callers that must not silently merge.
 
-There is **no confidence field on evidence**, and the mapping does not infer one.
-A vendor's confidence survives only inside `raw`. `BusinessValue.confidence`
-(0.0–1.0, optional) is a different concept on a different model. Studio memory
-observations do carry confidence (default 0.5–0.6, out-of-range values rejected
-rather than clamped), but that is the PM memory store, not evidence.
+The link is `Evidence.outcome_id`: a promoted evidence record points at the
+outcome it produced, and `promoted_outcome_for` reads it back — from the record
+itself, or from any record sharing its fingerprint. Deleting the outcome leaves
+the quote unlinked and promotable again.
+
+The quote-to-outcome chain is therefore: evidence record (source, name, content,
+url) → `outcome_id` → the Outcome on the Job. The `evidence_promoted` signal
+names the new outcome.
+
+## Confidence and impact
+
+Evidence carries two optional ratings: `impact` (`high`/`medium`/`low`,
+default `medium`) and `confidence` (`verified`/`claimed`, default `claimed`).
+They default so existing records keep working, and the connector draft mirrors
+them (`mapping.py`). A vendor's own confidence still survives only inside
+`raw`. `BusinessValue.confidence` (0.0–1.0, optional) is a different concept on
+a different model. Studio memory observations do carry confidence (default
+0.5–0.6, out-of-range values rejected rather than clamped), but that is the PM
+memory store, not evidence.
 
 ## What the alternatives were
 
@@ -90,7 +113,7 @@ rather than clamped), but that is the PM memory store, not evidence.
 - It does not discover URLs outside those four raw keys.
 - It does not dedupe. Re-running an ingest appends duplicate evidence records
   (and duplicate signals); only REST pagination cursors are deduped at the
-  connector level.
+  connector level. Promotion, however, is idempotent per quote — see above.
 - It does not extract a quote from content, and it does not back-link a promoted
-  outcome to its evidence. The candidate-outcome review model, where a quote
-  becomes a reviewed outcome, is still in progress.
+  outcome to its evidence from the Outcome side. The candidate-outcome review
+  model, where a quote becomes a reviewed outcome, is still in progress.

@@ -42,6 +42,9 @@ OBSERVATION_KINDS: frozenset[str] = frozenset(
     }
 )
 OBSERVATION_STATUSES: frozenset[str] = frozenset({"suggested", "confirmed", "dismissed"})
+#: What an observation may be about. An observation with no subject is legal:
+#: it is a note about the person or the work as a whole.
+OBSERVATION_SUBJECT_TYPES: frozenset[str] = frozenset({"job", "step", "outcome", "evidence"})
 TURN_ROLES: frozenset[str] = frozenset({"user", "assistant", "system", "tool"})
 
 MAX_TEXT = 2_000
@@ -182,6 +185,8 @@ class Observation:
     status: str = "suggested"
     confidence: float = 0.5
     source_turn: int | None = None
+    subject_type: str | None = None
+    subject_id: str | None = None
     created_at: str = ""
     updated_at: str = ""
 
@@ -194,6 +199,8 @@ class Observation:
             "status": self.status,
             "confidence": self.confidence,
             "source_turn": self.source_turn,
+            "subject_type": self.subject_type,
+            "subject_id": self.subject_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -268,6 +275,8 @@ CREATE TABLE IF NOT EXISTS observations (
     status TEXT NOT NULL DEFAULT 'suggested',
     confidence REAL NOT NULL DEFAULT 0.5,
     source_turn INTEGER,
+    subject_type TEXT,
+    subject_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -295,6 +304,8 @@ _MIGRATIONS: tuple[tuple[str, str, str], ...] = (
     ("conversations", "head_id", "TEXT"),
     ("turns", "message_id", "TEXT"),
     ("turns", "parent_id", "TEXT"),
+    ("observations", "subject_type", "TEXT"),
+    ("observations", "subject_id", "TEXT"),
 )
 
 
@@ -344,6 +355,21 @@ def _validate_data(data: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise MemoryError("observation data must be an object")
     return data
+
+
+def _validate_subject(
+    subject_type: str | None, subject_id: str | None
+) -> tuple[str | None, str | None]:
+    """An observation is either unattached or attached to a real record."""
+    if subject_type is None and subject_id is None:
+        return None, None
+    if subject_type is None:
+        raise MemoryError("a subject_id requires a subject_type")
+    if subject_type not in OBSERVATION_SUBJECT_TYPES:
+        raise MemoryError(f"unknown observation subject type: {subject_type}")
+    if subject_id is None or not str(subject_id).strip():
+        raise MemoryError("a subject_type requires a non-empty subject_id")
+    return subject_type, str(subject_id).strip()
 
 
 class StudioMemory:
@@ -655,15 +681,29 @@ class StudioMemory:
 
     # -- observations ------------------------------------------------------
 
-    def list_observations(self, include_dismissed: bool = False) -> list[Observation]:
-        query = "SELECT * FROM observations"
-        params: tuple[Any, ...] = ()
+    def list_observations(
+        self,
+        include_dismissed: bool = False,
+        subject_type: str | None = None,
+        subject_id: str | None = None,
+    ) -> list[Observation]:
+        clauses: list[str] = []
+        params: list[Any] = []
         if not include_dismissed:
-            query += " WHERE status != ?"
-            params = ("dismissed",)
+            clauses.append("status != ?")
+            params.append("dismissed")
+        if subject_type is not None:
+            clauses.append("subject_type = ?")
+            params.append(subject_type)
+        if subject_id is not None:
+            clauses.append("subject_id = ?")
+            params.append(subject_id)
+        query = "SELECT * FROM observations"
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY created_at ASC, rowid ASC"
         with self._lock:
-            rows = self._connection.execute(query, params).fetchall()
+            rows = self._connection.execute(query, tuple(params)).fetchall()
         return [self._observation_from_row(row) for row in rows]
 
     def add_observation(
@@ -674,8 +714,11 @@ class StudioMemory:
         status: str = "suggested",
         confidence: float = 0.5,
         source_turn: int | None = None,
+        subject_type: str | None = None,
+        subject_id: str | None = None,
     ) -> Observation:
         now = _now()
+        clean_subject_type, clean_subject_id = _validate_subject(subject_type, subject_id)
         observation = Observation(
             id=uuid.uuid4().hex,
             kind=_validate_kind(kind),
@@ -684,14 +727,31 @@ class StudioMemory:
             status=_validate_status(status),
             confidence=_validate_confidence(confidence),
             source_turn=source_turn,
+            subject_type=clean_subject_type,
+            subject_id=clean_subject_id,
             created_at=now,
             updated_at=now,
         )
         with self._lock, self._connection:
+            existing = self._find_observation(
+                observation.subject_type, observation.subject_id, observation.text
+            )
+            if existing is not None:
+                # The same claim about the same subject is one row: refresh the
+                # confidence and the timestamp instead of duplicating it.
+                self._connection.execute(
+                    "UPDATE observations SET confidence = ?, updated_at = ? WHERE id = ?",
+                    (observation.confidence, observation.updated_at, existing.id),
+                )
+                row = self._connection.execute(
+                    "SELECT * FROM observations WHERE id = ?", (existing.id,)
+                ).fetchone()
+                return self._observation_from_row(row)
             self._connection.execute(
                 "INSERT INTO observations "
-                "(id, kind, text, data, status, confidence, source_turn, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(id, kind, text, data, status, confidence, source_turn, "
+                "subject_type, subject_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     observation.id,
                     observation.kind,
@@ -700,11 +760,27 @@ class StudioMemory:
                     observation.status,
                     observation.confidence,
                     observation.source_turn,
+                    observation.subject_type,
+                    observation.subject_id,
                     observation.created_at,
                     observation.updated_at,
                 ),
             )
         return observation
+
+    def _find_observation(
+        self, subject_type: str | None, subject_id: str | None, text: str
+    ) -> Observation | None:
+        """The row already carrying this exact claim about this exact subject."""
+        if subject_type is None and subject_id is None:
+            query = "SELECT * FROM observations WHERE subject_type IS NULL AND subject_id IS NULL"
+            params: tuple[Any, ...] = ()
+        else:
+            query = "SELECT * FROM observations WHERE subject_type = ? AND subject_id = ?"
+            params = (subject_type, subject_id)
+        query += " AND text = ? ORDER BY created_at ASC, rowid ASC LIMIT 1"
+        row = self._connection.execute(query, (*params, text)).fetchone()
+        return self._observation_from_row(row) if row is not None else None
 
     def update_observation(
         self,
@@ -851,7 +927,12 @@ class StudioMemory:
         lines: list[str] = []
         for item in [*confirmed, *suggested]:
             text = item.text[:MAX_CONTEXT_TEXT]
-            lines.append(f"- ({item.status}) [{item.kind}] {text}")
+            subject = (
+                f" [{item.subject_type} {item.subject_id}]"
+                if item.subject_type and item.subject_id
+                else ""
+            )
+            lines.append(f"- ({item.status}) [{item.kind}]{subject} {text}")
 
         if not lines:
             return ""
@@ -932,6 +1013,7 @@ class StudioMemory:
             data = json.loads(row["data"])
         except (TypeError, json.JSONDecodeError):
             data = {}
+        keys = row.keys()
         return Observation(
             id=row["id"],
             kind=row["kind"],
@@ -940,6 +1022,8 @@ class StudioMemory:
             status=row["status"],
             confidence=row["confidence"],
             source_turn=row["source_turn"],
+            subject_type=row["subject_type"] if "subject_type" in keys else None,
+            subject_id=row["subject_id"] if "subject_id" in keys else None,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -951,6 +1035,7 @@ __all__ = [
     "MAX_SUGGESTED_IN_CONTEXT",
     "OBSERVATION_KINDS",
     "OBSERVATION_STATUSES",
+    "OBSERVATION_SUBJECT_TYPES",
     "Conversation",
     "ConversationNotFoundError",
     "MemoryError",

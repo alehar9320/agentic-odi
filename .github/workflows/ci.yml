@@ -323,6 +323,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check the cold-start bundle budget
+        working-directory: .
+        run: node scripts/check_bundle_budget.mjs
+
       - name: Verify generated API types are up to date
         run: |
           npm run gen:api-types

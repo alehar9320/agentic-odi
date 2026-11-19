@@ -5,6 +5,7 @@ import {
   canvasHasRecords,
   canvasStatus,
   isSimulatedCanvas,
+  keptByBrowserCaption,
   savedAtTime,
   savedCopyCaption,
 } from "./canvasProvenance";
@@ -107,8 +108,30 @@ describe("saved copy caption", () => {
     expect(savedCopyCaption(canvas(), now)).toBe("Saved copy on this device");
     expect(savedCopyCaption(saved("not-a-date"), now)).toBe("Saved copy on this device");
   });
-
   it("never claims a copy from the future is fresh", () => {
     expect(savedCopyCaption(saved("2026-11-01T13:00:00.000Z"), now)).toBe("Saved just now");
+  });
+});
+
+describe("kept by this browser caption", () => {
+  const kept = (keptByBrowser: boolean) =>
+    canvas({
+      provenance: {
+        kind: "live",
+        reason: "store",
+        generated_at: "2026-11-01T12:00:00.000Z",
+        record_counts: { jobs: 1, steps: 0, outcomes: 0, evidence: 0 },
+        kept_by_browser: keptByBrowser,
+      },
+    });
+
+  it("names the store that holds a write the sidecar could not take", () => {
+    expect(keptByBrowserCaption(kept(true))).toBe("Kept by this browser · will sync");
+  });
+
+  it("says nothing when the server holds every record", () => {
+    expect(keptByBrowserCaption(kept(false))).toBeNull();
+    expect(keptByBrowserCaption(canvas())).toBeNull();
+    expect(keptByBrowserCaption(null)).toBeNull();
   });
 });

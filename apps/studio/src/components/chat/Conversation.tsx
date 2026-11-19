@@ -32,13 +32,14 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
-import { formatClockTime, formatDayHeading, startsNewDay } from "../../lib/relativeTime";
+import { formatDayHeading, formatTurnTime, startsNewDay } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon, SpeakerIcon } from "../icons";
 import { Markdown } from "./Markdown";
+import { PendingCalls } from "./PendingCalls";
 import { StallNotice } from "./StallNotice";
 import { WorkBlock } from "./WorkBlock";
 import { workGrouping } from "./workGrouping";
@@ -83,7 +84,12 @@ function useMessageStamp(): MessageStamp | null {
   if (!iso) {
     return null;
   }
-  return { iso, clock: formatClockTime(iso), previousIso: transcript.messages[index - 1]?.createdAt };
+  // Recent turns read as a summary ("14m ago"); older ones as a wall clock.
+  return {
+    iso,
+    clock: formatTurnTime(iso),
+    previousIso: transcript.messages[index - 1]?.createdAt,
+  };
 }
 
 /**
@@ -281,8 +287,14 @@ function AssistantMessage() {
 }
 
 function UserMessage() {
+  const { displayName } = useStudio();
   const copied = useAuiState((state) => state.message.isCopied);
   const stamp = useMessageStamp();
+  // One name source: the same `displayName` the greeting and settings use.
+  // Nobody has named themselves yet, so the turn says "You" rather than
+  // inventing a person (#737).
+  const name = displayName.trim() || "You";
+  const initial = name.slice(0, 1).toUpperCase();
 
   // A pasted document is a message, not the screen. The bubble starts clamped at
   // eight lines; when the text fits, the clamp and its control disappear. Copy
@@ -303,6 +315,8 @@ function UserMessage() {
     <>
       <DayDivider />
       <article className="message message--user">
+      <div className="message__column message__column--user">
+      <p className="message__byline">{name}</p>
       <div
         ref={bubbleRef}
         className={`message__bubble${clamped && !expanded ? " is-clamped" : ""}`}
@@ -361,6 +375,10 @@ function UserMessage() {
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
       </ActionBarPrimitive.Root>
+      </div>
+      <span className="message__avatar message__avatar--user" aria-hidden="true">
+        {initial}
+      </span>
       </article>
     </>
   );
@@ -397,7 +415,7 @@ function EditComposer() {
 }
 
 export function Conversation() {
-  const { sendMessage, streaming, thinkingPhase, messages } = useStudio();
+  const { sendMessage, streaming, thinkingPhase, messages, openDetail } = useStudio();
 
   // Only the newest reply is announcement-worthy. Keeping it out of the log
   // means a reader can move through history without every delta replaying it.
@@ -426,7 +444,11 @@ export function Conversation() {
 
   return (
     <UiActionContext.Provider
-      value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
+      value={{
+        onIntent: (intent) => void sendMessage(intent),
+        onDetail: (target) => openDetail(target.panel, target.subject),
+        busy: streaming,
+      }}
     >
       {/* The phase lives outside the log: the streaming reply is `aria-busy`,
           and a status message inside it would not be announced until the
@@ -445,6 +467,10 @@ export function Conversation() {
               EditComposer,
             }}
           />
+          {/* The calls still in flight, below the last message: the transcript
+              is the record of what happened, and this is the one place that
+              answers what has not happened yet. */}
+          <PendingCalls />
         </div>
       </TranscriptClockContext.Provider>
     </UiActionContext.Provider>
