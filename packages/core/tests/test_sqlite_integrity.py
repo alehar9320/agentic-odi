@@ -351,9 +351,11 @@ def test_latest_backup_is_none_when_nothing_exists(tmp_path) -> None:
 def test_backup_time_is_local(tmp_path) -> None:
     # The filename stamp is UTC; the display is the reader's local time. Compute
     # the expectation from the same stamp so the test holds in any timezone.
-    expected = datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ").replace(
-        tzinfo=timezone.utc
-    ).astimezone()
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
     assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == expected.strftime("%H:%M")
 
 
@@ -382,9 +384,11 @@ def test_the_message_names_the_file_and_the_last_backup(tmp_path) -> None:
 
     message = corrupt_store_message(error, backup=backup)
 
-    expected = datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ").replace(
-        tzinfo=timezone.utc
-    ).astimezone()
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
     assert str(tmp_path / "odi.db") in message
     assert f"Last backup: {expected.strftime('%H:%M')} local" in message
     assert backup.name in message

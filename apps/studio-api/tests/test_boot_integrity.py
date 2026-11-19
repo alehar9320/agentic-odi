@@ -87,9 +87,11 @@ def test_the_boot_failure_names_the_last_backup(corrupt_store, tmp_path, monkeyp
         response = client.get("/api/canvas")
 
     error = response.json()["error"]
-    expected = datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ").replace(
-        tzinfo=timezone.utc
-    ).astimezone()
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
     assert f"Last backup: {expected.strftime('%H:%M')} local" in error["message"]
     assert "odi-20260102T061400Z.db" in error["message"]
     assert "odi-20260102T061400Z.db" in error["suggestion"]
