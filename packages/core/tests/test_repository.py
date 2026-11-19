@@ -447,3 +447,16 @@ def test_updating_a_missing_candidate_returns_none() -> None:
     repo = InMemoryRepository()
     assert repo.update_candidate("missing", {"status": "accepted"}) is None
     assert repo.get_candidate("missing") is None
+
+
+def test_updating_a_candidate_keeps_its_id_and_creation_time() -> None:
+    repo = InMemoryRepository()
+    created = repo.add_candidate(CandidateSolution(title="Guided setup", hypothesis="Faster"))
+    original_created_at = created.created_at
+
+    updated = repo.update_candidate(created.id, {"status": "accepted"})
+
+    assert updated is not None
+    assert updated.id == created.id
+    assert updated.created_at == original_created_at
+    assert repo.get_candidate(updated.id) is updated

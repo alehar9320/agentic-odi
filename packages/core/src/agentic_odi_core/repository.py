@@ -839,7 +839,7 @@ class InMemoryRepository:
         if candidate is None:
             return None
         self._append_event()
-        current = candidate.model_dump(exclude_unset=True)
+        current = candidate.model_dump()
         current.update(updates)
         new_candidate = candidate.model_validate(current)
         self.candidates[candidate_id] = new_candidate
