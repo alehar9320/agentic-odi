@@ -1,4 +1,5 @@
 import type { CanvasData, Evidence, Job, Outcome, Step } from "../types";
+import { UNSCORED_LABEL } from "./odi";
 
 /**
  * The kinds the canvas actually carries. Thesis, Segment and Strategy are not
@@ -56,7 +57,7 @@ export function text(value: string | number | null | undefined): string {
 
 /** A score is the number the sidecar returned, or the word for having none. */
 export function score(value: number | null | undefined): string {
-  return value === null || value === undefined ? "unscored" : String(value);
+  return value === null || value === undefined ? UNSCORED_LABEL : String(value);
 }
 
 /**

@@ -35,8 +35,8 @@ missing.
 
 | Concern | Owner | Known stray copies |
 | --- | --- | --- |
-| Markdown rendering | `@assistant-ui/react-markdown` (declared, imported nowhere) | `apps/studio/src/lib/markdown.ts` |
-| Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`) | `apps/studio/src/lib/useFocusTrap.ts`, four hand-built `role="dialog"` surfaces |
+| Markdown rendering | `@assistant-ui/react-markdown` (`MarkdownTextPrimitive`, plus the shared `mdComponents` map in `apps/studio/src/components/chat/Markdown.tsx`) | none left — the hand-written parser under `apps/studio/src/lib/` was deleted in #394 |
+| Dialog, focus trap, dismissal | `radix-ui` (declared; used only under `src/vendor`), rendered through the shared `apps/studio/src/vendor/components/ui/dialog.tsx` primitive | `apps/studio/src/lib/useFocusTrap.ts` and the remaining hand-built `role="dialog"` surfaces (`ChangelogModal.tsx`, `ShareSheet.tsx`, `FirstRunWizard.tsx`) |
 | Opportunity score wording | `apps/studio/src/lib/odi.ts` (`formatOpportunityScore`, `isUnderserved`, `UNDERSERVED_THRESHOLD`) | `apps/studio/src/lib/records.ts` prints the stored number as-is, on purpose — that table reports what the store returned |
 | Number clamping | `apps/studio/src/ui/primitives.tsx` | `apps/studio/src/ui/cards.tsx`, `apps/studio/src/components/canvas/OpportunityLandscape.tsx` |
 | Which host the app is running in | `apps/studio/src/bridge/runtime.ts` (`detectRuntime`, `runtimeFacts`) | `isTauri()`/`isInstalled()` read directly by a caller that then re-derives host or install state |
@@ -47,8 +47,44 @@ missing.
 | ISO-8601 timestamps | `datetime.isoformat()` | `strftime("%Y-%m-%dT%H:%M:%SZ")` in `apps/cli/src/agentic_odi_cli/profile.py` and `apps/cli/src/agentic_odi_cli/flags.py` |
 | Structural rules for artifact HTML | `scripts/artifact_a11y.py` (stdlib `html.parser`, six rules) with its inventory in `scripts/artifact_renderers.py` | none left — the four heading, anchor and decorative-svg regexes in `website/tests/test_site.py` were folded in rather than kept as a second opinion |
 
+## Studio interaction surfaces (audit, 2026-11-15)
+
+This is the canonical record of where interaction behavior lives in the Studio,
+whether it is reusable library behavior or product-specific presentation/state,
+and what to do next. It is not a migration plan; no dependencies or components
+change here.
+
+| Surface | Current owner / implementation | Behavior vs presentation & state | Recommendation | Reason |
+| --- | --- | --- | --- | --- |
+| Conversation transcript, composer shell, thread/list primitives | `@assistant-ui/react` runtime + thread/composer/message primitives in `apps/studio/src/assistant/*`, `components/chat/*` | Reusable conversation behavior (streaming, message model, composer/thread mechanics) owned by the library; Studio owns ODI-specific message parts, copy, and layout | **adopt** | Assistant-ui is the established behavior owner for conversation surfaces; keep extending through its primitives rather than parallel transcript/composer mechanics. |
+| Notifications (toasts/banners) | Radix toast stack via `banners/Banner.tsx`, `banners/BannerStack.tsx` (`@radix-ui/react-toast`, `Toast.Provider`/`Viewport`/`Root`/`Action`/`Close`), fed by `BannerToasts` + `state/notices` | Reusable notification behavior and accessibility come from Radix Toast; banner kinds, copy, actions, and when notices are raised are product state/presentation | **adopt** | Existing Radix toast stack is the notification owner; new notification behavior should reuse it, not introduce a second toast mechanism. |
+| Standard modal dialogs (release notes, diagnostics export, share link, connector suggestion, first-run wizard) | `diagnostics/DiagnosticsModal.tsx` and `components/customize/ConnectorSuggestionModal.tsx` render through the shared `apps/studio/src/vendor/components/ui/dialog.tsx` primitive; `components/ChangelogModal.tsx`, `components/ShareSheet.tsx` and `onboarding/FirstRunWizard.tsx` still hand-build `role="dialog"` with `useFocusTrap`/Escape/scrim | Dismissal, focus trapping, modality, and `aria` dialog semantics are generic interaction behavior; panel content and product flows are Studio-specific presentation/state | **adopt** (shared Dialog primitive) | The already-declared `radix-ui` Dialog primitive now owns dismissal/focus/modality for diagnostics and connector suggestion; migrating the remaining hand-built surfaces is follow-up work (issues #1001, #1002, #1004), product copy/layout stays local. |
+| Inline composer slash-command suggestions | `components/chat/composerParts.tsx` + `lib/commands.ts` (`CommandPalette`, `paletteOpenFor`) as an inline, draft-driven `listbox` over Studio command definitions | Selection/highlighting behavior is small and tightly coupled to the composer draft and ODI command registry; visual treatment matches the composer | **keep** | Inline command suggestions are product-specific composer behavior/state; do not automatically replace with `cmdk` or a generic command menu library. |
+| Menus and lightweight popovers | Bespoke anchors/dropdowns in context (e.g. thread/history affordances and canvas-local actions) rather than a shared menu primitive | Interaction is contextual to the owning surface and its state; visuals are product-specific | **keep** (revisit only if a menu becomes a repeated, generic pattern) | Current menus are surface-specific; introducing a generic menu library now would be premature without repeated shared behavior. |
+| ODI canvas & visualizations (job map, opportunity landscape, segment/evidence/thesis/capture views) | Canvas components in `components/canvas/*` rendering ODI domain entities and scores | Domain visualization and product meaning are the presentation/state; interactions are specific to ODI artifacts, not generic UI widgets | **keep** | ODI visualizations encode product/domain behavior and should not be marked for automatic replacement with generic charting or UI libraries. |
+
 These rows are the record of an audit, not a to-do list with a deadline. Fixing them
 is ordinary refactoring, one pull request per concern.
+
+## Interaction surface audit
+
+A surface-by-surface read of `apps/studio/src`, recording the current owner and an
+`adopt`, `keep`, or `revisit` recommendation for each interaction surface. This is
+the record of an audit, not a migration plan: no components are moved and no
+dependencies are added here. Conventional surfaces point at the libraries already
+declared in the workspace; ODI-specific visualizations and composer behavior are
+product presentation and state, not generic-library replacements.
+
+| Surface | Files | Owner | Recommendation | Reason |
+|---|---|---|---|---|
+| Dialogs, focus trap, dismissal | `ChangelogModal.tsx`, `ShareSheet.tsx`, `FirstRunWizard.tsx`, `StudioBar.tsx` (`role="dialog"` ask), `useFocusTrap.ts`; `DiagnosticsModal.tsx` and `ConnectorSuggestionModal.tsx` use the shared `vendor/components/ui/dialog.tsx` | `radix-ui` (declared; used under `src/vendor`) | adopt | `DiagnosticsModal` and `ConnectorSuggestionModal` now render through the shared Radix Dialog primitive (#1004); the remaining hand-built `role="dialog"` surfaces are the consolidation target (issues #1001, #1002). |
+| Menus and lightweight popovers | `StudioBar.tsx` history list (`role="menu"`/`menuitem`, Escape close), `More actions` menu (`role="menu"`/`menuitem`, Escape close) | none declared — hand-built anchors/dropdowns | keep | Menus are surface-specific to StudioBar's state and copy; no repeated generic menu pattern exists yet. Revisit only if a second surface needs the same menu mechanics. |
+| Notifications | `BannerStack.tsx`, `Banner.tsx`, `useToasts()` in `StudioContext.tsx` | `@radix-ui/react-toast` | keep | The Radix toast stack is already the notification owner; every banner portals into the single registered viewport. |
+| Conversation stage (viewport, message list, parts, branch picker) | `ChatStage.tsx`, `Conversation.tsx`, `ThreadComposer.tsx`, `SelectionToolbar.tsx`, `QueueLane.tsx`, `StallNotice.tsx` | `@assistant-ui/react` | keep | assistant-ui owns the conversation runtime; these encode product behavior on top of it and are not replaceable by a generic dialog library. |
+| Inline composer suggestions / slash commands | `composerParts.tsx` (`CommandPalette`, `SuggestionPills`), `Composer.tsx`, `ThreadComposer.tsx` | `@assistant-ui/react` | keep | Inline composer suggestions are assistant-ui behavior; not marked for automatic replacement with `cmdk` or a generic library. |
+| ODI visualizations | `OpportunityLandscape.tsx`, `JobMap.tsx`, `SegmentBoard.tsx`, `MemoryPanel.tsx`, `DirectCapture.tsx`, `EvidenceStream.tsx` | product-specific (Studio) | keep | ODI-specific visualizations encode domain behavior and are not candidates for generic libraries. |
+| Markdown rendering | `lib/markdown.ts` | `@assistant-ui/react-markdown` (declared, imported nowhere) | revisit | Declared but unused; a stray local copy exists. Covered by the canonical owners table. |
+
 
 ## The bounds
 

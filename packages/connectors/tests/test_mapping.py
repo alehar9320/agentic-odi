@@ -72,6 +72,8 @@ def test_a_draft_has_exactly_the_evidence_contract_fields() -> None:
         "job_id": None,
         "step_id": None,
         "outcome_id": None,
+        "impact": "medium",
+        "confidence": "claimed",
         "discriminator": draft.discriminator,
     }
     # The ODI store owns ids; a draft must not invent one.
@@ -108,6 +110,8 @@ def test_unknown_payload_keys_stay_inside_raw() -> None:
         "job_id",
         "step_id",
         "outcome_id",
+        "impact",
+        "confidence",
         "discriminator",
     }
 

@@ -1,19 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, addOutcome, addStep, createJob, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import { StudioApiError, addEvidence, addOutcome, addStep, createJob, deleteConversation, deleteEvidence, fetchCanvas, fetchMemory, isTransportFailure, listConversations, renameConversation, streamChat } from "./studioApi";
 import type { OutboxRecord } from "../bff/store/types";
 
 const outbox: OutboxRecord[] = [];
 
 const bff = {
   data: { fetchCanvas: vi.fn() },
-  memory: { listObservations: vi.fn(), listConversations: vi.fn() },
+  memory: {
+    listObservations: vi.fn(),
+    listConversations: vi.fn(),
+    renameConversation: vi.fn(),
+    deleteConversation: vi.fn(),
+  },
   chat: { stream: vi.fn() },
   createJob: vi.fn(),
   addStep: vi.fn(),
   addOutcome: vi.fn(),
   updateOutcome: vi.fn(),
   deleteOutcome: vi.fn(),
+  addEvidence: vi.fn(),
+  deleteEvidence: vi.fn(),
   listOutbox: vi.fn(async () => outbox),
 };
 
@@ -68,10 +75,14 @@ beforeEach(() => {
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
+  vi.mocked(bff.memory.renameConversation).mockReset();
+  vi.mocked(bff.memory.deleteConversation).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
   vi.mocked(bff.createJob).mockReset();
   vi.mocked(bff.addStep).mockReset();
   vi.mocked(bff.addOutcome).mockReset();
+  vi.mocked(bff.addEvidence).mockReset();
+  vi.mocked(bff.deleteEvidence).mockReset();
 });
 
 afterEach(() => {
@@ -197,6 +208,22 @@ describe("streamChat fallback", () => {
     expect(bff.chat.stream).not.toHaveBeenCalled();
   });
 
+  it("does not fall back for a 401 unauthorized", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: { code: "unauthorized", message: "Invalid API key" } }, 401));
+    await expect(
+      streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
+    ).rejects.toThrow();
+    expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back for a 403 forbidden", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: { code: "forbidden", message: "Access denied" } }, 403));
+    await expect(
+      streamChat({ base_url: "", api_key: "", model: "", mcp_url: "", messages: [] }, () => {}),
+    ).rejects.toThrow();
+    expect(bff.chat.stream).not.toHaveBeenCalled();
+  });
+
   it("falls back to the local BFF when a static host answers 200 text/html", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(htmlResponse());
     vi.mocked(bff.chat.stream).mockResolvedValueOnce(undefined);
@@ -238,6 +265,58 @@ describe("listConversations fallback", () => {
   });
 });
 
+describe("renameConversation fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.memory.renameConversation).mockResolvedValueOnce({
+      id: "c-1",
+      title: "Renamed",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+      head_id: null,
+    });
+
+    const renamed = await renameConversation("c-1", "Renamed");
+
+    expect(renamed.title).toBe("Renamed");
+    expect(bff.memory.renameConversation).toHaveBeenCalledWith("c-1", "Renamed");
+  });
+
+  it("PATCHes the title while the sidecar answers", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        conversation: {
+          id: "c-1",
+          title: "Renamed",
+          created_at: "x",
+          updated_at: "x",
+          head_id: null,
+        },
+      }),
+    );
+
+    const renamed = await renameConversation("c-1", "Renamed");
+
+    expect(renamed.title).toBe("Renamed");
+    expect(bff.memory.renameConversation).not.toHaveBeenCalled();
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain("/api/conversations/c-1");
+    expect(init?.method).toBe("PATCH");
+    expect(JSON.parse(String(init?.body))).toEqual({ title: "Renamed" });
+  });
+});
+
+describe("deleteConversation fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.memory.deleteConversation).mockResolvedValueOnce({ ok: true });
+
+    await expect(deleteConversation("c-1")).resolves.toEqual({ ok: true });
+
+    expect(bff.memory.deleteConversation).toHaveBeenCalledWith("c-1");
+  });
+});
+
 describe("queued writes with no sidecar", () => {
   it("creates a job, a step, and an outcome locally and marks each pending", async () => {
     // /api answers 503 with no structured error: the sidecar is not there. Every
@@ -275,6 +354,75 @@ describe("queued writes with no sidecar", () => {
       importance: 8,
       satisfaction: 3,
     });
+  });
+
+  it("records a capture in the browser store when the sidecar is down", async () => {
+    // The sidecar is not there. A capture must still land locally and come back
+    // `ok`, never as a failure, so the person's evidence is not lost.
+    vi.mocked(fetch).mockResolvedValue(offlineResponse());
+    vi.mocked(bff.addEvidence).mockResolvedValue({ id: "e-1", name: "Call notes" });
+
+    const result = await addEvidence({
+      mcp_url: "http://mcp",
+      source_name: "Support inbox",
+      name: "Call notes",
+      content: "They churn on deploy time",
+      job_id: "j-1",
+    });
+
+    expect(result).toEqual({ ok: true, pending: true });
+    expect(bff.addEvidence).toHaveBeenCalledWith({
+      source_name: "Support inbox",
+      source_kind: undefined,
+      item_type: undefined,
+      name: "Call notes",
+      content: "They churn on deploy time",
+      url: undefined,
+      job_id: "j-1",
+      step_id: undefined,
+      outcome_id: undefined,
+    });
+  });
+
+  it("removes a capture from the browser store when the sidecar is down", async () => {
+    vi.mocked(fetch).mockResolvedValue(offlineResponse());
+    vi.mocked(bff.deleteEvidence).mockResolvedValue({ deleted: "e-1" });
+
+    const result = await deleteEvidence("e-1", "http://mcp");
+
+    expect(result).toEqual({ ok: true, pending: true });
+    expect(bff.deleteEvidence).toHaveBeenCalledWith("e-1");
+  });
+
+  it("serves the sidecar's receipt, not the local one, while the sidecar answers", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    const result = await addEvidence({
+      mcp_url: "http://mcp",
+      source_name: "Support inbox",
+      name: "Call notes",
+      content: "They churn on deploy time",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(bff.addEvidence).not.toHaveBeenCalled();
+  });
+
+  it("does not queue a sidecar 422 for a capture", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ error: { code: "validation", message: "bad", retryable: false } }, 422),
+    );
+
+    await expect(
+      addEvidence({
+        mcp_url: "http://mcp",
+        source_name: "Support inbox",
+        name: "",
+        content: "x",
+      }),
+    ).rejects.toThrow();
+
+    expect(bff.addEvidence).not.toHaveBeenCalled();
   });
 
   it("does not queue an application error from a live sidecar", async () => {
@@ -402,5 +550,65 @@ describe("canvas reads keep a queued write visible", () => {
     const canvas = await fetchCanvas("http://mcp");
 
     expect(canvas.outcomes).toHaveLength(0);
+  });
+
+  it("overlays a queued capture on a canvas the sidecar answered without it", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        jobs: [],
+        steps: [],
+        outcomes: [],
+        evidence: [],
+        source: "mcp",
+        provenance: {
+          kind: "live",
+          reason: "store",
+          generated_at: "2026-11-01T12:00:00.000Z",
+          record_counts: { jobs: 0, steps: 0, outcomes: 0, evidence: 0 },
+        },
+      }),
+    );
+    outbox.push(
+      outboxRecord({
+        kind: "create",
+        entity: "evidence",
+        local_id: "e-1",
+        payload: {
+          source_name: "Support inbox",
+          name: "Call notes",
+          content: "They churn on deploy time",
+          job_id: "j-1",
+        },
+      }),
+    );
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    const record = canvas.evidence?.find((item) => item.id === "e-1");
+    expect(record).toBeDefined();
+    expect(record?.pending).toBe(true);
+    expect(record?.name).toBe("Call notes");
+    expect(record?.job_id).toBe("j-1");
+    // The board must say the browser holds the capture, not claim the server does.
+    expect(canvas.provenance?.kept_by_browser).toBe(true);
+  });
+
+  it("hides a capture whose delete is still queued", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        jobs: [],
+        steps: [],
+        outcomes: [],
+        evidence: [{ id: "e-1", name: "Call notes" }],
+        source: "mcp",
+      }),
+    );
+    outbox.push(
+      outboxRecord({ kind: "delete", entity: "evidence", local_id: "e-1", payload: {} }),
+    );
+
+    const canvas = await fetchCanvas("http://mcp");
+
+    expect(canvas.evidence ?? []).toHaveLength(0);
   });
 });

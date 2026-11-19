@@ -16,6 +16,15 @@ Pick the smallest tier that matches your time budget. CI owns the full matrix; a
 (`.github/workflows/ci.yml`), so nobody is asked to run it locally before
 opening a pull request.
 
+## What `--changed` does not cover
+
+The dependency audit (`pip-audit`, `npm audit`, `cargo audit`) is a CI job, not a
+tier. It reads the lockfiles rather than the diff, so its result does not depend
+on which files a pull request touched, and `--changed` neither runs it nor skips
+it by selection. Run it by hand when a pull request changes a dependency; the
+commands and the accepted-advisory ledger are in
+[Development](../docs/development.md#linting-formatting--type-checks).
+
 ## PR requirement (honest verification)
 
 A pull request **must** list the tiers it ran and the tiers it skipped in the PR body (in the repo's spirit of no-silent-fabrication). For example:
@@ -71,9 +80,11 @@ npm --prefix apps/studio run test:e2e
 ```
 
 CI runs this in the `e2e` job against the real Studio, the real sidecar, and
-the real MCP server. It is deliberately non-blocking: set the repository
-variable `AGENTIC_ODI_E2E` to `false` to skip it, and `continue-on-error`
-keeps a failure from turning CI red.
+the real MCP server. It is advisory by default: set the repository variable
+`AGENTIC_ODI_E2E` to `false` to skip it, and a failure is reported — in the job
+summary, in a warning annotation, and in `CI green`'s table — without turning
+CI red. Set `AGENTIC_ODI_E2E_BLOCKING` to `true` to make a browser failure
+block a merge.
 
 ## Honest PR bodies
 

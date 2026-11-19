@@ -56,3 +56,53 @@ def test_setup_wizard(tmp_path, monkeypatch) -> None:
     data = json.loads(res_show.output)
     assert data["product_name"] == "Acme Tool"
     assert data["domain"] == "acme.com"
+
+
+def test_clear_unsets_a_field(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    runner.invoke(app, ["profile", "set", "--product-name", "Acme App"])
+    res = runner.invoke(app, ["profile", "set", "--clear", "product_name"])
+    assert res.exit_code == 0
+    from agentic_odi_cli.profile import load_baseline
+
+    b = load_baseline()
+    assert b is not None
+    assert b.product_name is None
+
+
+def test_clear_wins_over_set_in_the_same_call(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    res = runner.invoke(
+        app,
+        ["profile", "set", "--core-problem", "x", "--clear", "core_problem"],
+    )
+    assert res.exit_code == 0
+    from agentic_odi_cli.profile import load_baseline
+
+    b = load_baseline()
+    assert b is not None
+    assert b.core_problem is None
+
+
+def test_an_unknown_clear_name_exits_2(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    res = runner.invoke(app, ["profile", "set", "--clear", "not_a_field"])
+    assert res.exit_code == 2
+    assert "product_name" in res.output
+    assert "domain" in res.output
+    assert "primary_user" in res.output
+    assert "business_model" in res.output
+    assert "core_problem" in res.output
+    assert "current_focus" in res.output
+
+
+def test_show_distinguishes_none_from_empty(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    runner.invoke(app, ["profile", "set", "--product-name", ""])
+    res = runner.invoke(app, ["profile", "show"])
+    assert res.exit_code == 0
+    assert "Product Name: (empty)" in res.output
+    res = runner.invoke(app, ["profile", "set", "--clear", "product_name"])
+    assert res.exit_code == 0
+    res = runner.invoke(app, ["profile", "show"])
+    assert "Product Name: —" in res.output

@@ -24,6 +24,7 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
+  ObservationSubjectType,
   Outcome,
   Segment,
   Signal,
@@ -713,13 +714,24 @@ export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<S
 }
 
 
-export async function fetchMemory(): Promise<Observation[]> {
+export async function fetchMemory(subject?: {
+  subject_type?: string;
+  subject_id?: string;
+}): Promise<Observation[]> {
+  const query = new URLSearchParams();
+  if (subject?.subject_type) {
+    query.set("subject_type", subject.subject_type);
+  }
+  if (subject?.subject_id) {
+    query.set("subject_id", subject.subject_id);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
   return withLocal(
     () =>
-      getJson<{ observations: Observation[] }>("/api/memory/observations").then(
-        (body) => body.observations,
-      ),
-    (bff) => bff.memory.listObservations(),
+      getJson<{ observations: Observation[] }>(
+        `/api/memory/observations${suffix}`,
+      ).then((body) => body.observations),
+    (bff) => bff.memory.listObservations(false, subject),
   );
 }
 
@@ -729,6 +741,8 @@ export interface AddObservationPayload {
   data?: Record<string, unknown>;
   confidence?: number;
   confirmed?: boolean;
+  subject_type?: ObservationSubjectType | null;
+  subject_id?: string | null;
 }
 
 export async function addObservation(payload: AddObservationPayload): Promise<Observation> {
@@ -838,6 +852,39 @@ export async function setConversationHead(
   );
 }
 
+/**
+ * Give a thread a new name. Falls through to the local store, so a rename still
+ * lands when the sidecar is down. The sidecar caps the title at 200 characters.
+ */
+export function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<Conversation> {
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { title },
+      ).then((body) => body.conversation),
+    (bff) => bff.memory.renameConversation(conversationId, title),
+  );
+}
+
+/**
+ * Remove one thread and its turns. Falls through to the local store, so a
+ * delete still lands when the sidecar is down.
+ */
+export function deleteConversation(conversationId: string): Promise<{ ok: boolean }> {
+  return withLocal(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+      ),
+    (bff) => bff.memory.deleteConversation(conversationId),
+  );
+}
+
 /** Answer one paused write. The turn resumes on the stream it came from. */
 export async function resolveApproval(
   approvalId: string,
@@ -902,12 +949,32 @@ export function addEvidence(payload: {
   outcome_id?: string;
   mcp_url: string;
 }): Promise<{ ok: boolean }> {
-  return postJson<{ ok: boolean }>("/api/evidence", payload);
+  return queuedWrite<{ ok: boolean }>(
+    () => postJson<{ ok: boolean }>("/api/evidence", payload),
+    (bff) =>
+      bff
+        .addEvidence({
+          source_name: payload.source_name,
+          source_kind: payload.source_kind,
+          item_type: payload.item_type,
+          name: payload.name,
+          content: payload.content,
+          url: payload.url,
+          job_id: payload.job_id,
+          step_id: payload.step_id,
+          outcome_id: payload.outcome_id,
+        })
+        .then(() => ({ ok: true })),
+  );
 }
 
 export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
-    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ ok: boolean }>(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteEvidence(evidenceId).then(() => ({ ok: true })),
   );
 }
 

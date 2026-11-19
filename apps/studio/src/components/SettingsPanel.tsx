@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { useOnboarding } from "../onboarding/context";
 import { useStudio, type ConnectionReport } from "../state/StudioContext";
 import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
@@ -52,7 +51,6 @@ export function SettingsPanel() {
     capabilities,
     surveyConnections,
   } = useStudio();
-  const { enabled: tourEnabled, restart: restartTour } = useOnboarding();
 
   // Opening Settings is the person asking what is connected, which is the first moment
   // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
@@ -118,7 +116,7 @@ export function SettingsPanel() {
         openCustomize={openCustomize}
       />
 
-      <UpdatesSection tourEnabled={tourEnabled} restartTour={restartTour} />
+      <UpdatesSection />
 
       <AboutSection settings={settings} capabilities={capabilities} />
 

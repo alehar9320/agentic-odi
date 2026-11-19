@@ -1,7 +1,7 @@
 [project]
 name = "agentic-odi-core"
 version = "0.15.0"
-description = "Core domain models, services, and repositories for Agentic ODI."
+description = "Core domain models, services, and repositories for Agentic ODI; includes candidate proposal extraction, approval, and rejection."
 requires-python = ">=3.10"
 dependencies = [
     "pydantic",

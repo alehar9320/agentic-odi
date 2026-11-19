@@ -34,6 +34,7 @@ class ApprovalRequest:
     name: str
     arguments: dict[str, object]
     prompt: str
+    consequence: str
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, object]:
@@ -43,6 +44,7 @@ class ApprovalRequest:
             "name": self.name,
             "arguments": self.arguments,
             "prompt": self.prompt,
+            "consequence": self.consequence,
             "created_at": self.created_at,
         }
 
@@ -71,6 +73,7 @@ class ApprovalRegistry:
         name: str,
         arguments: dict[str, object],
         prompt: str,
+        consequence: str = "",
     ) -> tuple[ApprovalRequest, asyncio.Future[ApprovalDecision]]:
         """Register a gate and return its description and the future to await."""
         loop = asyncio.get_running_loop()
@@ -80,6 +83,7 @@ class ApprovalRegistry:
             name=name,
             arguments=arguments,
             prompt=prompt,
+            consequence=consequence,
         )
         future: asyncio.Future[ApprovalDecision] = loop.create_future()
         with self._lock:

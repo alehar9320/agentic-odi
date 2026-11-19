@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar
 
@@ -13,6 +14,7 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     Evidence,
     Job,
+    Link,
     Outcome,
     ScheduledWork,
     Segment,
@@ -23,6 +25,10 @@ from agentic_odi_core.models import (
 )
 
 _Item = TypeVar("_Item")
+
+#: Characters a connector may wrap a quote in; stripped before fingerprinting so
+#: ``"Lost hours"`` and ``Lost hours`` identify the same customer sentence.
+_WRAPPING_QUOTES = "\"'“”‘’«»"
 
 #: A workspace has exactly one V2MOM, and the model carries no id, so the store
 #: keys it by this constant rather than a generated one.
@@ -117,6 +123,36 @@ def compute_evidence_fingerprint(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def normalize_quote_text(text: str) -> str:
+    """Normalize quote text so two renderings of one quote share an identity.
+
+    Unicode NFC, collapsed whitespace, casefold, wrapping quotes removed, and
+    terminal punctuation stripped. A connector that re-renders the same
+    sentence — extra spaces, a smart quote, a trailing period — must not look
+    like a second customer.
+    """
+    normalized = unicodedata.normalize("NFC", text or "")
+    normalized = " ".join(normalized.split()).casefold()
+    while normalized and normalized[0] in _WRAPPING_QUOTES:
+        normalized = normalized[1:].lstrip()
+    while normalized and normalized[-1] in _WRAPPING_QUOTES:
+        normalized = normalized[:-1].rstrip()
+    normalized = normalized.rstrip(".!?,;:")
+    return normalized
+
+
+def compute_promotion_fingerprint(source_kind: str, source_name: str, content: str) -> str:
+    """Fingerprint a quote by what identifies it, not how it was labelled.
+
+    Hashes the source with the *normalized* content, joined by ``\\x1f`` the way
+    signals do. ``name`` and ``raw`` are deliberately excluded: connectors
+    relabel records and payloads carry fetch timestamps, so including them
+    would let one quote become several opportunities.
+    """
+    payload = "\x1f".join([source_kind or "", source_name or "", normalize_quote_text(content)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 class Repository(Protocol):
     jobs: dict[str, Job]
     steps: dict[str, Step]
@@ -130,6 +166,7 @@ class Repository(Protocol):
     strategies: dict[str, Strategy]
     v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
+    links: dict[str, Link]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -208,6 +245,19 @@ class Repository(Protocol):
     def get_study(self, study_id: str) -> Study | None: ...
     def list_studies(self, job_id: str | None = None) -> list[Study]: ...
     def update_study(self, study_id: str, updates: dict) -> Study | None: ...
+    def add_link(self, link: Link) -> Link: ...
+    def get_link(self, link_id: str) -> Link | None: ...
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]: ...
+    def remove_link(self, link_id: str) -> bool: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
@@ -249,6 +299,7 @@ class InMemoryRepository:
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.links: dict[str, Link] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
 
@@ -680,6 +731,44 @@ class InMemoryRepository:
         self.studies[study_id] = new_study
         return new_study
 
+    def add_link(self, link: Link) -> Link:
+        self._append_event()
+        self.links[link.id] = link
+        return link
+
+    def get_link(self, link_id: str) -> Link | None:
+        return self.links.get(link_id)
+
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]:
+        items = list(self.links.values())
+        if source_type is not None:
+            items = [link for link in items if link.source_type == source_type]
+        if source_id is not None:
+            items = [link for link in items if link.source_id == source_id]
+        if target_type is not None:
+            items = [link for link in items if link.target_type == target_type]
+        if target_id is not None:
+            items = [link for link in items if link.target_id == target_id]
+        if relationship_type is not None:
+            items = [link for link in items if link.relationship_type == relationship_type]
+        return page(items, limit, offset)
+
+    def remove_link(self, link_id: str) -> bool:
+        if link_id not in self.links:
+            return False
+        self._append_event()
+        del self.links[link_id]
+        return True
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self._append_derived_event()
         self.strategies[strategy.id] = strategy
@@ -727,6 +816,7 @@ class InMemoryRepository:
         self.segments.clear()
         self.strategies.clear()
         self.v2mom.clear()
+        self.links.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

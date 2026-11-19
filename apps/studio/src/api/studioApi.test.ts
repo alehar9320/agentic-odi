@@ -9,6 +9,7 @@ import {
   clearMemory,
   createConversation,
   deleteConnector,
+  deleteConversation,
   deleteObservation,
   dismissSignal,
   fetchLatestConversation,
@@ -324,6 +325,39 @@ describe("memory", () => {
     expect(fetch).toHaveBeenCalledWith("/api/memory/observations", expect.objectContaining({ headers: expect.any(Object) }));
   });
 
+  it("fetchMemory filters by subject when asked", async () => {
+    mockJson({ observations: [] });
+    await fetchMemory({ subject_type: "outcome", subject_id: "O-12" });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations?subject_type=outcome&subject_id=O-12",
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+
+  it("addObservation carries a subject when given", async () => {
+    mockJson({ observation });
+    await addObservation({
+      kind: "opportunity",
+      text: "Activation is stuck.",
+      confirmed: true,
+      subject_type: "outcome",
+      subject_id: "O-12",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/memory/observations",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          kind: "opportunity",
+          text: "Activation is stuck.",
+          confirmed: true,
+          subject_type: "outcome",
+          subject_id: "O-12",
+        }),
+      }),
+    );
+  });
+
   it("addObservation posts the observation", async () => {
     mockJson({ observation });
     await expect(
@@ -382,6 +416,15 @@ describe("conversations", () => {
     expect(fetch).toHaveBeenCalledWith(
       "/api/conversations",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("deleteConversation sends DELETE to the thread", async () => {
+    mockJson({ ok: true });
+    await expect(deleteConversation("c-1")).resolves.toEqual({ ok: true });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/conversations/c-1",
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 

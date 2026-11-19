@@ -1,54 +1,28 @@
-"""MCP connection settings shared by the CLI and Studio."""
+"""MCP connection settings shared by the CLI and Studio.
+
+The parsing lives in :mod:`agentic_odi_core.settings`; this module keeps the
+public name the rest of the workspace imports. ``MCPConnectionConfig`` is an
+alias for :class:`~agentic_odi_core.settings.MCPConnectionSettings` for one
+release so no import breaks, and ``from_env()`` stays the only entry point.
+"""
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+from agentic_odi_core.settings import (
+    DEFAULT_MCP_KEEPALIVE,
+    DEFAULT_MCP_TIMEOUT,
+    KEEPALIVE_ENV,
+    TIMEOUT_ENV,
+    MCPConnectionSettings,
+)
 
-DEFAULT_MCP_TIMEOUT = 30.0
-DEFAULT_MCP_KEEPALIVE = 15.0
+MCPConnectionConfig = MCPConnectionSettings
 
-TIMEOUT_ENV = "AGENTIC_ODI_MCP_TIMEOUT"
-KEEPALIVE_ENV = "AGENTIC_ODI_MCP_KEEPALIVE"
-
-
-@dataclass(frozen=True)
-class MCPConnectionConfig:
-    """How long an MCP client waits, and how often it keeps a session alive.
-
-    ``keepalive_interval`` is ``None`` when keepalive is disabled.
-    """
-
-    timeout: float = DEFAULT_MCP_TIMEOUT
-    keepalive_interval: float | None = DEFAULT_MCP_KEEPALIVE
-
-    @classmethod
-    def from_env(cls) -> MCPConnectionConfig:
-        return cls(
-            timeout=_positive_float(TIMEOUT_ENV, DEFAULT_MCP_TIMEOUT),
-            keepalive_interval=_keepalive_interval(),
-        )
-
-
-def _positive_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if not raw:
-        return default
-    try:
-        value = float(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
-
-
-def _keepalive_interval() -> float | None:
-    raw = os.environ.get(KEEPALIVE_ENV)
-    if not raw:
-        return DEFAULT_MCP_KEEPALIVE
-    try:
-        value = float(raw)
-    except ValueError:
-        return DEFAULT_MCP_KEEPALIVE
-    if value < 0:
-        return DEFAULT_MCP_KEEPALIVE
-    return value or None
+__all__ = [
+    "DEFAULT_MCP_KEEPALIVE",
+    "DEFAULT_MCP_TIMEOUT",
+    "KEEPALIVE_ENV",
+    "MCPConnectionConfig",
+    "MCPConnectionSettings",
+    "TIMEOUT_ENV",
+]
