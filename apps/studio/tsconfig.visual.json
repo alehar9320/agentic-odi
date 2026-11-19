@@ -1,0 +1,34 @@
+{
+  // Visual tests run in Vitest Browser Mode, whose `expect.element()` matchers
+  // are narrower than jest-dom's: `toHaveTextContent` accepts no RegExp because
+  // the browser assertion compares strings. Keeping them in their own project
+  // stops that augmentation from overriding the jsdom matchers in the app
+  // program, where `@testing-library/jest-dom` does support RegExp.
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.visual.tsbuildinfo",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    // Matches the vite alias: `@/` is src/vendor/, the copied components.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/vendor/*"]
+    },
+    "types": ["vitest/globals"]
+  },
+  // The ambient Vite declarations (`*.css`, `import.meta.env`, the build-time
+  // constants) come from the same file the app program uses.
+  "include": ["src/**/*.visual.test.tsx", "src/vite-env.d.ts"]
+}

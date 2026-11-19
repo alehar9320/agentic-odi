@@ -113,6 +113,13 @@ filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
 
+The split runs through the type checker too: visual tests belong to
+`tsconfig.visual.json`, and `tsconfig.app.json` excludes them. Browser Mode
+declares its own `expect.element()` matchers, and `toHaveTextContent` there takes
+no `RegExp` because the assertion compares strings. In one program that
+augmentation overrode the jsdom matchers, so every `toHaveTextContent(/…/)` in
+the jsdom suite failed to typecheck.
+
 ### The cold-start bundle budget
 
 The first screen must not wait on everything the app can do, so the Vite build
