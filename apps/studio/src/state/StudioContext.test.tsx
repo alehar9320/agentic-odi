@@ -258,7 +258,7 @@ function route(
             code: "store_corrupt",
             message:
               "Your database failed its integrity check: /home/me/.odi.db. " +
-              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+              "Last backup: 06:14 local (odi-20260102T061400Z.db).",
             detail: "database disk image is malformed",
             suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
             retryable: false,
