@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from agentic_odi_cli import profile
+from agentic_odi_cli import paths, profile
 
 
 def _isolate(monkeypatch, tmp_path):
@@ -18,7 +18,7 @@ def test_config_dir_uses_xdg_config_home(monkeypatch, tmp_path):
 def test_config_dir_defaults_to_home(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert profile.config_dir() == Path(tmp_path) / "agentic-odi"
+    assert profile.config_dir() == tmp_path / ".config" / "agentic-odi"
 
 
 def test_baseline_file_location(monkeypatch, tmp_path):
@@ -29,7 +29,7 @@ def test_baseline_file_location(monkeypatch, tmp_path):
 def test_baseline_file_defaults_to_home(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert profile.baseline_file() == Path(tmp_path) / "agentic-odi" / "baseline.json"
+    assert profile.baseline_file() == tmp_path / ".config" / "agentic-odi" / "baseline.json"
 
 
 def test_baseline_exists_returns_false_when_no_file(monkeypatch, tmp_path):
@@ -403,3 +403,26 @@ def test_llm_profile_round_trips_non_ascii(monkeypatch, tmp_path):
         profile.LLMProfile(model="münchen-7b", base_url="http://localhost:8001/v1")
     )
     assert profile.load_llm_profile().model == "münchen-7b"
+
+
+def test_config_dir_uses_appdata_on_windows(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
+
+    assert profile.config_dir() == tmp_path / "roaming" / "agentic-odi"
+
+
+def test_config_dir_falls_back_to_appdata_home_on_windows(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.delenv("APPDATA", raising=False)
+    monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
+
+    assert profile.config_dir() == tmp_path / "AppData" / "Roaming" / "agentic-odi"
+
+
+def test_config_dir_is_absolute_when_home_is_unset(monkeypatch, tmp_path):
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("HOME", raising=False)
+    monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
+
+    assert profile.config_dir().is_absolute()
