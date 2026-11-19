@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+
+import { banners, waitForStudioReady } from "../helpers";
 
 /**
  * #545: the built app opens with no network.
@@ -45,6 +47,10 @@ async function openStudioWithWorker(page: import("@playwright/test").Page) {
     const cache = await caches.open(name);
     return Boolean(await cache.match(shell));
   }, SHELL);
+  // The studio this worker controls is empty, so it opens the connector offer
+  // over everything else — including the banners these tests assert on, which a
+  // modal hides. Readiness answers the offer; every test here starts from it.
+  await waitForStudioReady(page);
 }
 
 test.describe("the shell opens with no network", () => {
@@ -57,10 +63,10 @@ test.describe("the shell opens with no network", () => {
     const response = await page.goto(APP);
 
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole("textbox", { name: "Message the studio" })).toBeVisible();
+    await waitForStudioReady(page);
     // The banner renders its title and an aria-live announcement, so match the
     // visible title rather than the text, which would be two elements.
-    await expect(page.locator(".banner__title", { hasText: /you're offline/i })).toBeVisible();
+    await expect(banners(page).filter({ hasText: /you're offline/i })).toBeVisible();
   });
 
   test("serves the offline page only when the shell cache was evicted", async ({ page, context }) => {
@@ -147,7 +153,7 @@ test.describe("a new build waits for a person", () => {
       await registration?.update();
     });
 
-    const offer = page.locator(".banner__title", { hasText: /a new version of the studio is ready/i });
+    const offer = banners(page).filter({ hasText: /a new version of the studio is ready/i });
     await expect(offer).toBeVisible();
     // One offer, never a loop.
     await expect(offer).toHaveCount(1);

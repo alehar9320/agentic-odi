@@ -296,6 +296,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation, asserted from the stylesheet source |
 | `apps/studio/src/test/a11y.test.tsx` | The accessibility gate for every surface that ships. |
 | `apps/studio/src/test/contrast.test.ts` | The walker's own tests (issue #543, parent #331). |
+| `apps/studio/src/test/e2eQuarantine.test.ts` | The ratchet on `apps/studio/e2e/quarantine.ts` (#1118, from #1092). |
 | `apps/studio/src/test/keyboard.test.tsx` | The children keep one control each, so the tab order asserted below is the |
 | `apps/studio/src/test/renderCounts.test.tsx` | The case the budget depends on: a surface that re-renders because it reads |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | A verdict never appears without the confidence behind it. |

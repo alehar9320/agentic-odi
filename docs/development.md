@@ -533,9 +533,11 @@ response shapes, the sidecar's hydration of the canvas, and the first-run
 wizard's ordering relative to the rest of the app.
 
 ```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
-npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
+npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e         # the product suite
+npm --prefix apps/studio run test:e2e:smoke   # the blocking @smoke subset
+npm --prefix apps/studio run test:e2e:visual  # the opt-in screenshot contract
+npm --prefix apps/studio run test:e2e:ui      # the Playwright UI
 ```
 
 The first run needs the browser once:
@@ -545,9 +547,9 @@ npx --prefix apps/studio playwright install chromium
 ```
 
 Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
+a second sidecar on the MCP passthrough backend. `chromium` (the local
+backend, the product default) and `mcp-backend` (the passthrough) make up
+`test:e2e`; a spec is collected by exactly one of them.
 
 A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
 It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
@@ -559,13 +561,30 @@ true` and no membership in `ci-green`'s `needs` — so a screenshot failure
 cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none. When a test
-needs data behind it, it seeds through the API rather than through the UI, so
-the test stays about the view it is actually checking.
+never to a `data-testid`, of which the application has none, and never to a CSS
+class. When a test needs data behind it, it seeds through the API rather than
+through the UI, so the test stays about the view it is actually checking.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+Every spec imports `test` and `expect` from `e2e/fixtures.ts`. Its automatic
+fixture resets the shared studio — jobs, conversation memory, unread signals —
+before each test, so no spec inherits another's writes and the result does not
+depend on the order Playwright chose. A spec that imports from
+`@playwright/test` directly gets the shared state back.
+
+CI runs two browser jobs. `e2e-smoke` is **required** and runs the `@smoke`
+tagged subset with `--retries=0`. `e2e` runs the whole suite and stays advisory:
+set the repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
+`AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. Its summary lists every
+failure with its locator and call site, plus every test that passed only on
+retry.
+
+`test:e2e:visual` is opt-in because the repository has committed no screenshot
+baselines yet; running it in the product lane made that lane permanently red.
+
+A flaky spec is fixed or parked, never left to retry: `e2e/quarantine.ts` +
+`// quarantined: #<issue> <YYYY-MM-DD>` in the spec, with
+`src/test/e2eQuarantine.test.ts` failing the entry after thirty days. See
+[Testing](architecture/testing.md#a-flaky-spec-is-fixed-or-parked-never-retried-indefinitely).
 
 ## Cold-open budget
 

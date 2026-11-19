@@ -200,25 +200,99 @@ sidecar's response shapes, the sidecar's hydration of the canvas, and the
 first-run wizard's ordering relative to the rest of the app.
 
 ```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
+npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e         # the product suite, chromium + mcp-backend
+npm --prefix apps/studio run test:e2e:smoke   # the blocking @smoke subset
+npm --prefix apps/studio run test:e2e:visual  # the opt-in screenshot contract
 ```
 
 Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
+a second sidecar on the MCP passthrough backend. `chromium` (the local
+backend, the product default) and `mcp-backend` (the passthrough) make up
+`test:e2e`. `visual` and `screenshots` are opt-in and run by name.
+
+**A spec is collected by exactly one project.** `chromium` ignores
+`mcp-backend.spec.ts`, `visual.spec.ts` and `pr-screenshots.spec.ts`. Before
+#1118 it did not ignore the visual spec, so twelve comparisons ran twice, under
+two snapshot names, and one contract produced two independent verdicts.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none.
+never to a `data-testid`, of which the application has none, and never to a CSS
+class. A class-based locator reports "not visible" when a class moves, which
+names the symptom rather than the promise the test was making; a locator that
+asserts an attribute one shell happens to set (`aria-label` on the docked lens,
+which is labelled by `aria-labelledby`) passes at one viewport and fails at the
+other. The two structural handles left are the pre-JavaScript `#boot` shell,
+which has no roles because it paints before any script runs, and the
+`[role=…]` selector that finds banner rows before `banners()` narrows them to
+the one with actions in it — Radix renders each toast twice, as the row a
+person sees and as a hidden announcer with the same role and text.
 
 `first-paint.spec.ts` is the exception to "drives the real sidecar": it aborts
 the module bundle so it can read the pre-JavaScript shell in `index.html`, then
 compares the colour it painted against the `--bg` token for each theme.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+### Isolation: one reset, before every test
+
+`e2e/fixtures.ts` exports the `test` and `expect` every spec imports. Its
+automatic fixture calls `resetStudioState()` before each test: it deletes every
+job (a job takes its steps, outcomes and evidence with it), clears conversation
+memory, and dismisses unread signals. The sidecar, its SQLite stores and the
+MCP server are shared by the whole run — that is the point of the suite — so
+anything a spec leaves behind is state the next spec inherits, and the app
+restores the most recent conversation on boot.
+
+The reset used to be hand-rolled per spec, jobs only, with conversation memory
+cleared by exactly one file. That made the result depend on the order Playwright
+happened to choose, and `/brief` inside a neighbour's thread is what a `brief`
+failure looked like (#1118).
+
+A studio that has just been emptied is a studio that has not met the product
+
+yet: it opens the connector offer over the composer, and a modal hides the
+composer behind it. `waitForStudioReady()` answers that offer the way a person
+would, so a spec that starts from the shared reset reaches the composer without
+its own onboarding code. It belongs in the readiness helper for the same reason
+the reset belongs in a fixture: a spec that has to remember it is a spec that
+will eventually forget (#1118).
+
+### The visual contract is opt-in until it has baselines
+
+`e2e/visual.spec.ts` compares screens with `toHaveScreenshot`, and this
+repository has committed no baselines: `e2e/visual.spec.ts-snapshots/` does not
+exist. A comparison with no baseline cannot pass, so running it in the product
+lane reddened that lane on every push for a reason no test could fix. It is out
+of `test:e2e` until its Linux baselines are committed and reviewed;
+`npm run test:e2e:visual` writes and compares them with `animations:
+"disabled"`, `caret: "hide"` and `scale: "css"` from `playwright.config.ts`.
+
+### The smoke lane blocks a merge; the full suite is signal
+
+CI runs two browser jobs:
+
+- **`e2e-smoke` is required.** It runs the `@smoke`-tagged handful — the settled
+  shell, the first run, canvas hydration, one conversation turn, and one boot on
+  the MCP backend — with `--retries=0`, so a race fails instead of retiring
+  quietly. It has no `continue-on-error` and no repository-variable kill switch:
+  turning it off is a code change and a reviewed one.
+- **`e2e` is advisory.** It runs the whole suite with `--retries=1` and
+  publishes every failure (assertion, locator, call site, attempt count), the
+  tests that passed only on retry, and the traces under `test-results/`. Set the
+  repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
+  `AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. It is too broad and too
+  slow to be a merge gate on its own, which is why the narrow lane exists.
+
+A retry is recorded, never concealed: `retries: 1` keeps the first attempt's
+trace, and the summary names every test that needed the second one.
+
+### A flaky spec is fixed or parked, never retried indefinitely
+
+`e2e/quarantine.ts` is the only way to park one. The spec carries
+`// quarantined: #<issue> <YYYY-MM-DD>` in its first twenty lines, and the
+ledger carries the issue, the date, and a reason. `src/test/e2eQuarantine.test.ts`
+fails when a marker has no entry, an entry has no marker, the two disagree, or
+the entry is more than thirty days old. A parked spec still runs, so a fix is
+proven by deleting the entry. The list is empty today.
 
 ## Observability
 
