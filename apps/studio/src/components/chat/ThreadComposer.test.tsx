@@ -693,6 +693,7 @@ describe("canvas mentions", () => {
     const noIds: CanvasData = {
       ...data,
       jobs: [{ id: "", name: "No id here" }],
+      steps: [],
       outcomes: [{ id: "", statement: "Also no id" }],
       evidence: [{ id: "", name: "Empty id" }],
     };
