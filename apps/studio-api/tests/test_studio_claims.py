@@ -128,8 +128,46 @@ def test_an_instruction_makes_no_claim() -> None:
 def test_a_list_item_is_one_claim() -> None:
     claims = split_claims("- Stalled accounts. And more of them.")
 
+    assert [claim.text for claim in claims] == [
+        "Stalled accounts.",
+        "And more of them.",
+    ]
+    assert [claim.index for claim in claims] == [0, 1]
+
+
+def test_a_two_sentence_bullet_is_two_claims() -> None:
+    claims = split_claims("- Rotation is slow. It costs two days.")
+
+    assert [claim.text for claim in claims] == [
+        "Rotation is slow.",
+        "It costs two days.",
+    ]
+    assert [claim.index for claim in claims] == [0, 1]
+
+
+def test_each_sentence_in_a_bullet_keeps_its_own_status() -> None:
+    index = _index(("E-1", "Call with Acme", "Gong"))
+    claims = split_claims(
+        "- Rotation is slow. [[ev:E-1]] It costs two days. [[hypothesis]]",
+        index,
+    )
+
+    assert [claim.status for claim in claims] == ["cited", "hypothesis"]
+    assert claims[0].evidence == (index.resolve("E-1"),)
+    assert claims[1].evidence == ()
+
+
+def test_a_bullet_with_no_terminator_is_one_claim() -> None:
+    claims = split_claims("- Minimize the time")
+
     assert len(claims) == 1
-    assert claims[0].text == "Stalled accounts. And more of them."
+    assert claims[0].text == "Minimize the time"
+
+
+def test_ordered_list_markers_are_stripped() -> None:
+    claims = split_claims("1. First. Second.")
+
+    assert [claim.text for claim in claims] == ["First.", "Second."]
 
 
 def test_a_decimal_is_not_a_sentence_boundary() -> None:
