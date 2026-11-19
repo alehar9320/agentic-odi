@@ -93,8 +93,14 @@ jobs:
       # The gate below runs scripts/pr_ai_authorize.py, so the job has to have
       # the repository on disk. Without this checkout that step died with exit
       # code 2 and every pull request in the repository showed a red label job.
+      # Pin the base ref for the same reason as the other labelers: the default
+      # pull_request ref is the merge commit, and actions/checkout runs
+      # `git submodule foreach` while stripping its auth header, which exits 128
+      # on a branch carrying a stray gitlink.
       - uses: actions/checkout@v7
         if: ${{ ! github.event.pull_request.head.repo.fork }}
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
 
       - name: Process each pull request
         if: ${{ ! github.event.pull_request.head.repo.fork }}

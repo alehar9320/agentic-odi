@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
@@ -380,3 +381,22 @@ def test_managed_cli_prints_only_ai_merge_authorized():
     result = _run("--managed")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == LABEL
+
+
+def test_the_checkout_pins_the_base_ref_not_the_pull_request_head():
+    """The gate reads only repo scripts, so it must not check out the head.
+
+    The default ref for a ``pull_request`` event is the merge commit. When a
+    branch carries a stray gitlink (mode 160000, no ``.gitmodules`` url),
+    ``actions/checkout`` runs ``git submodule foreach`` while it strips its auth
+    header and git exits 128, failing the step before any command runs.
+    """
+    workflow = yaml.safe_load((WORKFLOWS / "pr-ai-authorize.yml").read_text(encoding="utf-8"))
+    checkouts = [
+        step
+        for step in workflow["jobs"]["labels"]["steps"]
+        if (step.get("uses") or "").startswith("actions/checkout")
+    ]
+    assert checkouts, "the labeler runs scripts/pr_ai_authorize.py and needs a tree"
+    for step in checkouts:
+        assert step["with"]["ref"] == "${{ github.event.pull_request.base.ref || github.ref }}"
