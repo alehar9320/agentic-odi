@@ -1,6 +1,19 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SESSION_KEY, clearSession, loadSession, saveSession } from "./session";
+
+function installStorage(storage: Storage | null): () => void {
+  const previous = Object.getOwnPropertyDescriptor(window, "localStorage");
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    get: () => storage,
+  });
+  return () => {
+    if (previous) {
+      Object.defineProperty(window, "localStorage", previous);
+    }
+  };
+}
 
 describe("studio session", () => {
   beforeEach(() => {
@@ -35,5 +48,51 @@ describe("studio session", () => {
     clearSession();
 
     expect(loadSession()).toBeNull();
+  });
+
+  describe("when storage is unavailable", () => {
+    let restore: (() => void) | null = null;
+
+    afterEach(() => {
+      restore?.();
+      restore = null;
+    });
+
+    it("returns null when reading storage throws, and never throws when writing", () => {
+      restore = installStorage({
+        getItem: () => {
+          throw new DOMException("denied", "SecurityError");
+        },
+        setItem: () => {
+          throw new DOMException("denied", "SecurityError");
+        },
+        removeItem: () => {
+          throw new DOMException("denied", "SecurityError");
+        },
+      } as unknown as Storage);
+
+      expect(loadSession()).toBeNull();
+      expect(() => saveSession({ job_id: null, step_id: null, outcome_id: null })).not.toThrow();
+      expect(() => clearSession()).not.toThrow();
+    });
+
+    it("does not throw when saving to a full quota", () => {
+      restore = installStorage({
+        getItem: () => null,
+        setItem: () => {
+          throw new DOMException("full", "QuotaExceededError");
+        },
+        removeItem: () => {},
+      } as unknown as Storage);
+
+      expect(() => saveSession({ job_id: "JOB-1", step_id: null, outcome_id: null })).not.toThrow();
+      expect(loadSession()).toBeNull();
+    });
+  });
+
+  it("still round-trips a session when storage works", () => {
+    saveSession({ job_id: "JOB-1", step_id: "S-1", outcome_id: "O-1" });
+
+    expect(loadSession()).toEqual({ job_id: "JOB-1", step_id: "S-1", outcome_id: "O-1" });
   });
 });
