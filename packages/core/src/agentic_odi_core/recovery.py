@@ -50,19 +50,19 @@ def backup_prefix(db_path: str) -> str:
 def latest_backup(db_path: str, *, directory: Path | None = None) -> Path | None:
     """Return the newest existing backup for a database, or ``None``.
 
-    Newest is by filename, which is a UTC timestamp, so it does not depend on
-    filesystem mtime resolution.
+    Newest is by modification time, with the filename as a tiebreaker. The
+    filename stamp has one-second resolution, so a pair written in the same
+    second differ only by their collision suffix and the clock cannot order
+    them; the file's own mtime can.
     """
     folder = directory if directory is not None else backups_dir()
     if not folder.is_dir():
         return None
     prefix = backup_prefix(db_path)
-    candidates = sorted(
-        (path for path in folder.glob(f"{prefix}-*.db") if path.is_file()),
-        key=lambda path: path.name,
-        reverse=True,
-    )
-    return candidates[0] if candidates else None
+    candidates = [path for path in folder.glob(f"{prefix}-*.db") if path.is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))
 
 
 def format_backup_time(backup: Path) -> str:
@@ -73,6 +73,11 @@ def format_backup_time(backup: Path) -> str:
     """
     stem = backup.stem
     _, _, stamp = stem.partition("-")
+    # A backup taken in a second that already has one gains a ``-N`` suffix so
+    # the pair are two files. The suffix is not part of the timestamp.
+    head, sep, tail = stamp.rpartition("-")
+    if sep and tail.isdigit():
+        stamp = head
     try:
         parsed = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
     except ValueError:
@@ -134,6 +139,12 @@ def backup_database(db_path: str, *, directory=None) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     prefix = backup_prefix(db_path)
     dest = folder / f"{prefix}-{_timestamp()}.db"
+    # Two backups in the same second would otherwise share a name and the
+    # later write would silently replace the earlier one.
+    suffix = 1
+    while dest.exists():
+        dest = folder / f"{prefix}-{_timestamp()}-{suffix}.db"
+        suffix += 1
     src = sqlite3.connect(str(source))
     try:
         dst = sqlite3.connect(str(dest))
