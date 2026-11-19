@@ -40,6 +40,20 @@ interface Env {
 
 const API_PREFIX = "/api/";
 
+/** Module-scope cache so the entry is resolved once per isolate. */
+let entryCache: string | null = null;
+
+/** Resolve the entry bundle name from the asset shelf. */
+async function resolveEntry(env: Env): Promise<string> {
+  const page = await env.ASSETS.fetch(new Request("https://assets/"));
+  if (page.status !== 200) {
+    return "unknown";
+  }
+  const text = await page.text();
+  const match = text.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
+  return match?.[0] ?? "unresolved";
+}
+
 /**
  * Capabilities the Worker can guarantee without any sidecar: local-only data,
  * memory, and the deterministic assistant. Everything that needs a sidecar
@@ -262,11 +276,8 @@ export default {
           env,
         );
       }
-      const page = await env.ASSETS.fetch(new Request("https://assets/"));
-      const entry =
-        page.status === 200
-          ? ((await page.text()).match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "unknown")
-          : "unknown";
+      const entry = entryCache ?? (await resolveEntry(env));
+      entryCache = entry;
       return secure(
         Response.json(
           {
