@@ -178,7 +178,7 @@ must not leave them so.
 | `ComposerPrimitive.Quote` / `.QuoteText` / `.QuoteDismiss` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #435 | Shows and clears the quote before send. |
 | `ComposerPrimitive.Dictate` / `.StopDictation` / `.DictationTranscript` | Adopted | `apps/studio/src/assistant/dictation.ts` | #433 | Dictation, hidden where unsupported. |
 | `ComposerPrimitive.Resume` | Planned | — | #424 | Appears only with a checkpoint. |
-| `ComposerPrimitive.TriggerPopover` (and its `Root`/`Items`/`Item`/`Categories`/`CategoryItem`/`Back`) | Planned | — | #426 | `@` mentions and `/` commands. |
+| `ComposerPrimitive.TriggerPopover` (and its `Root`/`Items`/`Item`/`Categories`/`CategoryItem`/`Back`) | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | `@` names a canvas record and `/` runs the existing commands. Categories are not used because both sources are flat. |
 | `ComposerPrimitive.If` | Decision | — | — | `AuiIf` is the idiom already in use. |
 | `ComposerPrimitive.AttachmentByIndex` | Rejected | — | — | The composer renders chips through `ComposerPrimitive.Attachments`, which scopes each to its attachment; the bare by-index form stays unused. |
 | `composer.quote` / `composer.queue` / `composer.dictation` / `composer.submission` / `composer.inTransit` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | `quote` and `dictation` are read today; `queue` arrives with #410, and `submission`/`inTransit` matter to that issue's honesty: a sent message the thread does not show yet must not look lost. |
@@ -276,7 +276,7 @@ only the surface is missing.
 | `useAui` | Adopted | `apps/studio/src/components/chat/ThreadComposer.tsx` | #238 | Imperative actions. |
 | `AuiIf` | Adopted | `apps/studio/src/components/chat/Conversation.tsx` | #238 | The conditional idiom in use. |
 | `useAuiEvent` | Decision | — | — | Events are for cross-surface coordination; one surface has nothing to coordinate yet. |
-| `unstable_useMentionAdapter` / `unstable_useSlashCommandAdapter` | Planned | — | #426 | Composer triggers. |
+| `unstable_useMentionAdapter` / `unstable_useSlashCommandAdapter` | Partial | `apps/studio/src/components/chat/ThreadComposer.tsx` | — | Slash commands use the adapter helper with the existing `STUDIO_COMMANDS`; mentions use a canvas-specific `TriggerAdapter` for domain ordering and `@id` formatting. The general mention helper is not used. |
 | `unstable_useComposerInputHistory` | Adopted | `apps/studio/src/assistant/composerHistory.ts` | #430 | ArrowUp recall. |
 | `useSmooth` | Decision | — | — | Smoothes bursty SSE text. Might read as deliberate rather than laggy — needs a comparison, not a guess. |
 | `useThreadViewport` (viewport state) | Adopted | `apps/studio/src/components/chat/ChatStage.tsx` | #245 | `isAtBottom` / `scrollToBottom` drive the jump-to-latest affordance; the arrival count lives in `arrivalCount.ts`. |
@@ -331,14 +331,14 @@ only the surface is missing.
 | Status | Rows |
 |---|---|
 | Adopted | 49 |
-| Partial | 10 |
-| Planned | 13 |
+| Partial | 12 |
+| Planned | 11 |
 | Decision | 41 |
 | Rejected | 44 |
 | Total | 157 |
 
-Read it as: **59** of the library's 157 relevant capabilities already deliver
-something a person can use, **13** more are carried by open issues, **41** rows
+Read it as: **61** of the library's 157 relevant capabilities already deliver
+something a person can use, **11** more are carried by open issues, **41** rows
 wait on a named decision, and **44** are rejected with a reason. Every row is
 accounted for — that is the whole point of the page.
 <!-- END GENERATED: assistant-ui-count -->

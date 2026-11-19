@@ -61,6 +61,7 @@ CI_JOB_COVERAGE: dict[str, tuple[str, ...]] = {
     "tauri-check": (),
     "tauri-build": (),
     "e2e": (),
+    "e2e-smoke": (),
 }
 
 CI_ONLY_REASONS: dict[str, str] = {
@@ -81,14 +82,22 @@ CI_ONLY_REASONS: dict[str, str] = {
         "drives Chromium against a built Studio and both services; advisory at merge time "
         "and owned by the e2e lane"
     ),
+    "e2e-smoke": (
+        "drives Playwright smoke scenarios against a built Studio and both services; "
+        "the browser lane owns its full-stack runtime"
+    ),
 }
 
 TIER_NOTES = {
     "changed": (
-        "Not run: mypy, studio unit tests/build, website build, e2e, tauri, dependency audit."
+        "Not run: mypy, studio unit tests/build, website build, e2e, e2e-smoke, tauri, "
+        "dependency audit."
     ),
-    "default": "Not run: e2e (owned by the e2e lane), tauri, dependency audit.",
-    "full": ("Not run: e2e (owned by the e2e lane), tauri-check, tauri-build, dependency audit."),
+    "default": "Not run: e2e/e2e-smoke (owned by the browser lane), tauri, dependency audit.",
+    "full": (
+        "Not run: e2e/e2e-smoke (owned by the browser lane), tauri-check, tauri-build, "
+        "dependency audit."
+    ),
 }
 
 
