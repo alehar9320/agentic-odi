@@ -87,9 +87,10 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
-#: Opportunity scores are stored and compared to one decimal place. Half of the
-#: last digit (0.05) is the Studio's score-mismatch tolerance; the two sides
-#: are pinned by tests/test_score_tolerance_parity.py.
+#: Opportunity scores are compared to one decimal place: a stored score within
+#: half of the last digit of the recomputed value is a rounding difference, not
+#: drift. Half of that digit (0.05) is the Studio's score-mismatch tolerance;
+#: the two sides are pinned by tests/test_score_tolerance_parity.py.
 OPPORTUNITY_SCORE_DECIMALS = 1
 
 

@@ -12,10 +12,11 @@ export const UNDERSERVED_THRESHOLD = 10;
 /** The one phrase for a score the store does not hold. */
 export const UNSCORED_LABEL = "Not scored";
 
-/** Half of the last decimal place core keeps for an opportunity score, so a
- * stored rounded score is not treated as drift. Core stores scores to one
- * decimal place; `tests/test_score_tolerance_parity.py` fails if the tolerance
- * and `OPPORTUNITY_SCORE_DECIMALS` disagree. */
+/** Half of the last decimal place an opportunity score is compared at, so a
+ * stored score that differs only by display rounding is not treated as drift.
+ * The comparison precision is one decimal place;
+ * `tests/test_score_tolerance_parity.py` fails if the tolerance and
+ * `OPPORTUNITY_SCORE_DECIMALS` disagree. */
 export const SCORE_MISMATCH_TOLERANCE = 0.05;
 
 export function opportunityScore(importance: number, satisfaction: number): number {

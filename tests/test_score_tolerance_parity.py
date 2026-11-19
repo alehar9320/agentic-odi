@@ -1,10 +1,10 @@
 """The score-mismatch tolerance is one number, not two.
 
-`packages/core` keeps opportunity scores to one decimal place
+`packages/core` declares the precision an opportunity score is compared at
 (`OPPORTUNITY_SCORE_DECIMALS`), and the Studio treats a stored score as matching
 its inputs when it is within `SCORE_MISMATCH_TOLERANCE` of the recomputed value.
-Nothing connected the two, so core's precision and the Studio's tolerance could
-drift apart while every test in each language kept passing.
+Nothing connected the two, so core's comparison precision and the Studio's
+tolerance could drift apart while every test in each language kept passing.
 
 The Studio has no pytest-visible behaviour, so its half is read from source —
 the same approach `test_underserved_threshold_parity.py` takes.
