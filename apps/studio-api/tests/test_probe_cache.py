@@ -73,7 +73,7 @@ def test_cache_retains_no_secret_or_response_body(monkeypatch):
     result = asyncio.run(probes.probe_llm_health("http://probe-c/v1", "super-secret", "m", now=now))
     assert "super-secret" not in result["message"]
 
-    key_hash = hashlib.sha256("super-secret".encode()).hexdigest()[:16]
+    key_hash = hashlib.sha256(b"super-secret").hexdigest()[:16]
     with probes._PROBE_CACHE_LOCK:
         _, stored = probes._PROBE_CACHE[("http://probe-c/v1", "m", key_hash)]
     assert "super-secret" not in stored.message
