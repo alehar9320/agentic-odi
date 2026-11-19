@@ -149,7 +149,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 
 <!-- BEGIN GENERATED TOOLS (scripts/integration_guide.py) -->
 
-68 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
+94 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
 
 | Tool | Effect | Stage | Required arguments | Purpose |
 | ---- | ------ | ----- | ------------------ | ------- |
@@ -167,16 +167,45 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `get_outcomes` | `read` | 2 | `job_id` | List the desired outcomes of a Job or step, one page at a time. |
 | `get_outcome` | `read` | 2 | `outcome_id` | Fetch one desired outcome by id. |
 | `update_outcome` | `write` | 2 | `outcome_id` | Edit an outcome's statement or scores. |
+| `get_outcome_history` | `read` | 4 | `outcome_id` | List the accepted score snapshots for an Outcome, oldest first. |
+| `get_outcome_delta` | `read` | 4 | `outcome_id` | The signed score change across an Outcome's recorded snapshots. |
+| `get_outcome_interval` | `read` | 4 | `outcome_id` | The stored band and its provenance for an Outcome, or a no-band result. |
+| `get_outcome_inputs` | `read` | 4 | `outcome_id` | The paired survey inputs a stored band was reproduced from, or a no-inputs result. |
+| `import_survey` | `write` | 4 | `rows` | Land a survey's per-outcome means, sample and band on matching Outcomes. |
+| `get_survey_import_plan` | `read` | 4 | `rows` | Plan a survey import without writing: every row's fate and line number. |
+| `commit_survey_import` | `write` | 4 | `rows` | Write a survey import only when every row resolves; otherwise refuse. |
+| `rank_outcomes` | `write` | 4 | `job_id` | Rank a Job's Outcomes by evidence strength into measured/thin/none sections. |
 | `delete_outcome` | `destructive` | 2 | `outcome_id` | Delete a desired outcome. |
 | `add_customer_outcome` | `write` | — | `job_id`, `customer_value`, `business_value` | Record a customer outcome with customer and business value. |
 | `get_customer_outcome` | `read` | — | `outcome_id` | Fetch one customer outcome by id. |
 | `list_customer_outcomes` | `read` | — | — | List customer outcomes, optionally for one Job, one page at a time. |
 | `update_customer_outcome` | `write` | — | `outcome_id` | Edit a customer outcome's values. |
 | `delete_customer_outcome` | `destructive` | — | `outcome_id` | Delete a customer outcome. |
+| `add_alternative` | `write` | 2 | `job_id`, `name`, `kind` | Record what a customer uses today for one Job. |
+| `get_alternative` | `read` | 2 | `alternative_id` | Get a single Alternative by ID. |
+| `list_alternatives` | `read` | 2 | — | List the Alternatives recorded for a Job. |
+| `delete_alternative` | `destructive` | 2 | `alternative_id` | Delete an Alternative and its links. |
+| `link_alternative` | `write` | 2 | `outcome_id`, `alternative_id`, `adequacy` | Rate one Alternative against one Outcome with the customer's adequacy. |
+| `unlink_alternative` | `write` | 2 | `outcome_id`, `alternative_id` | Remove one Alternative-to-Outcome link. |
+| `get_outcome_alternatives` | `read` | 2 | `outcome_id` | The Alternatives recorded for one Outcome, with each adequacy rating. |
+| `get_has_existing_solution` | `read` | 2 | `outcome_id` | Whether an existing solution is recorded: yes, nothing linked, or not asked. |
+| `list_alternative_links` | `read` | 2 | `job_id` | Every recorded alternative for one Job, each with its outcome and adequacy. |
 | `add_evidence` | `write` | — | `source_name`, `source_kind`, `name`, `content` | Attach a research record as evidence. |
 | `get_evidence` | `read` | — | `evidence_id` | Fetch one evidence record by id. |
 | `list_evidence` | `read` | — | — | List evidence, optionally for one Job, one page at a time. |
 | `delete_evidence` | `destructive` | — | `evidence_id` | Delete an evidence record. |
+| `add_interview` | `write` | — | `title`, `participant_label` | Record a research interview (who, when, the job it informs). |
+| `get_interview` | `read` | — | `interview_id` | Get a single Interview by ID. |
+| `list_interviews` | `read` | — | — | List interviews, optionally filtered by job. |
+| `delete_interview` | `destructive` | — | `interview_id` | Delete an Interview and its cascading quotes. |
+| `add_quote` | `write` | — | `interview_id`, `text` | Append a verbatim quote to an interview. |
+| `list_quotes` | `read` | — | `interview_id` | List an interview's quotes in ordinal order. |
+| `import_transcript` | `write` | — | `text`, `title`, `participant_label` | Parse a transcript and persist it as one interview with its quotes. |
+| `extract_candidates` | `write` | — | `quote_id` | Propose outcomes from one quote; proposes, accepts nothing. |
+| `list_candidates` | `read` | — | — | List proposed outcomes, optionally by quote, Job, or status, one page at a time. |
+| `get_candidate` | `read` | — | `candidate_id` | Fetch one proposed outcome by id. |
+| `update_candidate` | `write` | — | `candidate_id` | Update an outcome candidate's review state or statement. |
+| `delete_candidate` | `destructive` | — | `candidate_id` | Delete an OutcomeCandidate. |
 | `promote_evidence` | `write` | — | `evidence_id`, `target` | Promote a record into a Job, outcome, or customer outcome. |
 | `evaluate_outcome` | `read` | 2 | `statement` | Check a statement against the ODI format before saving it. |
 | `get_odi_schema` | `read` | — | — | Return the canonical JSON schema for every ODI entity. |
@@ -184,9 +213,6 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `get_odi_framework_guidelines` | `read` | — | — | Say which tool to use at each stage of ODI. |
 | `get_capabilities` | `read` | — | — | Describe what the assistant can help with. |
 | `get_capabilities_manifest` | `read` | — | — | Return the whole tool surface as machine-readable JSON. |
-| `extract_candidates` | `write` | 2 | `quote_id`, `quote`, `job_id` | Propose outcomes from one quote; proposes, accepts nothing. |
-| `list_candidates` | `read` | 2 | — | List proposed outcomes, optionally by quote, Job, or status, one page at a time. |
-| `get_candidate` | `read` | 2 | `candidate_id` | Fetch one proposed outcome by id. |
 | `accept_candidate` | `write` | 2 | `candidate_id`, `importance`, `satisfaction` | Accept a proposed outcome, creating exactly one Outcome. |
 | `reject_candidate` | `write` | 2 | `candidate_id`, `reason` | Reject a proposed outcome; the reason is required and kept. |
 | `merge_candidate` | `write` | 2 | `candidate_id`, `merged_into` | Fold a proposed outcome into an existing Outcome; creates none. |

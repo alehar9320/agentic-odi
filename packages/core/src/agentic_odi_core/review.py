@@ -21,21 +21,14 @@ about the extractor, and a merge is information about duplicates.
 from __future__ import annotations
 
 from agentic_odi_core.errors import ValidationError
-from agentic_odi_core.models import CandidateStatus, Outcome, OutcomeCandidate
+from agentic_odi_core.models import CandidateStatus, ExtractedCandidate, Outcome
 from agentic_odi_core.repository import Repository
 from agentic_odi_core.services import (
+    CandidateNotFoundError,
     JobNotFoundError,
     ODIService,
     OutcomeNotFoundError,
 )
-
-
-class CandidateNotFoundError(ValidationError):
-    """No candidate has that id."""
-
-    def __init__(self, candidate_id: str) -> None:
-        self.candidate_id = candidate_id
-        super().__init__(f"Candidate not found: {candidate_id}")
 
 
 class CandidateAlreadyDecidedError(ValidationError):
@@ -50,7 +43,7 @@ class CandidateAlreadyDecidedError(ValidationError):
         )
 
 
-def _require_proposed(repo: Repository, candidate_id: str) -> OutcomeCandidate:
+def _require_proposed(repo: Repository, candidate_id: str) -> ExtractedCandidate:
     candidate = repo.get_extracted_candidate(candidate_id)
     if candidate is None:
         raise CandidateNotFoundError(candidate_id)
@@ -104,7 +97,7 @@ def accept_candidate(
     return outcome
 
 
-def reject_candidate(repo: Repository, candidate_id: str, *, reason: str) -> OutcomeCandidate:
+def reject_candidate(repo: Repository, candidate_id: str, *, reason: str) -> ExtractedCandidate:
     """Reject a proposed candidate. The reason is required and kept.
 
     Rejection is information about the extractor, so the candidate is retained
@@ -129,7 +122,7 @@ def merge_candidate(
     candidate_id: str,
     *,
     merged_into: str,
-) -> OutcomeCandidate:
+) -> ExtractedCandidate:
     """Fold a proposed candidate into an existing outcome. Creates no outcome.
 
     ``merged_into`` must be an outcome that exists; the candidate is flipped to

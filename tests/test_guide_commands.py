@@ -169,11 +169,13 @@ def test_the_interviews_sequence_runs_end_to_end(tmp_path: Path) -> None:
         "--job-id",
         "demo-job-1",
     )
-    candidate_id = _extract_id(r"\(([0-9a-f-]{36})\)", extract)
+    candidate_id = _extract_id(
+        r"(?m)^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s+\S+", extract
+    )
 
     run("candidates", "list", "--job-id", "demo-job-1")
     run("candidates", "list", "--status", "proposed", "--json")
-    run("candidates", "show", candidate_id)
+    run("candidates", "get", candidate_id)
 
     accepted = run("candidates", "accept", candidate_id, "--importance", "9", "--satisfaction", "4")
     outcome_id = _extract_id(r"Outcome created:\s*([0-9a-f-]{36})", accepted)

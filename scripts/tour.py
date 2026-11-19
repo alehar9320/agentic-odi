@@ -109,7 +109,9 @@ class _Normalizer:
 
 
 def _extract_candidate_id(output: str) -> str:
-    match = re.search(r"\((" + _UUID.pattern + r")\)", output)
+    match = re.search(r"\((" + _UUID.pattern + r")\)", output) or re.search(
+        r"(?m)^(" + _UUID.pattern + r")\s+\S+", output
+    )
     if not match:
         raise TourError(f"no candidate id in extract output:\n{output}")
     return match.group(1)

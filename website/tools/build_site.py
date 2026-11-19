@@ -388,15 +388,7 @@ def _render_pages(env: Environment) -> dict[str, str]:
         tool_signatures={tool["name"]: _signature(tool) for tool in tools},
         catalog_cards=cards,
         odi_schema=odi_schema,
-        # Quotes need no escaping in HTML text, so only &, < and > are escaped here;
-        # the template marks the value safe. Escaping every quote cost ~9 KB of
-        # "&#34;" on the one page that already sits at the document-size budget.
-        odi_schema_json=(
-            json.dumps(odi_schema, separators=(",", ":"), sort_keys=True)
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-        ),
+        odi_schema_json=json.dumps(odi_schema, separators=(",", ":"), sort_keys=True),
         works_today=_works_today(tools, cards, connectors),
         roadmap_pending=roadmap_pending,
         formula_base=formula_base,

@@ -59,7 +59,7 @@ on the candidate — it is never silently dropped or rewritten.
 ```bash
 agentic-odi candidates list --job-id demo-job-1
 agentic-odi candidates list --status proposed --json
-agentic-odi candidates show <candidate-id>
+agentic-odi candidates get <candidate-id>
 ```
 
 `list` filters by quote, job, or status. `show` prints one candidate with its

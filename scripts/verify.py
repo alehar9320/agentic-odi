@@ -78,10 +78,13 @@ CI_ONLY_REASONS: dict[str, str] = {
     "tauri-build": (
         "builds and bundles the desktop app; needs the Rust toolchain and the webview libraries"
     ),
-    "e2e-smoke": ("builds the site and drives Chromium against it; browser lane"),
     "e2e": (
         "drives Chromium against a built Studio and both services; advisory at merge time "
         "and owned by the e2e lane"
+    ),
+    "e2e-smoke": (
+        "drives Chromium against the built Studio and both services; advisory at merge "
+        "time and owned by the e2e lane"
     ),
 }
 

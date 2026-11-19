@@ -1,34 +1,18 @@
-"""The one text normaliser the product uses to decide two statements match.
+"""Compare outcome statements by meaning, not by exact text.
 
-Extraction is idempotent on ``(quote_id, normalised_statement)``: re-running an
-extractor over the same quote must add nothing. Duplicate merge (``A6``) groups
-candidates by the same key. Both need the *same* answer to "are these the same
-statement", so the normaliser lives in exactly one place — here — rather than
-being reimplemented per caller.
-
-The transformation is deliberately lossy and stable:
-
-1. lowercase,
-2. Unicode NFKC, then punctuation and symbol removal,
-3. whitespace collapse,
-4. stopword removal.
-
-Stopwords are removed for *comparison* only; the stored statement keeps the
-reader's words. A statement that normalises to nothing (for example ``"the"``)
-falls back to its punctuation-stripped text, and if that too is empty, to a
-stable marker — so two different empty-normalising statements never collide
-into one idempotency key.
+Extraction produces a candidate per proposal; the same idea is often phrased
+twice. This module gives one documented normaliser and one similarity score so
+that "the same" is decided in exactly one place.
 """
 
 from __future__ import annotations
 
+import difflib
 import re
-import unicodedata
 
-#: Words dropped before comparison. Kept small and explicit on purpose: a large
-#: list silently merges statements that a person would read as different, and a
-#: merge is not reversible. This is the whole vocabulary — there is no second
-#: list anywhere else in the product.
+# Pinned vocabulary. Changing this list changes what counts as a duplicate, so
+# it is treated as a contract: add words deliberately, with a test that shows
+# the intended collapse or non-collapse.
 STOPWORDS: frozenset[str] = frozenset(
     {
         "a",
@@ -39,27 +23,19 @@ STOPWORDS: frozenset[str] = frozenset(
         "at",
         "be",
         "by",
-        "do",
-        "does",
         "for",
         "from",
-        "how",
-        "i",
         "in",
+        "into",
         "is",
         "it",
         "its",
-        "me",
-        "my",
         "of",
         "on",
         "or",
-        "our",
-        "so",
         "that",
         "the",
         "their",
-        "them",
         "then",
         "there",
         "these",
@@ -67,72 +43,53 @@ STOPWORDS: frozenset[str] = frozenset(
         "this",
         "to",
         "was",
-        "we",
         "were",
-        "what",
         "when",
-        "where",
         "which",
-        "who",
-        "why",
-        "will",
         "with",
-        "you",
-        "your",
     }
 )
 
-#: Marker used when a statement has no comparable content at all, so an
-#: all-stopword statement still gets a distinct, stable key.
-EMPTY_NORMALISED = "\x00empty"
-
-_PUNCTUATION = re.compile(r"[^\w\s]", re.UNICODE)
-_WHITESPACE = re.compile(r"\s+", re.UNICODE)
+_PUNCTUATION = re.compile(r"[^\w\s]")
+_WHITESPACE = re.compile(r"\s+")
 
 
-def _strip_punctuation(text: str) -> str:
-    """Lowercase, NFKC-normalise, drop punctuation/symbols, collapse whitespace."""
-    folded = unicodedata.normalize("NFKC", text).lower()
-    without_punctuation = _PUNCTUATION.sub(" ", folded)
-    return _WHITESPACE.sub(" ", without_punctuation).strip()
+def normalize(text: str) -> str:
+    """Lowercase, strip punctuation, drop stopwords, collapse whitespace.
 
-
-def normalise(text: str) -> str:
-    """Return the comparison form of ``text``.
-
-    Lowercase, punctuation-free, stopword-free, single-spaced. An input that
-    has no content after punctuation removal returns :data:`EMPTY_NORMALISED`;
-    an input whose words are all stopwords falls back to its punctuation-stripped
-    text, so ``"the time"`` and ``"the cost"`` stay distinct even though both
-    lose their stopwords.
+    The result is the key used to decide whether two statements are the same
+    idea. It is deliberately lossy: ``"Minimize the time it takes to onboard"``
+    normalises to ``"minimize time takes onboard"``.
     """
-    stripped = _strip_punctuation(text)
-    if not stripped:
-        return EMPTY_NORMALISED
-    words = [word for word in stripped.split(" ") if word and word not in STOPWORDS]
-    if words:
-        return " ".join(words)
-    return stripped
+    lowered = text.lower()
+    without_punctuation = _PUNCTUATION.sub(" ", lowered)
+    tokens = [token for token in without_punctuation.split() if token not in STOPWORDS]
+    return _WHITESPACE.sub(" ", " ".join(tokens)).strip()
 
 
-def is_same_statement(left: str, right: str) -> bool:
-    """Whether two statements normalise to the same comparison form."""
-    return normalise(left) == normalise(right)
+def similar(left: str, right: str) -> float:
+    """Return a similarity in ``[0, 1]`` between two statements.
 
+    The score is the mean of two signals: token-set overlap (Jaccard) and
+    :class:`difflib.SequenceMatcher` on the normalised text. Token overlap
+    catches word-order changes; the sequence ratio catches partial edits.
 
-def normalisation_key(quote_id: str, statement: str) -> tuple[str, str]:
-    """The idempotency key for a candidate: its quote and its normalised statement.
-
-    Extraction is keyed on this pair, so re-extracting the same quote produces
-    the same keys and therefore adds no candidates.
+    When both statements normalise to empty there is no content to compare, so
+    the score is ``1.0`` only when the raw strings are identical and ``0.0``
+    otherwise — two different stopword-only strings are not "the same".
     """
-    return (quote_id, normalise(statement))
+    left_normalized = normalize(left)
+    right_normalized = normalize(right)
+    if not left_normalized or not right_normalized:
+        if left.strip() == right.strip():
+            return 1.0
+        return 0.0
+    if left_normalized == right_normalized:
+        return 1.0
 
-
-__all__ = [
-    "EMPTY_NORMALISED",
-    "STOPWORDS",
-    "is_same_statement",
-    "normalisation_key",
-    "normalise",
-]
+    left_tokens = set(left_normalized.split())
+    right_tokens = set(right_normalized.split())
+    union = left_tokens | right_tokens
+    overlap = len(left_tokens & right_tokens) / len(union) if union else 0.0
+    ratio = difflib.SequenceMatcher(None, left_normalized, right_normalized).ratio()
+    return (overlap + ratio) / 2

@@ -32,9 +32,13 @@ Minimize the time it takes to test a rotation against the C…  18.00
 Minimize the time it takes to stage a new secret safely whe…  17.00
 Minimize the time it takes to verify permissions before a d…  16.00
 agentic-odi candidates extract --quote-id tour-q1 --quote "Minimize the time it takes to onboard when a customer signs up." --job-id demo-job-1
-- [proposed] Minimize the time it takes to onboard when a customer signs up.  (<id-1>)
+id                                    status    statement                                                   
+------------------------------------  --------  ------------------------------------------------------------
+<id-1>  proposed  Minimize the time it takes to onboard when a customer signs…
 agentic-odi candidates list --job-id demo-job-1 --status proposed
-- [proposed] Minimize the time it takes to onboard when a customer signs up.  (<id-1>)
+id                                    status    statement                                                   
+------------------------------------  --------  ------------------------------------------------------------
+<id-1>  proposed  Minimize the time it takes to onboard when a customer signs…
 agentic-odi candidates accept {candidate_id} --importance 9 --satisfaction 4
 Outcome created: <id-2>
 agentic-odi brief {outcome_id}

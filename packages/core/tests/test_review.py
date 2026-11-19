@@ -7,7 +7,6 @@ import asyncio
 import pytest
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.evaluation import OutcomeStatementError
-from agentic_odi_core.extraction import FixtureStatementExtractor, Proposal, extract_candidates
 from agentic_odi_core.models import CandidateStatus
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.review import (
@@ -18,6 +17,11 @@ from agentic_odi_core.review import (
     reject_candidate,
 )
 from agentic_odi_core.services import JobNotFoundError, ODIService, OutcomeNotFoundError
+from agentic_odi_core.spine_extraction import (
+    FixtureStatementExtractor,
+    Proposal,
+    extract_candidates,
+)
 
 VALID = "Minimize the time it takes to onboard a new customer when they sign up."
 

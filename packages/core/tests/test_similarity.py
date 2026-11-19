@@ -1,53 +1,58 @@
-"""Tests for the shared statement normaliser."""
+"""Tests for the statement normaliser and similarity score."""
 
 from __future__ import annotations
 
-from agentic_odi_core.similarity import (
-    EMPTY_NORMALISED,
-    is_same_statement,
-    normalisation_key,
-    normalise,
+import pytest
+from agentic_odi_core.similarity import normalize, similar
+
+
+def test_normalize_lowercases_and_drops_punctuation() -> None:
+    assert normalize("Minimize the time it takes to onboard!") == "minimize time takes onboard"
+
+
+def test_normalize_drops_stopwords_and_collapses_whitespace() -> None:
+    assert normalize("  the   QUICK  brown fox  ") == "quick brown fox"
+
+
+def test_normalize_of_stopwords_only_is_empty() -> None:
+    assert normalize("the and of to") == ""
+
+
+def test_normalize_is_pinned_to_the_documented_vocabulary() -> None:
+    # "with" is a stopword, "without" is not; a change to the list breaks this.
+    assert normalize("with care") == "care"
+    assert normalize("without care") == "without care"
+
+
+@pytest.mark.parametrize(
+    ("left", "right"),
+    [
+        ("Minimize the time it takes to onboard", "minimize time it takes onboard"),
+        ("Maximize the number of steps", "Maximize the number steps"),
+    ],
 )
+def test_similar_collapses_word_order_and_stopwords(left: str, right: str) -> None:
+    assert similar(left, right) == 1.0
 
 
-def test_normalise_is_case_and_punctuation_insensitive() -> None:
-    assert normalise("Minimize the TIME it takes!") == normalise("minimize time it takes")
+def test_similar_is_zero_for_two_different_stopword_only_strings() -> None:
+    assert similar("the and", "of to") == 0.0
 
 
-def test_normalise_removes_stopwords() -> None:
-    assert normalise("the time it takes") == "time takes"
+def test_similar_is_one_for_identical_stopword_only_strings() -> None:
+    assert similar("the and", " the and ") == 1.0
 
 
-def test_normalise_keeps_distinct_content() -> None:
-    assert normalise("the time") != normalise("the cost")
+def test_similar_is_between_zero_and_one_for_partial_overlap() -> None:
+    score = similar("Minimize the time to onboard", "Minimize the cost of support")
+    assert 0.0 < score < 1.0
 
 
-def test_normalise_collapses_whitespace() -> None:
-    assert normalise("  minimize   the\n time  ") == normalise("minimize time")
+def test_similar_is_symmetric() -> None:
+    left = "Minimize the time it takes to onboard a new hire"
+    right = "Minimize onboarding time for new hires"
+    assert similar(left, right) == similar(right, left)
 
 
-def test_normalise_empty_input_uses_marker() -> None:
-    assert normalise("") == EMPTY_NORMALISED
-    assert normalise("   ") == EMPTY_NORMALISED
-    assert normalise("!!!") == EMPTY_NORMALISED
-
-
-def test_all_stopword_statement_falls_back_to_stripped_text() -> None:
-    # "the" has no comparable content, but two different all-stopword inputs
-    # must not collide into one key.
-    assert normalise("the") == "the"
-    assert normalise("the") != normalise("of")
-
-
-def test_is_same_statement() -> None:
-    assert is_same_statement("Minimize the time!", "minimize time")
-    assert not is_same_statement("Minimize the time", "Maximize the time")
-
-
-def test_normalisation_key_is_quote_scoped() -> None:
-    assert normalisation_key("q1", "Minimize the time") != normalisation_key(
-        "q2", "Minimize the time"
-    )
-    assert normalisation_key("q1", "Minimize the time!") == normalisation_key(
-        "q1", "minimize  time"
-    )
+def test_unrelated_statements_score_low() -> None:
+    assert similar("Minimize the time to onboard", "Maximize revenue per account") < 0.5

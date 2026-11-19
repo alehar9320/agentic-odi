@@ -9,7 +9,7 @@ Studio) runs against real code rather than doubles.
 Two stages are real as of ``A4``/``A5``:
 
 * ``candidate`` — :class:`StoreCandidateExtractor` runs a
-  :class:`~agentic_odi_core.extraction.StatementExtractor` over one quote and
+  :class:`~agentic_odi_core.spine_extraction.StatementExtractor` over one quote and
   persists the proposals through the repository.
 * ``outcome`` — :class:`StoreOutcomeAcceptor` accepts a proposed candidate
   through :func:`~agentic_odi_core.review.accept_candidate`, which goes through
@@ -25,11 +25,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from agentic_odi_core.errors import NotFoundError
-from agentic_odi_core.extraction import (
-    FixtureStatementExtractor,
-    StatementExtractor,
-    extract_candidates,
-)
 from agentic_odi_core.models import (
     BetRecord,
     DecisionRecord,
@@ -48,6 +43,11 @@ from agentic_odi_core.spine import (
     ScoreSample,
     Spine,
 )
+from agentic_odi_core.spine_extraction import (
+    FixtureStatementExtractor,
+    StatementExtractor,
+    extract_candidates,
+)
 
 
 def _now() -> str:
@@ -64,7 +64,7 @@ class SpineStageError(NotFoundError):
 class StoreCandidateExtractor:
     """The real ``candidate`` stage: extract from one quote into the store.
 
-    Wraps a :class:`~agentic_odi_core.extraction.StatementExtractor` (the model
+    Wraps a :class:`~agentic_odi_core.spine_extraction.StatementExtractor` (the model
     boundary) and the repository (the store). The extractor proposes; this stage
     validates and persists. It never writes an :class:`Outcome`.
     """
