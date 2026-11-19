@@ -246,6 +246,7 @@ class LocalBackend(Backend):
             job_not_found,
             step_not_found,
         )
+        from agentic_odi_core.errors import ValidationError
 
         step_id = args.get("step_id")
         claim_check = args.get("claim_check")
@@ -257,6 +258,7 @@ class LocalBackend(Backend):
                 satisfaction=float(args["satisfaction"]),
                 step_id=step_id,
                 claim_check=claim_check,
+                objectives=args.get("objectives"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args["job_id"])) from None
@@ -265,6 +267,8 @@ class LocalBackend(Backend):
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
         except ClaimCheckError as exc:
+            raise BackendError(str(exc)) from exc
+        except ValidationError as exc:
             raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
@@ -293,10 +297,11 @@ class LocalBackend(Backend):
 
     def _update_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, ValueOutOfRangeError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
 
         updates: dict[str, Any] = {
             key: args[key]
-            for key in ("statement", "importance", "satisfaction", "step_id")
+            for key in ("statement", "importance", "satisfaction", "step_id", "objectives")
             if key in args
         }
         try:
@@ -305,6 +310,8 @@ class LocalBackend(Backend):
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
         except ValueOutOfRangeError as exc:
             raise BackendError(_VALUE_RANGE_ERROR) from exc
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from exc
         return outcome.model_dump()
 
     def _delete_outcome(self, args: dict[str, Any]) -> str:
@@ -424,6 +431,8 @@ class LocalBackend(Backend):
                 job_id=args.get("job_id"),
                 step_id=args.get("step_id"),
                 outcome_id=args.get("outcome_id"),
+                impact=args.get("impact", "medium"),
+                confidence=args.get("confidence", "claimed"),
             )
         except JobNotFoundError:
             raise BackendError(job_not_found(args.get("job_id") or "")) from None
@@ -673,7 +682,7 @@ class LocalBackend(Backend):
         from agentic_odi_core import JobNotFoundError, job_not_found
         from agentic_odi_core.transcript import TranscriptFormatError
 
-        display = args.get("display_name") or args.get("filename") or "stdin"
+        display = args.get("filename") or "stdin"
         try:
             interview, quotes = self.service.import_transcript(
                 args["text"],
@@ -909,6 +918,15 @@ class LocalBackend(Backend):
     def _get_traceability_report(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.service.traceability_report().as_dict()
 
+    def _links_add(self, args: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError("links_add is not yet implemented")
+
+    def _links_list(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        raise NotImplementedError("links_list is not yet implemented")
+
+    def _links_remove(self, args: dict[str, Any]) -> str:
+        raise NotImplementedError("links_remove is not yet implemented")
+
 
 _LOCAL_HANDLERS = {
     "add_job": LocalBackend._add_job,
@@ -976,6 +994,9 @@ _LOCAL_HANDLERS = {
     "unlink_outcome": LocalBackend._unlink_outcome,
     "get_outcome_alignments": LocalBackend._get_outcome_alignments,
     "get_traceability_report": LocalBackend._get_traceability_report,
+    "links_add": LocalBackend._links_add,
+    "links_list": LocalBackend._links_list,
+    "links_remove": LocalBackend._links_remove,
     "get_health": LocalBackend._get_health,
 }
 
@@ -1162,6 +1183,8 @@ def require_backend() -> Backend:
 
 def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
     """Call ``tool_name`` on the resolved backend, reporting failures cleanly."""
+    from agentic_odi_core.errors import ConfigurationError  # noqa: PLC0415
+
     try:
         return require_backend().call(tool_name, args)
     except BackendError as exc:
@@ -1171,4 +1194,9 @@ def run_tool(tool_name: str, args: dict[str, Any]) -> Any:
         typer.secho(f"Error: {message}", fg="red", err=True)
         if exc.suggestion:
             typer.secho(f"Hint: {exc.suggestion}", fg="yellow", err=True)
+        raise typer.Exit(code=1) from exc
+    except ConfigurationError as exc:
+        # A bad environment variable fails fast, but a user running a command
+        # should read one line naming it, not a traceback.
+        typer.secho(f"Error: {exc}", fg="red", err=True)
         raise typer.Exit(code=1) from exc

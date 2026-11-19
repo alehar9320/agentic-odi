@@ -20,6 +20,7 @@ from agentic_odi_core.contract import (
 )
 from agentic_odi_core.errors import (
     AlreadyPromotedError,
+    ConfigurationError,
     ConflictError,
     NotFoundError,
     OdiError,
@@ -38,6 +39,7 @@ from agentic_odi_core.evaluation import (
     statement_to_dict,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.logging import configure_logging
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -60,8 +62,11 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    CONFIDENCE_WEIGHTS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    LINK_RELATIONSHIP_TYPES,
+    OUTCOME_INPUT_MIN,
     V2MOM,
     BusinessImpactCategory,
     BusinessValue,
@@ -77,9 +82,11 @@ from agentic_odi_core.models import (
     InterviewQuote,
     Job,
     JobStage,
+    Link,
     Outcome,
     OutcomeAlignment,
     OutcomeCandidate,
+    RelationshipType,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -94,6 +101,7 @@ from agentic_odi_core.models import (
     StudyStatus,
     ValueMetric,
     compute_opportunity_score,
+    confidence_weighted_inputs,
     create_job,
     job_stage_catalog,
 )
@@ -187,6 +195,7 @@ __all__ = [
     "CAPABILITIES",
     "CandidateNotFoundError",
     "CandidateStatus",
+    "CONFIDENCE_WEIGHTS",
     "ClaimCheck",
     "ClaimCheckError",
     "ClaimSkip",
@@ -207,6 +216,9 @@ __all__ = [
     "JobStage",
     "JOB_STAGE_INDEX",
     "JOB_STAGE_ORDER",
+    "Link",
+    "LINK_RELATIONSHIP_TYPES",
+    "RelationshipType",
     "MCPConnectionConfig",
     "ModelRouter",
     "ModelTier",
@@ -214,6 +226,7 @@ __all__ = [
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
+    "OUTCOME_INPUT_MIN",
     "OdiError",
     "HeuristicProposalStrategy",
     "LocalOpenAIEngine",
@@ -229,6 +242,7 @@ __all__ = [
     "ProposalStrategy",
     "QuoteNotFoundError",
     "RateLimitError",
+    "ConfigurationError",
     "RoutingMode",
     "SerializationError",
     "Step",
@@ -264,6 +278,8 @@ __all__ = [
     "Repository",
     "build_repository",
     "compute_opportunity_score",
+    "confidence_weighted_inputs",
+    "configure_logging",
     "create_job",
     "candidate_not_found",
     "customer_outcome_not_found",

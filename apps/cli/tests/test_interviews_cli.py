@@ -330,3 +330,47 @@ def test_import_empty_file_is_refused_with_the_filename(tmp_path):
     # The refusal ran before any write: no interview was created.
     listed = runner.invoke(app, ["--db", db, "interviews", "list", "--json"])
     assert json.loads(listed.output) == []
+
+
+def test_import_over_the_mcp_backend_sends_only_the_tool_arguments(tmp_path, monkeypatch):
+    """The transcript file name is a display string, not an ``import_transcript`` argument.
+
+    FastMCP rejects unknown keyword arguments, so a key that only the local
+    handler understands makes ``--backend mcp`` fail before importing anything.
+    """
+    from agentic_odi_core.contract import TOOL_SPECS
+
+    allowed = TOOL_SPECS["import_transcript"].arguments
+    sent: dict[str, object] = {}
+
+    def fake_call(tool, args, url, timeout):
+        unknown = sorted(set(args) - set(allowed))
+        assert not unknown, f"{tool} received keys the tool does not accept: {unknown}"
+        sent.update(args)
+        return 'Interview created successfully: {"interview": {"id": "i-1"}, "quote_count": 1}'
+
+    monkeypatch.setattr("agentic_odi_cli.backend._call_mcp", fake_call)
+    path = _write(tmp_path, "session.md", "**Ana:** It takes forever to get set up.\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--backend",
+            "mcp",
+            "--mcp-url",
+            "http://example/mcp",
+            "interviews",
+            "import",
+            path,
+            "--title",
+            "Ana — onboarding",
+            "--participant",
+            "Ana",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "i-1" in result.output
+    assert {"text", "title", "participant_label", "filename"} <= set(sent)
+    assert "display_name" not in sent

@@ -39,6 +39,10 @@ Snapshot = dict[str, Any]
 def _snapshot(repo: Repository) -> Snapshot:
     """A comparable read of every entity surface the Repository exposes."""
     return {
+        #: The write counter names the change a signal points at, and services
+        #: fold it into their fingerprints: two backends that agree on rows but
+        #: not on this still dedupe each other's signals away.
+        "last_event_id": repo.last_event_id(),
         "jobs": [j.model_dump() for j in repo.list_jobs()],
         "steps": sorted(
             (s.model_dump() for s in repo.get_steps_for_job("job-1")),

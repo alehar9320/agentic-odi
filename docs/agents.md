@@ -1,3 +1,11 @@
+---
+title: Agent Assignment
+blurb: Which agents take issues, how to claim one, and when a claim expires.
+nav_group: Operate
+nav_order: 3
+slug: agents
+---
+
 # Agent Assignment
 
 Who can take a GitHub issue in this repository, how an agent records that it has

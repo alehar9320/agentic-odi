@@ -220,9 +220,20 @@ CORE_LAYERS: dict[str, tuple[str, ...]] = {
         "factory",
         "integrity",
         "recovery",
+        "migrations",
+        "paths",
     ),
     "methodology": ("services", "segmentation", "strategy", "router", "messages", "steve_jobs"),
-    "contract": ("contract", "errors", "remote", "schema", "connection", "consent"),
+    "contract": (
+        "contract",
+        "errors",
+        "remote",
+        "schema",
+        "connection",
+        "consent",
+        "logging",
+        "settings",
+    ),
 }
 
 CORE_PACKAGE = "agentic_odi_core"

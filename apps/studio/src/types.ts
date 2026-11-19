@@ -442,6 +442,7 @@ export type WorkspacePanelId =
   | "memory"
   | "catchup"
   | "schedule"
+  | "dashboard"
   | "settings";
 
 /**

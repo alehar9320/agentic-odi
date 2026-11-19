@@ -17,6 +17,7 @@ from agentic_odi_core.models import (
     Interview,
     InterviewQuote,
     Job,
+    Link,
     Outcome,
     OutcomeCandidate,
     ScheduledWork,
@@ -172,6 +173,7 @@ class Repository(Protocol):
     interviews: dict[str, Interview]
     quotes: dict[str, InterviewQuote]
     candidates: dict[str, OutcomeCandidate]
+    links: dict[str, Link]
 
     def add_job(self, job: Job) -> Job: ...
     def list_jobs(self, limit: int | None = None, offset: int = 0) -> list[Job]: ...
@@ -250,6 +252,19 @@ class Repository(Protocol):
     def get_study(self, study_id: str) -> Study | None: ...
     def list_studies(self, job_id: str | None = None) -> list[Study]: ...
     def update_study(self, study_id: str, updates: dict) -> Study | None: ...
+    def add_link(self, link: Link) -> Link: ...
+    def get_link(self, link_id: str) -> Link | None: ...
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]: ...
+    def remove_link(self, link_id: str) -> bool: ...
     def add_strategy(self, strategy: Strategy) -> Strategy: ...
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
@@ -317,6 +332,7 @@ class InMemoryRepository:
         self.studies: dict[str, Study] = {}
         self.interviews: dict[str, Interview] = {}
         self.quotes: dict[str, InterviewQuote] = {}
+        self.links: dict[str, Link] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
         self.candidates: dict[str, OutcomeCandidate] = {}
@@ -755,6 +771,44 @@ class InMemoryRepository:
         self.studies[study_id] = new_study
         return new_study
 
+    def add_link(self, link: Link) -> Link:
+        self._append_event()
+        self.links[link.id] = link
+        return link
+
+    def get_link(self, link_id: str) -> Link | None:
+        return self.links.get(link_id)
+
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]:
+        items = list(self.links.values())
+        if source_type is not None:
+            items = [link for link in items if link.source_type == source_type]
+        if source_id is not None:
+            items = [link for link in items if link.source_id == source_id]
+        if target_type is not None:
+            items = [link for link in items if link.target_type == target_type]
+        if target_id is not None:
+            items = [link for link in items if link.target_id == target_id]
+        if relationship_type is not None:
+            items = [link for link in items if link.relationship_type == relationship_type]
+        return page(items, limit, offset)
+
+    def remove_link(self, link_id: str) -> bool:
+        if link_id not in self.links:
+            return False
+        self._append_event()
+        del self.links[link_id]
+        return True
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         self._append_derived_event()
         self.strategies[strategy.id] = strategy
@@ -781,6 +835,7 @@ class InMemoryRepository:
         return new_strategy
 
     def add_interview(self, interview: Interview) -> Interview:
+        self._append_event()
         self.interviews[interview.id] = interview
         return interview
 
@@ -803,6 +858,7 @@ class InMemoryRepository:
         interview = self.interviews.get(interview_id)
         if not interview:
             return None
+        self._append_event()
         current = interview.model_dump(exclude_unset=True)
         current.update(updates)
         new_interview = interview.model_validate(current)
@@ -813,6 +869,7 @@ class InMemoryRepository:
         """Delete an interview and cascade its quotes; return the removed quote ids."""
         if interview_id not in self.interviews:
             return []
+        self._append_event()
         del self.interviews[interview_id]
         removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
         for quote_id in removed:
@@ -824,6 +881,7 @@ class InMemoryRepository:
         return removed
 
     def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
+        self._append_event()
         self.quotes[quote.id] = quote
         return quote
 
@@ -842,6 +900,7 @@ class InMemoryRepository:
         return next(iter(self.v2mom.values()), None)
 
     def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+        self._append_event()
         self.candidates[candidate.id] = candidate
         return candidate
 
@@ -869,11 +928,15 @@ class InMemoryRepository:
         current = candidate.model_dump(exclude_unset=True)
         current.update(updates)
         new_candidate = candidate.model_validate(current)
+        self._append_event()
         self.candidates[candidate_id] = new_candidate
         return new_candidate
 
     def delete_candidate(self, candidate_id: str) -> bool:
-        return self.candidates.pop(candidate_id, None) is not None
+        if self.candidates.pop(candidate_id, None) is None:
+            return False
+        self._append_event()
+        return True
 
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
@@ -894,6 +957,7 @@ class InMemoryRepository:
         self.candidates.clear()
 
         self.v2mom.clear()
+        self.links.clear()
 
     def reload(self) -> None:
         """Reset in-memory state; there is no external store to re-read."""

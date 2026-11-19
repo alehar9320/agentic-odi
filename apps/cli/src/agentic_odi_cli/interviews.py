@@ -50,7 +50,6 @@ def import_transcript(
     import sys
     from pathlib import Path
 
-    display = "stdin" if path == "-" else path
     if path == "-":
         text = sys.stdin.read()
         filename = None
@@ -67,7 +66,6 @@ def import_transcript(
         "text": text,
         "title": title,
         "participant_label": participant,
-        "display_name": display,
     }
     if filename is not None:
         args["filename"] = filename

@@ -1,4 +1,5 @@
 import type { CanvasData, Evidence, Job, Outcome, Step } from "../../types";
+import { opportunityScore } from "../../lib/odi";
 import { notFound, validation } from "../errors";
 import { newId, nowIso } from "../id";
 import type {
@@ -8,10 +9,6 @@ import type {
   StoredOutcome,
   StoredStep,
 } from "../store/types";
-
-export function computeOpportunityScore(importance: number, satisfaction: number): number {
-  return importance + Math.max(importance - satisfaction, 0);
-}
 
 function stripJob(job: StoredJob): Job {
   return { id: job.id, name: job.name, description: job.description };
@@ -236,7 +233,7 @@ export class LocalDataService {
       satisfaction,
       opportunity_score:
         importance !== null && satisfaction !== null
-          ? computeOpportunityScore(importance, satisfaction)
+          ? opportunityScore(importance, satisfaction)
           : null,
       seq: await this.store.nextSeq(),
       created_at: now,
@@ -276,7 +273,7 @@ export class LocalDataService {
       satisfaction,
       opportunity_score:
         importance !== null && satisfaction !== null
-          ? computeOpportunityScore(importance, satisfaction)
+          ? opportunityScore(importance, satisfaction)
           : null,
       updated_at: nowIso(),
     };
@@ -335,7 +332,7 @@ export class LocalDataService {
   }
 
   async computeOpportunity(importance: number, satisfaction: number): Promise<number> {
-    return computeOpportunityScore(
+    return opportunityScore(
       validateScore(importance, "Importance") ?? importance,
       validateScore(satisfaction, "Satisfaction") ?? satisfaction,
     );
