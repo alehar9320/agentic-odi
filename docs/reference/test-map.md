@@ -368,6 +368,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_signal_inbox.py` | Signals: fingerprint dedupe, emissions from real mutations, the attention budget. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
+| `packages/core/tests/test_steve_jobs.py` | Tier 0 deterministic responder: branch routing, context, and the no-fabrication contract. |
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
 | `packages/core/tests/test_study.py` | A Study is one named pass over a Job, and running it again makes a wave. |
 | `packages/core/tests/test_traceability.py` | Traceability: orphans, unfunded objectives, and drift. |
