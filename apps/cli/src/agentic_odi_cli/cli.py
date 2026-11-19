@@ -626,15 +626,17 @@ def backup_cmd(
     ),
 ) -> None:
     """Write a verified snapshot of the local database."""
-    from agentic_odi_core.recovery import backup_database
+    from agentic_odi_core.recovery import backup_database, prune_backups
 
     path = db_path or context.config().db_path or _default_db_path()
     try:
-        out = backup_database(path)
+        out, removed = backup_database(path)
     except (OSError, RuntimeError) as exc:
         typer.echo(f"Backup failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"Backup written: {out}")
+    if removed:
+        typer.echo(f"Pruned {len(removed)} old backup(s).")
 
 
 @app.command("restore")

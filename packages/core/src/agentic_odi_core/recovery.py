@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from agentic_odi_core.errors import StoreCorrupt
@@ -24,6 +24,16 @@ from agentic_odi_core.errors import StoreCorrupt
 DEFAULT_BACKUP_DIR = "~/.agentic-odi/backups"
 
 BACKUP_DIR_ENV = "AGENTIC_ODI_BACKUP_DIR"
+
+#: How many backups a database keeps. Read defensively from the environment;
+#: a non-positive value falls back to the default rather than deleting the
+#: backup that was just written.
+BACKUP_KEEP_ENV = "AGENTIC_ODI_BACKUP_KEEP"
+DEFAULT_BACKUP_KEEP = 14
+
+#: One backup per calendar day survives for this many days, so a daily habit
+#: cannot be reduced to a single file by running the CLI twice a day.
+BACKUP_DAILY_DAYS = 7
 
 #: The prefix a database's backups share, keyed by the database file's stem.
 _BACKUP_PREFIXES = {"odi": "odi", "studio": "studio"}
@@ -126,11 +136,108 @@ def _integrity_ok(path: Path) -> bool:
     return bool(res) and str(res[0]).lower() == "ok"
 
 
-def backup_database(db_path: str, *, directory=None) -> Path:
+def _newest_first(paths: list[Path]) -> list[Path]:
+    """Sort backups newest first, sharing one tiebreaker with ``latest_backup``.
+
+    The filename stamp has one-second resolution, so a pair written in the same
+    second differ only by their collision suffix; the file's own mtime is the
+    only reliable order, with the name as a stable tiebreaker.
+    """
+    return sorted(paths, key=lambda path: (path.stat().st_mtime_ns, path.name), reverse=True)
+
+
+def _backup_stamp(path: Path) -> str:
+    """The calendar day a backup was written, as ``YYYY-MM-DD`` in UTC.
+
+    The filename stamp is UTC by construction, so a backup written at
+    23:55 in one zone and 00:05 in another is not counted as two different days.
+    """
+    stem = path.stem
+    _, _, stamp = stem.partition("-")
+    head, sep, tail = stamp.rpartition("-")
+    if sep and tail.isdigit():
+        stamp = head
+    try:
+        parsed = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return ""
+    return parsed.strftime("%Y-%m-%d")
+
+
+def prune_backups(
+    db_path: str,
+    *,
+    keep: int | None = None,
+    directory: Path | None = None,
+) -> list[Path]:
+    """Bound the number of backups for a database.
+
+    Keeps the newest ``keep`` snapshots and, additionally, one backup per
+    distinct calendar day for the last ``BACKUP_DAILY_DAYS`` days. The rest are
+    removed oldest first. A failed unlink is reported, not raised, and the
+    backup that was just written is never deleted.
+
+    Returns the list of removed paths. Pass ``keep=None`` to read the count
+    from :data:`BACKUP_KEEP_ENV`, falling back to :data:`DEFAULT_BACKUP_KEEP`
+    for anything that is unset, blank, or non-positive.
+    """
+    if keep is None:
+        raw = os.environ.get(BACKUP_KEEP_ENV)
+        if raw is None or not raw.strip():
+            keep = DEFAULT_BACKUP_KEEP
+        else:
+            try:
+                keep = int(raw.strip())
+            except ValueError:
+                keep = DEFAULT_BACKUP_KEEP
+            if keep <= 0:
+                keep = DEFAULT_BACKUP_KEEP
+
+    folder = directory if directory is not None else backups_dir()
+    if not folder.is_dir():
+        return []
+    prefix = backup_prefix(db_path)
+    candidates = [path for path in folder.glob(f"{prefix}-*.db") if path.is_file()]
+    if not candidates:
+        return []
+
+    ordered = _newest_first(candidates)
+    cutoff = datetime.now(timezone.utc).date() - timedelta(days=BACKUP_DAILY_DAYS - 1)
+
+    keepers: set[int] = set()
+    for index, path in enumerate(ordered):
+        if index < keep:
+            keepers.add(index)
+            continue
+        stamp = _backup_stamp(path)
+        if stamp:
+            try:
+                day = datetime.strptime(stamp, "%Y-%m-%d").date()
+            except ValueError:
+                day = None
+            if day is not None and day >= cutoff:
+                keepers.add(index)
+
+    removed: list[Path] = []
+    for index, path in enumerate(ordered):
+        if index in keepers:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            # A backup that cannot be removed is a surprise, not a failure: the
+            # person still has a good restore and the directory is no worse off.
+            continue
+        removed.append(path)
+    return removed
+
+
+def backup_database(db_path: str, *, directory=None) -> tuple[Path, list[Path]]:
     """Write a verified snapshot of ``db_path`` using SQLite's online backup.
 
-    Returns the path of the new backup file. Raises if the source does not
-    exist or the snapshot fails its integrity check.
+    Returns the path of the new backup file and the backups that pruning
+    removed. Raises if the source does not exist or the snapshot fails its
+    integrity check; no pruning happens after a failed backup.
     """
     source = Path(db_path)
     if not source.is_file():
@@ -161,7 +268,8 @@ def backup_database(db_path: str, *, directory=None) -> Path:
         except OSError:
             pass
         raise RuntimeError("backup failed integrity check")
-    return dest
+    removed = prune_backups(db_path, directory=folder)
+    return dest, removed
 
 
 def restore_database(backup_path, db_path: str) -> Path:

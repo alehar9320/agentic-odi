@@ -430,7 +430,7 @@ def test_backup_database_writes_a_verified_snapshot(tmp_path) -> None:
     db = tmp_path / "odi.db"
     _make_database(db)
 
-    backup = backup_database(str(db), directory=tmp_path / "backups")
+    backup, _ = backup_database(str(db), directory=tmp_path / "backups")
 
     assert backup.exists()
     assert backup.name.startswith("odi-")
@@ -488,7 +488,7 @@ def test_backup_time_handles_a_collision_suffix(tmp_path) -> None:
 def test_restore_keeps_the_previous_file_as_pre_restore(tmp_path) -> None:
     db = tmp_path / "odi.db"
     _make_database(db)
-    backup = backup_database(str(db), directory=tmp_path / "backups")
+    backup, _ = backup_database(str(db), directory=tmp_path / "backups")
     # Change the live file after the snapshot so the swap is observable.
     conn = sqlite3.connect(str(db))
     try:
