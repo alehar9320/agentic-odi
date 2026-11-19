@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 
 from agentic_odi_core import InMemoryRepository
 from agentic_odi_studio_api.app import create_app
@@ -162,6 +163,53 @@ def test_a_cached_verdict_is_still_reused_within_the_ttl(monkeypatch):
         assert result["checked_at"] == first["checked_at"]
 
     assert counter[0] == 1  # no additional probes
+
+
+def test_saving_config_writes_the_profile_the_cli_reads(monkeypatch, tmp_path):
+    """The saved file must be the CLI's ``llm_profile.json``, not a second format."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    response = _client().post(
+        "/api/config",
+        json={
+            "base_url": "http://saved/v1",
+            "api_key": "saved-key",
+            "model_name": "saved-model",
+            "mcp_url": "http://saved:8000/mcp",
+        },
+    )
+
+    assert response.status_code == 200
+    saved = tmp_path / "agentic-odi" / "llm_profile.json"
+    assert json.loads(saved.read_text(encoding="utf-8")) == {
+        "base_url": "http://saved/v1",
+        "api_key": "saved-key",
+        "model": "saved-model",
+        "mcp_url": "http://saved:8000/mcp",
+    }
+
+
+def test_saving_config_drops_the_cached_verdict(monkeypatch, tmp_path):
+    """A settings change must make the next probe call the network."""
+    counter = [0]
+    _make_healthy_probe(monkeypatch, counter)
+    t = [1000.0]
+
+    def now() -> float:
+        return t[0]
+
+    asyncio.run(probes.probe_llm_health("http://probe-cfg/v1", "k", "m", now=now))
+    assert counter[0] == 1
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    response = _client().post(
+        "/api/config",
+        json={"base_url": "http://probe-cfg/v1", "api_key": "k", "model_name": "m"},
+    )
+    assert response.status_code == 200
+
+    asyncio.run(probes.probe_llm_health("http://probe-cfg/v1", "k", "m", now=now))
+    assert counter[0] == 2
 
 
 def test_health_route_reports_checked_at_and_cached(monkeypatch):
