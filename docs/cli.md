@@ -309,6 +309,61 @@ Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
 plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
 
+## Propose and review outcomes
+
+`candidates` turns a quote into proposed outcomes, then records a person's
+decision on each. Extraction **proposes only**; a candidate becomes an Outcome
+only when it is accepted, and that write goes through the same outcome validator
+as any other. See [Interviews](interviews.md) for the full walkthrough.
+
+```bash
+# Propose outcomes from one quote (nothing is accepted).
+agentic-odi candidates extract --quote-id <quote-id> \
+  --quote "Minimize the time it takes to onboard when a customer signs up." \
+  --job-id <job-id>
+
+# Review what was proposed.
+agentic-odi candidates list --job-id <job-id>
+agentic-odi candidates list --status proposed --json
+agentic-odi candidates get <candidate-id>
+
+# Record a person's decision: accept, reject, or merge.
+agentic-odi candidates accept <candidate-id> --importance 9 --satisfaction 4
+agentic-odi candidates accept <candidate-id> --importance 9 --satisfaction 4 \
+  --statement "Minimize the time it takes to onboard a customer when they sign up."
+agentic-odi candidates reject <candidate-id> --reason "names a solution, not an outcome"
+agentic-odi candidates merge <candidate-id> --merged-into <outcome-id>
+```
+
+`accept` creates **exactly one** Outcome and links its evidence. An
+already-decided candidate is refused rather than re-accepted, so a retry cannot
+double-write. `reject` requires a reason and keeps it. `merge` folds a
+near-duplicate into an existing Outcome and creates no outcome.
+
+Once an outcome exists, render its decision brief:
+
+```bash
+agentic-odi brief <outcome-id>          # the case for the outcome, with each basis
+agentic-odi brief <outcome-id> --json   # the same, machine-readable
+```
+
+Every figure in the brief carries the words that explain where its number came
+from, so a figure with no data reads `0 decisions recorded` rather than a
+placeholder.
+
+## Load the sample workspace
+
+`demo` loads a labelled corpus so you can see a filled canvas before you have
+research of your own. Every row it writes carries `origin="demo"`; loading is
+additive and a second load is a no-op. `clear` removes only the `origin="demo"`
+rows and never touches your own data.
+
+```bash
+agentic-odi demo load            # 1 job, 8 steps, 40 outcomes, 12 evidence rows
+agentic-odi demo load --json     # the same counts, machine-readable
+agentic-odi demo clear --yes     # remove only the sample rows
+```
+
 ## Evidence
 
 Evidence is research captured from connectors (or entered by hand) and linked to
@@ -355,7 +410,8 @@ and the kept amount is reported. `.pdf` and `.docx` are refused: attach them in
 the Studio, which extracts their text.
 
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
-ingested batch into evidence in one step.
+ingested batch into evidence in one step. `connectors list-presets` prints every
+preset the catalog offers, with its area, before you `connectors add` one.
 
 ## The signal inbox
 
@@ -505,6 +561,8 @@ agentic-odi guidelines        # the ODI stage-by-stage guide
 agentic-odi capabilities      # what the assistant can do
 agentic-odi capabilities --json   # machine-readable manifest
 agentic-odi capabilities tools  # tool names only
+agentic-odi spine             # which stages of the quote-to-measurement spine exist
+agentic-odi spine --json      # the same, machine-readable
 ```
 
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
@@ -618,6 +676,7 @@ agentic-odi customer-outcomes delete <outcome-id> --yes
 # Compute an ODI Opportunity Score (top-level, also under the group)
 agentic-odi score 8 2
 agentic-odi outcomes score 8 2
+agentic-odi customer-outcomes score 8 2
 ```
 
 `score` applies the ODI opportunity formula,
@@ -642,6 +701,7 @@ agentic-odi alternatives add --job-id <job-id> --name "Nothing today" --kind not
 
 # List the inventory for a Job
 agentic-odi alternatives list --job-id <job-id>
+agentic-odi alternatives links --job-id <job-id>   # every alternative with its outcome and adequacy
 
 # Rate an alternative against an outcome with the customer's own adequacy
 agentic-odi alternatives link <outcome-id> <alternative-id> --adequacy 7 --usage-n 12

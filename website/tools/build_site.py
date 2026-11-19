@@ -236,6 +236,21 @@ def _flat_guides(nav: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, An
     return [(group, guide) for group in nav.get("groups", []) for guide in group.get("guides", [])]
 
 
+def _compact_markup(html: str) -> str:
+    """Drop whitespace between tags, leaving code blocks byte-identical.
+
+    The MCP reference is generated: one section per tool, one row per argument.
+    The template is already terse, but the blank lines and indentation between
+    block elements are still a kilobyte of bytes no reader sees. Preformatted
+    regions keep their exact whitespace, because there it is content.
+    """
+    parts = re.split(r"(<pre\b[\s\S]*?</pre>|<code\b[\s\S]*?</code>)", html)
+    return "".join(
+        part if index % 2 else re.sub(r">\s+<", "><", part).strip()
+        for index, part in enumerate(parts)
+    )
+
+
 def _guide_body(
     env: Environment,
     guide: dict[str, Any],
@@ -255,7 +270,7 @@ def _guide_body(
         return body, [], None
 
     if slug == "mcp":
-        body = env.get_template("_mcp_reference.html").render(**context)
+        body = _compact_markup(env.get_template("_mcp_reference.html").render(**context))
         return body, [], None
 
     source = guide.get("source")
@@ -503,6 +518,23 @@ def _page_url(name: str) -> str:
     if name == "index.html":
         return ""
     return name[: -len("index.html")]
+
+
+def _page_sections() -> dict[str, str]:
+    """Each page's section label, from the nav groups.
+
+    A card's chip names the section the page belongs to. The nav is the one
+    place that already groups the guides, so the label comes from there rather
+    than from a second list that would drift.
+    """
+    nav = _load_json("nav.json")
+    sections: dict[str, str] = {}
+    for group in nav.get("groups", []):
+        for guide in group.get("guides", []):
+            sections[f"docs/{guide['slug']}/index.html"] = group["title"]
+    sections["index.html"] = "Overview"
+    sections["docs/index.html"] = "Documentation"
+    return sections
 
 
 def _search_entry(name: str, page: str) -> dict[str, str]:

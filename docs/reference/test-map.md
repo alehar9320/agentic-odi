@@ -42,6 +42,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_customer_outcomes_cli.py` | Customer Outcomes CLI: local backend, aliases, output, and errors. |
 | `apps/cli/tests/test_data_export.py` | `data-export` writes a restorable snapshot of the local store. |
 | `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
+| `apps/cli/tests/test_demo_cli.py` | Tests for ``odi demo`` — the labelled sample workspace. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
@@ -85,6 +86,7 @@ isolation, and coverage rules stay in
 | `apps/mcp-server/tests/test_segments.py` | Stage 5 and Stage 6 round-trip through the live MCP registry. |
 | `apps/mcp-server/tests/test_server_tools.py` | — |
 | `apps/mcp-server/tests/test_signals.py` | The three signal tools round-trip through the live MCP registry. |
+| `apps/mcp-server/tests/test_spine_tools.py` | The spine and candidate tools over the MCP boundary. |
 | `apps/mcp-server/tests/test_tool_branches.py` | Branch coverage for MCP tool prompts, errors, and full updates. |
 | `apps/mcp-server/tests/test_tool_progress.py` | Long tools report progress so the Studio can stop looking hung. |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | Startup validation refuses a contract that the server cannot serve. |
@@ -345,6 +347,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
 | `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
+| `packages/core/tests/test_demo.py` | The demo workspace loads on purpose, and never masquerades as real data. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
 | `packages/core/tests/test_evaluation_harness.py` | The evaluation harness: a service is judged by the shared fixture. |
@@ -376,10 +379,12 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_repository.py` | Tests for the in-memory Repository implementation. |
 | `packages/core/tests/test_repository_factory.py` | — |
 | `packages/core/tests/test_repository_health.py` | Repository health reflects whether the store can be queried. |
+| `packages/core/tests/test_review.py` | Tests for A5 — accepting, rejecting and merging a proposed outcome. |
 | `packages/core/tests/test_router.py` | — |
 | `packages/core/tests/test_schedule.py` | — |
 | `packages/core/tests/test_scheduled_work.py` | — |
 | `packages/core/tests/test_schema.py` | — |
+| `packages/core/tests/test_schema_version.py` | ALH-53 / F1 — a schema version you can migrate. |
 | `packages/core/tests/test_score_history.py` | A score keeps its history, so "did it move?" is a subtraction. |
 | `packages/core/tests/test_segmentation.py` | Tests for Stage 5: outcome-based segmentation. |
 | `packages/core/tests/test_segments_service.py` | Tests for the Stage 5 and Stage 6 service surface. |
@@ -387,6 +392,11 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_service.py` | Tests for the core ODIService layer. |
 | `packages/core/tests/test_signal_inbox.py` | Signals: fingerprint dedupe, emissions from real mutations, the attention budget. |
 | `packages/core/tests/test_similarity.py` | Tests for the statement normaliser and similarity score. |
+| `packages/core/tests/test_spine.py` | The spine seam refuses rather than fabricating, and reports its gaps. |
+| `packages/core/tests/test_spine_end_to_end.py` | H3 — one end-to-end test of the spine over the real code paths. |
+| `packages/core/tests/test_spine_extraction.py` | Tests for A4 — extracting candidate outcomes from one quote. |
+| `packages/core/tests/test_spine_similarity.py` | Tests for the shared statement normaliser. |
+| `packages/core/tests/test_spine_stages.py` | The real spine stages: they read and write the store, and never fabricate. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
 | `packages/core/tests/test_stats.py` | Deterministic bands (B3) pinned against hand-computed fixtures. |
@@ -402,9 +412,13 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_trust_service.py` | The trust read/write service paths: survey import, ranking and staleness. |
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
+| `tests/contract/test_contract_snapshot.py` | ALH-61 / H1 — pin the contract, fail on drift. |
+| `tests/contract/test_contract_snapshot_drift.py` | ALH-61 / H1 — the snapshot gate must actually fail on each kind of drift. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
 | `tests/contract/test_no_unregistered_gitlinks.py` | Index gitlinks must be registered submodules with a url. |
 | `tests/contract/test_protected_files.py` | Protected files must never be deleted on main. |
+| `tests/e2e/__init__.py` | — |
+| `tests/e2e/test_spine.py` | End-to-end proof: one quote travels the whole spine and survives a reopen. |
 | `tests/scripts/conftest.py` | Make the standalone scripts in scripts/ importable under pytest. |
 | `tests/scripts/test_artifact_a11y.py` | The shared structural audit for artifact HTML (issue ALH-238). |
 | `tests/scripts/test_artifact_inventory.py` | The renderer inventory and the gate that keeps it true. |
@@ -452,8 +466,11 @@ isolation, and coverage rules stay in
 | `tests/test_dev_entrypoint.py` | One canonical way to run the stack locally, everywhere it is documented. |
 | `tests/test_docs_code_overview.py` | The README's Code Overview table must match the actual workspace. |
 | `tests/test_docs_method.py` | The eight-stage guide must survive being followed, not just being read. |
+| `tests/test_guide_commands.py` | The spine guides' commands are checked against the live CLI, and run. |
+| `tests/test_integration_example.py` | ALH-129 — the integration guide is executed, not just written. |
 | `tests/test_score_tolerance_parity.py` | The score-mismatch tolerance is one number, not two. |
 | `tests/test_timeout_ceiling.py` | — |
+| `tests/test_tour.py` | The ninety-second tour is generated, executed, and stays current. |
 | `tests/test_underserved_threshold_parity.py` | The boundary between "served" and "underserved" is one number, not two. |
 | `tests/test_worker_build_route.py` | `/api/build` tells a support thread which release the hosted Studio runs. |
 | `tests/test_worker_deploy_route.py` | `/api/deploy` tells a probe which commit and which bundle this artifact is. |

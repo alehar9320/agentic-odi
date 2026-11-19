@@ -20,6 +20,7 @@ from agentic_odi_core import (
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
     AlternativeNotFoundError,
+    CandidateAlreadyDecidedError,
     CandidateNotFoundError,
     CandidateStatus,
     ClaimCheckError,
@@ -56,7 +57,16 @@ from agentic_odi_core import (
     scheduled_work_not_found,
 )
 from agentic_odi_core import (
+    accept_candidate as accept_candidate_impl,
+)
+from agentic_odi_core import (
     customer_outcome_not_found as _cust_not_found,
+)
+from agentic_odi_core import (
+    merge_candidate as merge_candidate_impl,
+)
+from agentic_odi_core import (
+    reject_candidate as reject_candidate_impl,
 )
 from agentic_odi_core.errors import ValidationError as CoreValidationError
 from fastapi.responses import JSONResponse
@@ -224,6 +234,7 @@ outcomes_db = _repo.outcomes
 customer_outcomes_db = _repo.customer_outcomes
 evidence_db = _repo.evidence
 signals_db = _repo.signals
+candidates_db = _repo.extracted_candidates
 segments_db = _repo.segments
 strategies_db = _repo.strategies
 
@@ -1248,24 +1259,43 @@ def import_transcript(
 
 
 @mcp.tool
-def extract_candidates(quote_id: str, stage_hint: str | None = None) -> str:
-    """Propose outcome candidates from one quote, storing each proposal once.
-
-    Valid proposals are stored ``proposed``; a proposal that fails the ODI
-    statement check is stored ``rejected`` with the validator's reason, so the
-    evidence that the extractor is wrong is kept. No Outcome is created.
-    """
+async def extract_candidates(
+    quote_id: str,
+    stage_hint: str | None = None,
+    quote: str | None = None,
+    job_id: str | None = None,
+    job_name: str | None = None,
+) -> str:
+    """Propose outcomes from a stored quote, or from raw text with a job."""
+    from agentic_odi_core import FixtureStatementExtractor
     from agentic_odi_core.extraction import FixtureExtractor
+    from agentic_odi_core.spine_extraction import extract_candidates as extract_spine
 
+    if quote is not None:
+        if job_id is None or service.get_job(job_id) is None:
+            return job_not_found(job_id or "")
+        try:
+            candidates = await extract_spine(
+                _repo,
+                FixtureStatementExtractor(),
+                quote_id=quote_id,
+                quote=quote,
+                job_id=job_id,
+                job_name=job_name,
+                stage_hint=stage_hint,
+            )
+        except (OdiError, ValueError) as exc:
+            return _fail(exc)
+        return json.dumps([candidate.model_dump(mode="json") for candidate in candidates])
     try:
-        candidates = service.extract_candidates(quote_id, FixtureExtractor(), stage_hint)
+        stored = service.extract_candidates(quote_id, FixtureExtractor(), stage_hint)
     except QuoteNotFoundError:
         return _quote_not_found(quote_id)
     except InterviewNotFoundError as exc:
         return _interview_not_found(exc.interview_id)
     except (OdiError, ValueError) as exc:
         return _fail(exc)
-    return json.dumps([candidate.model_dump() for candidate in candidates])
+    return json.dumps([candidate.model_dump() for candidate in stored])
 
 
 @mcp.tool
@@ -1274,12 +1304,19 @@ def list_candidates(
     status: str | None = None,
     limit: int | None = None,
     offset: int = 0,
+    quote_id: str | None = None,
+    job_id: str | None = None,
 ) -> str:
-    """List outcome candidates, optionally filtered by interview or status."""
+    """List outcome candidates, filtered by interview, quote, job or status."""
     try:
         resolved = CandidateStatus(status) if status is not None else None
     except ValueError:
         return _fail(ValueError(f"unknown candidate status: {status}"))
+    if quote_id is not None or job_id is not None:
+        spine_items = _repo.list_extracted_candidates(
+            quote_id=quote_id, job_id=job_id, status=resolved, limit=limit, offset=offset
+        )
+        return json.dumps([item.model_dump(mode="json") for item in spine_items])
     items = service.list_candidates(
         interview_id=interview_id, status=resolved, limit=limit, offset=offset
     )
@@ -1288,10 +1325,16 @@ def list_candidates(
 
 @mcp.tool
 def get_candidate(candidate_id: str) -> str:
-    """Get a single outcome candidate by ID."""
+    """Get a single proposed or extracted candidate by ID."""
     candidate = service.get_candidate(candidate_id)
     if candidate is None:
-        return _candidate_not_found(candidate_id)
+        extracted = _repo.get_extracted_candidate(candidate_id)
+        if extracted is None:
+            return _fail(
+                CandidateNotFoundError(candidate_id),
+                f"Error: Candidate with ID {candidate_id} not found.",
+            )
+        return extracted.model_dump_json()
     return candidate.model_dump_json()
 
 
@@ -1391,6 +1434,110 @@ async def evaluate_outcome(ctx: Context, statement: str, job_id: str | None = No
 
 
 @mcp.tool
+def get_outcome_score(outcome_id: str) -> str:
+    """Read an outcome's scores as a sample; an unscored outcome reports nothing yet."""
+    from agentic_odi_core.spine_stages import SpineStageError, StoreScoreSampler
+
+    try:
+        sample = StoreScoreSampler(_repo).sample(outcome_id)
+    except SpineStageError:
+        return _outcome_not_found(outcome_id)
+    return json.dumps(
+        {
+            "outcome_id": sample.outcome_id,
+            "importance": sample.importance,
+            "satisfaction": sample.satisfaction,
+            "opportunity_score": sample.opportunity_score,
+            "sample_size": sample.sample_size,
+        }
+    )
+
+
+@mcp.tool
+def get_brief(subject_id: str) -> str:
+    """Render the brief for a subject; every figure carries the basis for its value."""
+    from agentic_odi_core.spine_stages import SpineStageError, StoreBriefRenderer
+
+    try:
+        brief = StoreBriefRenderer(_repo).render(subject_id)
+    except SpineStageError:
+        return _outcome_not_found(subject_id)
+    return json.dumps(
+        {
+            "subject_id": brief.subject_id,
+            "headline": brief.headline,
+            "figures": [
+                {"name": figure.name, "value": figure.value, "basis": figure.basis}
+                for figure in brief.figures
+            ],
+        }
+    )
+
+
+@mcp.tool
+def record_decision(subject_id: str, choice: str, rationale: str) -> str:
+    """Record a decision about a subject, with its rationale."""
+    from agentic_odi_core.spine_stages import SpineStageError, StoreDecisionRecorder
+
+    try:
+        decision = StoreDecisionRecorder(_repo).record(
+            subject_id=subject_id, choice=choice, rationale=rationale
+        )
+    except SpineStageError:
+        return _outcome_not_found(subject_id)
+    return json.dumps(
+        {
+            "id": decision.id,
+            "subject_id": decision.subject_id,
+            "choice": decision.choice,
+            "rationale": decision.rationale,
+            "decided_at": decision.decided_at,
+        }
+    )
+
+
+@mcp.tool
+def track_bet(decision_id: str, statement: str, metric: str) -> str:
+    """Track a bet under a decision, with the metric that would move."""
+    from agentic_odi_core.spine_stages import SpineStageError, StoreBetTracker
+
+    try:
+        bet = StoreBetTracker(_repo).track(
+            decision_id=decision_id, statement=statement, metric=metric
+        )
+    except SpineStageError as exc:
+        return _fail(exc, f"Error: Decision with ID {decision_id} not found.")
+    return json.dumps(
+        {
+            "id": bet.id,
+            "decision_id": bet.decision_id,
+            "statement": bet.statement,
+            "metric": bet.metric,
+            "baseline": bet.baseline,
+        }
+    )
+
+
+@mcp.tool
+def get_measurement(bet_id: str) -> str:
+    """Read what a bet measured; an unmeasured bet reports nothing yet, never a zero."""
+    from agentic_odi_core.spine_stages import SpineStageError, StoreMeasurementReader
+
+    try:
+        measurement = StoreMeasurementReader(_repo).measure(bet_id)
+    except SpineStageError as exc:
+        return _fail(exc, f"Error: Bet with ID {bet_id} not found.")
+    return json.dumps(
+        {
+            "bet_id": measurement.bet_id,
+            "metric": measurement.metric,
+            "value": measurement.value,
+            "observed_at": measurement.observed_at,
+        }
+    )
+
+
+@mcp.tool
 def schedule_work(
     name: str,
     schedule_expression: str,
@@ -1454,6 +1601,70 @@ def trigger_scheduled_work(work_id: str) -> str:
 @mcp.tool
 def get_odi_schema() -> str:
     return json.dumps(odi_schema())
+
+
+@mcp.tool
+def accept_candidate(
+    candidate_id: str,
+    importance: float,
+    satisfaction: float,
+    statement: str | None = None,
+    step_id: str | None = None,
+) -> str:
+    """Accept a proposed outcome, creating exactly one Outcome."""
+    try:
+        outcome = accept_candidate_impl(
+            service,
+            _repo,
+            candidate_id,
+            statement=statement,
+            importance=importance,
+            satisfaction=satisfaction,
+            step_id=step_id,
+        )
+    except CandidateNotFoundError as exc:
+        return _fail(exc, f"Error: Candidate with ID {candidate_id} not found.")
+    except CandidateAlreadyDecidedError as exc:
+        return _fail(exc)
+    except JobNotFoundError:
+        return job_not_found("")
+    except StepNotFoundError:
+        return _step_not_found(step_id)
+    except ValueOutOfRangeError as exc:
+        return _fail(exc, "Error: importance and satisfaction must be between 1.0 and 10.0")
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return f"Outcome created successfully: {outcome.model_dump_json()}"
+
+
+@mcp.tool
+def reject_candidate(candidate_id: str, reason: str) -> str:
+    """Reject a proposed outcome; the reason is required and kept."""
+    try:
+        candidate = reject_candidate_impl(_repo, candidate_id, reason=reason)
+    except CandidateNotFoundError as exc:
+        return _fail(exc, f"Error: Candidate with ID {candidate_id} not found.")
+    except CandidateAlreadyDecidedError as exc:
+        return _fail(exc)
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return f"Candidate rejected: {candidate.model_dump_json()}"
+
+
+@mcp.tool
+def merge_candidate(candidate_id: str, merged_into: str) -> str:
+    """Fold a proposed outcome into an existing Outcome; creates none."""
+    try:
+        candidate = merge_candidate_impl(_repo, candidate_id, merged_into=merged_into)
+    except CandidateNotFoundError as exc:
+        return _fail(exc, f"Error: Candidate with ID {candidate_id} not found.")
+    except CandidateAlreadyDecidedError as exc:
+        return _fail(exc)
+    except OutcomeNotFoundError:
+        return _outcome_not_found(merged_into)
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return f"Candidate merged: {candidate.model_dump_json()}"
 
 
 @mcp.tool

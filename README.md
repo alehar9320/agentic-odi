@@ -279,6 +279,16 @@ disruptive for an overserved one, new-market for outcomes that map to no job in
 the store — recording the two it rejected. An outcome that joins no cluster is
 reported as unclustered, never inflated into a market.
 
+**See the loop in ninety seconds.** The
+[ninety-second tour](docs/tour/README.md) walks quote → candidate → outcome →
+brief on a labelled sample workspace, with a generated transcript and a
+committed terminal cast:
+
+```bash
+odi demo load                        # a labelled sample you can explore
+odi summary demo-job-1 --top 3       # the landscape
+```
+
 ## Connect your agent
 
 The server speaks the Model Context Protocol. Any MCP client can reach it:
@@ -312,6 +322,11 @@ soon". See [External Connectors](docs/connectors.md).
 | [Architecture](docs/architecture/README.md) | The workspace, the data flow, and the testing strategy. |
 | [Test map](docs/reference/test-map.md) | Every test file and the one line it says about itself. |
 | [Observability](docs/architecture/observability.md) | What a turn cost, which tool was slow, and the one logging setup. |
+| [Interviews](docs/interviews.md) | Quote to candidate to outcome: propose, review, and accept. |
+| [Scoring](docs/scoring.md) | The opportunity score, its basis, bands, and the landscape. |
+| [Decisions](docs/decision.md) | Brief to decision to bet to measure, and the honest empty states. |
+| [Integrate an Agent](docs/integration.md) | Connect an external agent over MCP: connect, read, write under consent, and errors. |
+| [The ODI Spine](docs/architecture/spine.md) | Quote to candidate to outcome to score to brief to decision to bet to measure. |
 | [Deployment](docs/deployment.md) | The project site, the hosted server, and the Worker. |
 | [Development](docs/development.md) | Lint, types, frontend checks, and the coverage map. |
 | [The assistant-ui ledger](docs/assistant-ui-ledger.md) | Every assistant-ui capability, and the one honest state it is in. |

@@ -109,7 +109,8 @@ async def test_get_and_delete_candidate() -> None:
 
     assert fetched["id"] == candidate_id
     assert deleted == f"Candidate deleted successfully: {candidate_id}"
-    assert missing == f"Error: Outcome candidate with ID {candidate_id} not found."
+    payload = json.loads(missing)
+    assert payload["error"]["message"] == f"Candidate with ID {candidate_id} not found."
 
 
 @pytest.mark.asyncio

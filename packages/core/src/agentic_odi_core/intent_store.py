@@ -17,7 +17,13 @@ from agentic_odi_core.events import (
     new_event_id,
 )
 from agentic_odi_core.integrity import IntegrityResult, ensure_intact
-from agentic_odi_core.migrations import MIGRATIONS, migrate
+from agentic_odi_core.migrations import CURRENT_VERSION, MIGRATIONS, current_version, migrate
+
+#: The store's own file format version, read from the one shared migration
+#: ledger in :mod:`agentic_odi_core.migrations`.
+CURRENT_SCHEMA_VERSION = CURRENT_VERSION
+
+_UPGRADE_COMMAND = "odi update"
 
 
 class IntentStore:
@@ -30,6 +36,7 @@ class IntentStore:
         *,
         label: str = "Your database",
     ) -> None:
+        self._db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
         self._closed = False
         try:
@@ -37,19 +44,48 @@ class IntentStore:
             # migration on a damaged file raises a bare DatabaseError; the gate
             # turns that into an actionable StoreCorrupt that names the file.
             self.integrity: IntegrityResult = ensure_intact(self.conn, db_path, label=label)
+            # Read the stamped version before any write. Switching to WAL would
+            # rewrite the file header, and a future-version refusal must leave the
+            # file byte-for-byte unchanged.
+            self.conn.execute("PRAGMA busy_timeout=5000;")
+            self._refuse_future_version(current_version(self.conn))
             # WAL lets readers and one writer work at once; the busy timeout makes
             # a second writer wait for the lock (the CLI, the sidecar, and a test
             # can all hold a connection to the same file) instead of raising
             # "database is locked" the moment the lock is taken.
             self.conn.execute("PRAGMA journal_mode=WAL;")
-            self.conn.execute("PRAGMA busy_timeout=5000;")
             self._init_db()
+        except sqlite3.OperationalError as exc:
+            self._close_quietly()
+            raise StoreError(self._unwritable_message(exc)) from exc
         except sqlite3.DatabaseError as exc:
-            self.conn.close()
+            self._close_quietly()
             raise StoreCorrupt(db_path, [str(exc)], label=label) from exc
         except BaseException:
-            self.conn.close()
+            self._close_quietly()
             raise
+
+    def _unwritable_message(self, exc: sqlite3.OperationalError) -> str:
+        return (
+            f"the store at {self._db_path} could not be opened for writing: {exc}. "
+            "Make the file and its directory writable, or point AGENTIC_ODI_DB at "
+            "another path."
+        )
+
+    def _refuse_future_version(self, version: int | None) -> None:
+        if version is not None and version > CURRENT_SCHEMA_VERSION:
+            raise StoreError(
+                f"the store at {self._db_path} was written by a newer build "
+                f"(schema v{version}); this build supports schema "
+                f"v{CURRENT_SCHEMA_VERSION}. Run `{_UPGRADE_COMMAND}` to upgrade, "
+                "or use the newer build."
+            )
+
+    def _close_quietly(self) -> None:
+        try:
+            self.conn.close()
+        except sqlite3.Error:
+            pass
 
     def _init_db(self) -> None:
         with self.conn:
@@ -90,6 +126,25 @@ class IntentStore:
                 )
                 """
             )
+
+    def schema_version(self) -> int:
+        """The store's own file-format version, for a surface to report.
+
+        Reads ``PRAGMA user_version`` without writing: a caller that only wants
+        to report the version must not trigger a migration.
+        """
+        return current_version(self.conn)
+
+    def ensure_version(self) -> int:
+        """Migrate the store to the current schema version and return it.
+
+        The shared ledger runs every step newer than the stamped version in one
+        transaction, so a failure leaves the version, the schema and the data
+        exactly as they were. A newer store is refused by name.
+        """
+        version = current_version(self.conn)
+        self._refuse_future_version(version)
+        return migrate(self.conn, MIGRATIONS, label="Your database")
 
     def append(
         self,

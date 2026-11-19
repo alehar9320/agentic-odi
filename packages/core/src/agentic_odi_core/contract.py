@@ -73,6 +73,14 @@ class ToolName(str, Enum):
     GET_FRAMEWORK_GUIDELINES = "get_odi_framework_guidelines"
     GET_CAPABILITIES = "get_capabilities"
     GET_CAPABILITIES_MANIFEST = "get_capabilities_manifest"
+    ACCEPT_CANDIDATE = "accept_candidate"
+    REJECT_CANDIDATE = "reject_candidate"
+    MERGE_CANDIDATE = "merge_candidate"
+    SCORE_OUTCOME = "get_outcome_score"
+    RENDER_BRIEF = "get_brief"
+    RECORD_DECISION = "record_decision"
+    TRACK_BET = "track_bet"
+    MEASURE_BET = "get_measurement"
     LIST_SIGNALS = "list_signals"
     MARK_SIGNAL_READ = "mark_signal_read"
     DISMISS_SIGNAL = "dismiss_signal"
@@ -625,17 +633,17 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.EXTRACT_CANDIDATES.value: ToolSpec(
         name="extract_candidates",
-        summary="Propose outcome candidates from one interview quote.",
+        summary="Propose candidates from an interview quote, or raw text with a job.",
         effect=_derive_effect("extract_candidates"),
-        arguments=("quote_id", "stage_hint"),
+        arguments=("quote_id", "stage_hint", "quote", "job_id", "job_name"),
         required=("quote_id",),
         returns="The newly stored OutcomeCandidates (valid ones proposed, invalid ones rejected).",
     ),
     ToolName.LIST_CANDIDATES.value: ToolSpec(
         name="list_candidates",
-        summary="List outcome candidates, optionally filtered by interview or status.",
+        summary="List candidates, filtered by interview, quote, job or status.",
         effect=_derive_effect("list_candidates"),
-        arguments=("interview_id", "status", "limit", "offset"),
+        arguments=("interview_id", "status", "limit", "offset", "quote_id", "job_id"),
         returns="A list of OutcomeCandidates.",
     ),
     ToolName.GET_CANDIDATE.value: ToolSpec(
@@ -724,6 +732,78 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("get_capabilities_manifest"),
         arguments=(),
         returns="The full tool manifest JSON.",
+    ),
+    ToolName.ACCEPT_CANDIDATE.value: ToolSpec(
+        name="accept_candidate",
+        summary="Accept a proposed outcome, creating exactly one Outcome.",
+        effect=_derive_effect("accept_candidate"),
+        arguments=("candidate_id", "statement", "importance", "satisfaction", "step_id"),
+        required=("candidate_id", "importance", "satisfaction"),
+        returns="The created Outcome.",
+        stage="2",
+    ),
+    ToolName.REJECT_CANDIDATE.value: ToolSpec(
+        name="reject_candidate",
+        summary="Reject a proposed outcome; a non-empty reason is required and kept.",
+        effect=_derive_effect("reject_candidate"),
+        arguments=("candidate_id", "reason"),
+        required=("candidate_id", "reason"),
+        returns="The rejected candidate.",
+        stage="2",
+    ),
+    ToolName.MERGE_CANDIDATE.value: ToolSpec(
+        name="merge_candidate",
+        summary="Fold a proposed outcome into an existing Outcome; creates none.",
+        effect=_derive_effect("merge_candidate"),
+        arguments=("candidate_id", "merged_into"),
+        required=("candidate_id", "merged_into"),
+        returns="The merged candidate.",
+        stage="2",
+    ),
+    ToolName.SCORE_OUTCOME.value: ToolSpec(
+        name="get_outcome_score",
+        summary="Read an outcome's scores as a sample, with its sample size.",
+        effect=ToolEffect.READ,
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The score sample for the outcome.",
+        stage="4",
+    ),
+    ToolName.RENDER_BRIEF.value: ToolSpec(
+        name="get_brief",
+        summary="Render the brief for a subject, each figure carrying its basis.",
+        effect=ToolEffect.READ,
+        arguments=("subject_id",),
+        required=("subject_id",),
+        returns="The brief document for the subject.",
+        stage=None,
+    ),
+    ToolName.RECORD_DECISION.value: ToolSpec(
+        name="record_decision",
+        summary="Record a decision about a subject, with its rationale.",
+        effect=_derive_effect("record_decision"),
+        arguments=("subject_id", "choice", "rationale"),
+        required=("subject_id", "choice", "rationale"),
+        returns="The recorded decision.",
+        stage=None,
+    ),
+    ToolName.TRACK_BET.value: ToolSpec(
+        name="track_bet",
+        summary="Track a bet under a decision, with the metric that would move.",
+        effect=_derive_effect("track_bet"),
+        arguments=("decision_id", "statement", "metric"),
+        required=("decision_id", "statement", "metric"),
+        returns="The tracked bet.",
+        stage=None,
+    ),
+    ToolName.MEASURE_BET.value: ToolSpec(
+        name="get_measurement",
+        summary="Read what a bet measured; an unmeasured bet reports nothing yet.",
+        effect=ToolEffect.READ,
+        arguments=("bet_id",),
+        required=("bet_id",),
+        returns="The measurement for the bet.",
+        stage=None,
     ),
     ToolName.GET_HEALTH.value: ToolSpec(
         name="get_health",
