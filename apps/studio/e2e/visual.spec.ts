@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { openStudio, rail } from "./helpers";
 import { MULTI_JOB, RECORD_JOB, seedCanvas } from "./visual/fixtures";
@@ -39,18 +41,6 @@ async function openView(page: Page, view: string): Promise<void> {
 }
 
 test.describe("the visual harness", () => {
-  test.beforeEach(async ({ request }) => {
-    // The sidecar repository is shared by the whole run, so every screen
-    // starts from the empty canvas the way a first visit does.
-    const canvas = await request.get("/api/canvas");
-    expect(canvas.ok()).toBeTruthy();
-    const body = (await canvas.json()) as { jobs: { id: string }[] };
-    for (const job of body.jobs) {
-      const deleted = await request.delete(`/api/jobs/${encodeURIComponent(job.id)}`);
-      expect(deleted.ok()).toBeTruthy();
-    }
-  });
-
   for (const viewport of VIEWPORTS) {
     for (const theme of THEMES) {
       test(`renders the records view at ${viewport.name} in ${theme} theme`, async ({

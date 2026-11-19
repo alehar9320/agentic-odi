@@ -68,8 +68,8 @@ def _snapshot(repo: Repository) -> Snapshot:
             (q.model_dump() for i in repo.list_interviews("job-1") for q in repo.list_quotes(i.id)),
             key=lambda d: d["id"],
         ),
-        "candidates": sorted(
-            (c.model_dump(mode="json") for c in repo.list_candidates()),
+        "outcome_candidates": sorted(
+            (c.model_dump(mode="json") for c in repo.list_outcome_candidates()),
             key=lambda d: d["id"],
         ),
     }
@@ -136,7 +136,7 @@ def _seed(repo: Repository) -> None:
             ordinal=0,
         )
     )
-    repo.add_candidate(
+    repo.add_outcome_candidate(
         OutcomeCandidate(
             id="candidate-1",
             interview_id="interview-1",
@@ -203,7 +203,7 @@ def test_job_delete_cascades_interviews_and_quotes(tmp_path) -> None:
         assert repo.get_interview("interview-1") is None
         assert repo.get_quote("quote-1") is None
         assert repo.list_interviews() == []
-        assert repo.list_candidates() == []
+        assert repo.list_outcome_candidates() == []
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ def test_job_delete_cascades_interviews_and_quotes(tmp_path) -> None:
         "evidence",
         "interviews",
         "quotes",
-        "candidates",
+        "outcome_candidates",
     ],
 )
 def test_every_entity_round_trips(tmp_path, entity: str) -> None:

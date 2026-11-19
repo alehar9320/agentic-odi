@@ -408,9 +408,17 @@ python3 scripts/pr_ai_merge.py --managed            # list owned labels
 
 The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
 applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
-combined status of the head commit is `success` (CI green), `ready-for-merge`
-is present (no merge conflicts), and hygiene passes (open, non-draft, targets
-`main`). It is removed when any gate fails.
+head commit's check suite is complete and green, `ready-for-merge` is present
+(no merge conflicts), and hygiene passes (open, non-draft, targets `main`). It
+is removed when any gate fails.
+
+"Green" is `compute_ci_state()` in `scripts/pr_ai_authorize.py`: `CI green` and
+`PR guardrails` must be successful, and every other GitHub Actions check run on
+the head commit must be green except the advisory browser suite (`End-to-end`),
+which `AGENTIC_ODI_E2E_BLOCKING=true` turns into a gate. The legacy combined
+commit status is deliberately not consulted — it carries only third-party
+statuses, so it reads `success` while CI is still queued. See
+[ADR 0009](architecture/adr/0009-ai-merge-gate-reads-the-check-suite.md).
 
 ```bash
 python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
@@ -420,9 +428,17 @@ python3 scripts/pr_ai_authorize.py --managed            # list owned labels
 ### Auto-merge (Phase 2)
 
 The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
-`gh pr merge --auto --squash` on any open PR carrying `ai-merge-authorized`,
-re-verifying CI green immediately before arming. Human override: `do-not-merge`
-or `needs human review` cancels auto-merge and a comment explains why.
+`gh pr merge --auto --squash` only on an open PR that carries
+`ai-merge-authorized`, `ai-merge-safe` and `ready-for-merge`, whose head commit
+passes the check-suite gate, and whose labels it has just re-read. The trigger
+is narrowed to the labels that can change the decision, so an unrelated label
+cannot arm a merge.
+
+Arming is a request, not a decision: every run can disarm. If a gate stops
+holding — the authorization or trust label is removed, a new push resets the
+checks, a human adds `do-not-merge` or `needs human review`, or the suite goes
+red — the workflow calls `gh pr merge --disable-auto` and says why in an
+idempotent `## AI merge act` comment that names the head commit it judged.
 
 ### Branch protection (enforced on `main`)
 
@@ -457,13 +473,15 @@ for the decision and the deferred `label gate` check.
 See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
 
 ```bash
-uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
-uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
-uv run python scripts/verify.py --full      # full matrix (CI's job)
+uv run python scripts/verify.py --changed   # required CI checks the diff can drive (PR bar)
+uv run python scripts/verify.py --default   # adds repo-wide mypy, studio build, site build
+uv run python scripts/verify.py --full      # local matrix; e2e/Tauri/audit stay CI-only
 ```
 
 Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
-`--full`. The PR body must list the tiers run and skipped.
+`--full`. The gate prints which tier covers each required CI job and why the
+rest are CI-only; `tests/scripts/test_verify_ci_parity.py` keeps that table
+equal to `ci-green.needs`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
@@ -517,9 +535,11 @@ response shapes, the sidecar's hydration of the canvas, and the first-run
 wizard's ordering relative to the rest of the app.
 
 ```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
-npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
+npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e         # the product suite
+npm --prefix apps/studio run test:e2e:smoke   # the blocking @smoke subset
+npm --prefix apps/studio run test:e2e:visual  # the opt-in screenshot contract
+npm --prefix apps/studio run test:e2e:ui      # the Playwright UI
 ```
 
 The first run needs the browser once:
@@ -529,9 +549,9 @@ npx --prefix apps/studio playwright install chromium
 ```
 
 Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
+a second sidecar on the MCP passthrough backend. `chromium` (the local
+backend, the product default) and `mcp-backend` (the passthrough) make up
+`test:e2e`; a spec is collected by exactly one of them.
 
 A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
 It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
@@ -543,13 +563,30 @@ true` and no membership in `ci-green`'s `needs` — so a screenshot failure
 cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none. When a test
-needs data behind it, it seeds through the API rather than through the UI, so
-the test stays about the view it is actually checking.
+never to a `data-testid`, of which the application has none, and never to a CSS
+class. When a test needs data behind it, it seeds through the API rather than
+through the UI, so the test stays about the view it is actually checking.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+Every spec imports `test` and `expect` from `e2e/fixtures.ts`. Its automatic
+fixture resets the shared studio — jobs, conversation memory, unread signals —
+before each test, so no spec inherits another's writes and the result does not
+depend on the order Playwright chose. A spec that imports from
+`@playwright/test` directly gets the shared state back.
+
+CI runs two browser jobs. `e2e-smoke` is **required** and runs the `@smoke`
+tagged subset with `--retries=0`. `e2e` runs the whole suite and stays advisory:
+set the repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
+`AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. Its summary lists every
+failure with its locator and call site, plus every test that passed only on
+retry.
+
+`test:e2e:visual` is opt-in because the repository has committed no screenshot
+baselines yet; running it in the product lane made that lane permanently red.
+
+A flaky spec is fixed or parked, never left to retry: `e2e/quarantine.ts` +
+`// quarantined: #<issue> <YYYY-MM-DD>` in the spec, with
+`src/test/e2eQuarantine.test.ts` failing the entry after thirty days. See
+[Testing](architecture/testing.md#a-flaky-spec-is-fixed-or-parked-never-retried-indefinitely).
 
 ## Cold-open budget
 

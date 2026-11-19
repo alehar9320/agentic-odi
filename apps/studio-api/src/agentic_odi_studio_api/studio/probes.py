@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import os
 import socket
 import threading
@@ -10,15 +12,20 @@ import time
 from collections import OrderedDict
 from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, NamedTuple
 from urllib.parse import urlparse
 
+from agentic_odi_core import settings
 from openai import AsyncOpenAI
 
 DEFAULT_BASE_URL = "http://localhost:8001/v1"
 DEFAULT_API_KEY = "local"
 DEFAULT_MODEL = "local-tools-model"
 DEFAULT_MCP_URL = "http://localhost:8000/mcp"
+
+#: The profile file the CLI writes; the sidecar reads and updates the same one.
+PROFILE_FILE_NAME = "llm_profile.json"
 
 OFFLINE_MESSAGE = "LLM server offline (Local Studio Mode enabled)"
 
@@ -29,6 +36,37 @@ _PROBE_TTL_SECONDS = 30.0
 #: map without bound. Stale entries are evicted on read; the map is trimmed to
 #: this cap on write.
 _PROBE_CACHE_CAP = 512
+
+#: Generation counter incremented when settings that affect probes are saved.
+#: Allows callers to detect that the cache was invalidated since their last read.
+_CONFIG_GENERATION = 0
+
+#: Key for the credential fingerprint in the cache key. It scopes the key to
+#: this cache; it is not a secret, because the fingerprint only has to be stable
+#: and distinct per credential, never reversible.
+_CREDENTIAL_FINGERPRINT_KEY = b"agentic-odi-probe-cache"
+
+#: Iteration count for the fingerprint. A credential is fed to this function, so
+#: it uses a deliberately slow KDF rather than a plain digest: a fast hash of a
+#: secret is trivially attackable offline, and static analysis rejects it
+#: outright. One call costs a few tens of milliseconds, which is lost in the
+#: noise next to the network probe it precedes.
+_CREDENTIAL_FINGERPRINT_ITERATIONS = 100_000
+
+
+def credential_fingerprint(api_key: str) -> str:
+    """A stable, non-reversible identifier for a credential.
+
+    The cache only needs two different credentials to land on different keys,
+    so this derives an opaque token from the secret and never keeps the secret.
+    """
+    derived = hashlib.pbkdf2_hmac(
+        "sha256",
+        api_key.encode(),
+        _CREDENTIAL_FINGERPRINT_KEY,
+        _CREDENTIAL_FINGERPRINT_ITERATIONS,
+    )
+    return derived.hex()[:16]
 
 
 class ProbeResult(NamedTuple):
@@ -43,11 +81,20 @@ class ProbeResult(NamedTuple):
     checked_at: str  # ISO 8601 UTC
 
 
-#: (endpoint, model) -> (monotonic timestamp, ProbeResult). Keyed on the
-#: endpoint and model only -- never on a credential -- so concurrent tabs
-#: sharing an endpoint reuse a single probe.
-_PROBE_CACHE: OrderedDict[tuple[str, str], tuple[float, ProbeResult]] = OrderedDict()
+#: (endpoint, model, credential fingerprint) -> (monotonic timestamp, ProbeResult). Keyed on
+#: the endpoint, model, and a truncated hash of the API key -- never the
+#: credential itself -- so a key rotation is a different entry even if an
+#: invalidator is missed.
+_PROBE_CACHE: OrderedDict[tuple[str, str, str], tuple[float, ProbeResult]] = OrderedDict()
 _PROBE_CACHE_LOCK = threading.Lock()
+
+
+def invalidate_probe_cache() -> None:
+    """Drop every cached verdict after a settings change."""
+    global _CONFIG_GENERATION
+    with _PROBE_CACHE_LOCK:
+        _PROBE_CACHE.clear()
+        _CONFIG_GENERATION += 1
 
 
 def _iso_utc(ts: float) -> str:
@@ -67,21 +114,38 @@ def _trim_to_cap() -> None:
         _PROBE_CACHE.popitem(last=False)
 
 
-def _load_profile_fallback() -> dict[str, str]:
-    """Read llm_profile.json directly without importing cli package."""
-    import json
-    from pathlib import Path
+def _profile_file() -> Path:
+    """The LLM profile file the CLI writes, resolved through the shared settings."""
+    return settings.config_dir() / PROFILE_FILE_NAME
 
-    xdg = os.getenv("XDG_CONFIG_HOME")
-    cfg_dir = Path(xdg) / "agentic-odi" if xdg else Path.home() / ".config" / "agentic-odi"
-    profile_file = cfg_dir / "llm_profile.json"
+
+def _load_profile_fallback() -> dict[str, Any]:
+    """Read llm_profile.json directly without importing cli package."""
+    profile_file = _profile_file()
     if not profile_file.exists():
         return {}
     try:
-        with open(profile_file) as f:
+        with open(profile_file, encoding="utf-8") as f:
             return json.load(f)
     except Exception:  # noqa: BLE001
         return {}
+
+
+def save_profile(updates: dict[str, str]) -> dict[str, Any]:
+    """Merge ``updates`` into the stored profile and return the merged mapping.
+
+    Empty values are skipped so a caller that omits a field does not blank it.
+    The write goes to a sibling temp file and is renamed into place, so a reader
+    never observes a half-written profile.
+    """
+    merged = {**_load_profile_fallback(), **{k: v for k, v in updates.items() if v}}
+    profile_file = _profile_file()
+    profile_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp = profile_file.with_name(profile_file.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(merged, f)
+    os.replace(tmp, profile_file)
+    return merged
 
 
 def defaults() -> dict[str, str]:
@@ -191,11 +255,13 @@ async def probe_llm_health(
 
     Returns ``{"healthy", "message", "checked_at", "cached"}``. When ``fresh``
     is true the cache is bypassed and the entry refreshed, so a user-initiated
-    "check now" is never stale. Results are keyed on (endpoint, model) -- never
-    on a credential -- and the map is bounded by TTL eviction and a size cap.
+    "check now" is never stale. Results are keyed on (endpoint, model, key_hash)
+    -- never the credential itself, a truncated hash -- and the map is bounded
+    by TTL eviction and a size cap.
     """
 
-    key = (base_url, model_name)
+    key_hash = credential_fingerprint(api_key)
+    key = (base_url, model_name, key_hash)
     t = now()
 
     with _PROBE_CACHE_LOCK:

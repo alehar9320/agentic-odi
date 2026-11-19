@@ -1056,17 +1056,19 @@ class ODIService:
 
         created: list[OutcomeCandidate] = []
         for _, candidate in planned:
-            created.append(self.repo.add_candidate(candidate))
+            created.append(self.repo.add_outcome_candidate(candidate))
         return created
 
     def _candidates_by_key(self, quote_id: str) -> set[str]:
         """The normalised statements already stored for a quote."""
         return {
-            normalize(c.statement) for c in self.repo.list_candidates() if c.quote_id == quote_id
+            normalize(c.statement)
+            for c in self.repo.list_outcome_candidates()
+            if c.quote_id == quote_id
         }
 
     def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
-        return self.repo.get_candidate(candidate_id)
+        return self.repo.get_outcome_candidate(candidate_id)
 
     def list_candidates(
         self,
@@ -1075,16 +1077,16 @@ class ODIService:
         limit: int | None = None,
         offset: int = 0,
     ) -> list[OutcomeCandidate]:
-        return self.repo.list_candidates(interview_id, status, limit=limit, offset=offset)
+        return self.repo.list_outcome_candidates(interview_id, status, limit=limit, offset=offset)
 
     def update_candidate(self, candidate_id: str, updates: dict[str, Any]) -> OutcomeCandidate:
-        candidate = self.repo.update_candidate(candidate_id, updates)
+        candidate = self.repo.update_outcome_candidate(candidate_id, updates)
         if candidate is None:
             raise CandidateNotFoundError(candidate_id)
         return candidate
 
     def delete_candidate(self, candidate_id: str) -> None:
-        if not self.repo.delete_candidate(candidate_id):
+        if not self.repo.delete_outcome_candidate(candidate_id):
             raise CandidateNotFoundError(candidate_id)
 
     def promote_evidence(

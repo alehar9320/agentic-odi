@@ -18,6 +18,9 @@ REQUIRED_HEADERS = {
     "X-Frame-Options",
     "Referrer-Policy",
     "Permissions-Policy",
+    "Strict-Transport-Security",
+    "Cross-Origin-Opener-Policy",
+    "Cross-Origin-Resource-Policy",
 }
 
 REQUIRED_CSP_DIRECTIVES = {
@@ -38,6 +41,31 @@ def test_every_required_header_is_declared() -> None:
     source = _source()
     for name in REQUIRED_HEADERS:
         assert f'"{name}"' in source, f"{name} is missing from the Worker"
+
+
+def test_hsts_is_https_only_with_a_year_max_age_and_no_preload() -> None:
+    source = _source()
+    assert '"Strict-Transport-Security": "max-age=31536000; includeSubDomains"' in source
+    assert (
+        "preload"
+        not in source.split('"Strict-Transport-Security"')[1].split('"Cross-Origin-Opener-Policy"')[
+            0
+        ]
+    ), "HSTS must not commit to preload"
+
+
+def test_coop_and_corp_are_same_origin() -> None:
+    source = _source()
+    assert '"Cross-Origin-Opener-Policy": "same-origin"' in source
+    assert '"Cross-Origin-Resource-Policy": "same-origin"' in source
+
+
+def test_coep_is_deliberately_absent() -> None:
+    source = _source()
+    assert '"Cross-Origin-Embedder-Policy"' not in source, (
+        "COEP must not be added: it would break the model-endpoint fetches "
+        "allowed by connect-src and the blob/image handling in img-src"
+    )
 
 
 def test_the_declared_values_match_the_policy() -> None:
