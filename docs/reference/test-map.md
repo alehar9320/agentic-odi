@@ -25,6 +25,7 @@ isolation, and coverage rules stay in
 | Path | Covers |
 |---|---|
 | `apps/cli/tests/conftest.py` | Shared conftest for CLI tests. |
+| `apps/cli/tests/test_alternatives_cli.py` | Alternatives CLI: local backend, output, solution state, and errors (M2-07). |
 | `apps/cli/tests/test_backend.py` | Backend seam: local SQLite backend and remote MCP backend. |
 | `apps/cli/tests/test_backend_edges.py` | Edge-case tests for backend validation, parsing, and MCP failures. |
 | `apps/cli/tests/test_backend_selection.py` | — |
@@ -63,6 +64,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_steps_cli.py` | — |
 | `apps/cli/tests/test_studies_cli.py` | Tests for the studies CLI group (ALH-69, M2-05). |
 | `apps/cli/tests/test_summary_cli.py` | Tests for the `odi summary` report. |
+| `apps/cli/tests/test_trust_cli.py` | Tests for the trust surfaces: survey import, deltas, top and coverage. |
 | `apps/cli/tests/test_update.py` | — |
 | `apps/cli/tests/test_update_check.py` | — |
 | `apps/cli/tests/test_update_command.py` | — |
@@ -95,6 +97,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_boot_integrity.py` | Boot integrity and clean-shutdown tests for the Studio sidecar (issue #598). |
 | `apps/studio-api/tests/test_capability_routes.py` | The MCP health route and the capability probe must agree on one method. |
 | `apps/studio-api/tests/test_probe_cache.py` | Tests for the LLM probe TTL cache and the ``/api/health/llm`` response. |
+| `apps/studio-api/tests/test_studio_alternatives.py` | Alternatives CRUD and the three-state solution query through the Studio API (M2-07). |
 | `apps/studio-api/tests/test_studio_api.py` | Tests for the Living Studio sidecar API (``/api/*``). |
 | `apps/studio-api/tests/test_studio_approvals.py` | The write-approval gate: it resolves once, expires, and never leaks. |
 | `apps/studio-api/tests/test_studio_auth.py` | Authentication requirements for the Living Studio sidecar API (``/api/*``). |
@@ -190,7 +193,11 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/canvas/JobMap.test.tsx` | A cold load: the cached canvas is on disk, the sidecar has not answered. |
 | `apps/studio/src/components/canvas/MemoryPanel.test.tsx` | — |
 | `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | Mock StudioContext |
+| `apps/studio/src/components/canvas/OpportunityLandscapeFacet.test.tsx` | — |
 | `apps/studio/src/components/canvas/OutcomeCard.test.tsx` | The card lists the records captured against its outcome, so the canvas |
+| `apps/studio/src/components/canvas/OutcomeCardAlternatives.test.tsx` | — |
+| `apps/studio/src/components/canvas/OutcomeCardBand.test.tsx` | — |
+| `apps/studio/src/components/canvas/OutcomeCardNote.test.tsx` | The note is a value, so it must never be parsed as markup. |
 | `apps/studio/src/components/canvas/OutcomeCardSample.test.tsx` | — |
 | `apps/studio/src/components/canvas/SchedulePanel.test.tsx` | — |
 | `apps/studio/src/components/canvas/ScorePopover.test.tsx` | A consistent record: 8.6 + max(8.6 − 7.2, 0) = 10.0, right on the line. |
@@ -331,6 +338,8 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_registry.py` | — |
 | `packages/connectors/tests/test_rest_connector.py` | — |
 | `packages/connectors/tests/test_sink.py` | — |
+| `packages/core/tests/test_alternatives.py` | What a customer uses today, recorded and asked about honestly (M2-07). |
+| `packages/core/tests/test_alternatives_presentation.py` | Presenting the alternatives inventory to a reader (M2-07.2, ALH-166). |
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
@@ -351,14 +360,16 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_messages.py` | Tests for shared assistant messages and error helpers. |
 | `packages/core/tests/test_migrations.py` | The migration ledger: numbered, recorded, and gapless. |
 | `packages/core/tests/test_models.py` | Tests for core domain models. |
+| `packages/core/tests/test_n_advisory.py` | The minimum-n advisory warns about a thin sample without overclaiming (M2-14). |
 | `packages/core/tests/test_opportunity_ranking.py` | Pin the opportunity leaderboard and its served/underserved buckets. |
 | `packages/core/tests/test_opportunity_score.py` | Regression tests for the ODI opportunity score. |
 | `packages/core/tests/test_outcome_mapping.py` | Tests for the evidence-to-outcome proposal engine (issue #80). |
+| `packages/core/tests/test_outcome_method.py` | Sample size and method travel with an outcome score. |
 | `packages/core/tests/test_outcome_trace_write.py` | Writing an outcome's V2MOM links at creation and update time (#590). |
 | `packages/core/tests/test_outcome_validation.py` | The outcome statement guard is enforced when an outcome is captured. |
 | `packages/core/tests/test_pagination.py` | Pagination on the list methods of both repositories and the service layer. |
 | `packages/core/tests/test_perf_cold_open.py` | Cold-open budget for a 1,500-outcome study. |
-| `packages/core/tests/test_persistence_parity.py` | Cross-repository parity harness (the epic's Persistence checklist). |
+| `packages/core/tests/test_persistence_parity.py` | A field added on one persistence link must exist on all of them. |
 | `packages/core/tests/test_promotion_identity.py` | One customer quote must not become three opportunities. |
 | `packages/core/tests/test_proposals.py` | Tests for proposal lifecycle (issue #80). |
 | `packages/core/tests/test_remote.py` | Tests for the shared MCP tool-result error parser. |
@@ -369,6 +380,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_schedule.py` | — |
 | `packages/core/tests/test_scheduled_work.py` | — |
 | `packages/core/tests/test_schema.py` | — |
+| `packages/core/tests/test_score_history.py` | A score keeps its history, so "did it move?" is a subtraction. |
 | `packages/core/tests/test_segmentation.py` | Tests for Stage 5: outcome-based segmentation. |
 | `packages/core/tests/test_segments_service.py` | Tests for the Stage 5 and Stage 6 service surface. |
 | `packages/core/tests/test_segments_staleness.py` | Tests for the staleness rule on derived artifacts. |
@@ -377,11 +389,17 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_similarity.py` | Tests for the statement normaliser and similarity score. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
+| `packages/core/tests/test_stats.py` | Deterministic bands (B3) pinned against hand-computed fixtures. |
 | `packages/core/tests/test_steve_jobs.py` | Tier 0 deterministic responder: branch routing, context, and the no-fabrication contract. |
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
 | `packages/core/tests/test_study.py` | A Study is one named pass over a Job, and running it again makes a wave. |
+| `packages/core/tests/test_survey.py` | Survey import (B2) against a hand-computed fixture. |
+| `packages/core/tests/test_survey_input_retention.py` | B3.1: retained paired survey inputs survive a reload and reproduce a band. |
 | `packages/core/tests/test_traceability.py` | Traceability: orphans, unfunded objectives, and drift. |
 | `packages/core/tests/test_transcript.py` | A2 — transcript parsing (pure), ahead of persistence. |
+| `packages/core/tests/test_trust_pillar.py` | The Pillar-2 (ALH-7) integration contract, end to end over one store. |
+| `packages/core/tests/test_trust_seams.py` | The trust surfaces behave per their named provisional conventions. |
+| `packages/core/tests/test_trust_service.py` | The trust read/write service paths: survey import, ranking and staleness. |
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |

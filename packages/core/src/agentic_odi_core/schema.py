@@ -13,6 +13,8 @@ from pydantic import BaseModel
 
 from agentic_odi_core.models import (
     V2MOM,
+    Alternative,
+    AlternativeLink,
     BusinessValue,
     CandidateSolution,
     CustomerOutcome,
@@ -26,10 +28,12 @@ from agentic_odi_core.models import (
     OutcomeAlignment,
     OutcomeCandidate,
     ScheduledWork,
+    ScoreSnapshot,
     Segment,
     Step,
     Strategy,
     Study,
+    SurveyInputSet,
     ValueMetric,
 )
 
@@ -42,6 +46,8 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "CustomerValue": CustomerValue,
     "BusinessValue": BusinessValue,
     "CustomerOutcome": CustomerOutcome,
+    "Alternative": Alternative,
+    "AlternativeLink": AlternativeLink,
     "Evidence": Evidence,
     "Segment": Segment,
     "Strategy": Strategy,
@@ -49,6 +55,8 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Study": Study,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,
+    "ScoreSnapshot": ScoreSnapshot,
+    "SurveyInputSet": SurveyInputSet,
     "Interview": Interview,
     "InterviewQuote": InterviewQuote,
     "OutcomeCandidate": OutcomeCandidate,
