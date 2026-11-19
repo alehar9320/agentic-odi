@@ -61,6 +61,19 @@ pub fn run() {
         // The updater installs the new bundle; this plugin performs the
         // in-place relaunch that makes the staged update take effect.
         .plugin(tauri_plugin_process::init())
+        // Remember where the window was and how big it was, so the small
+        // default size only applies to the first launch. Size and position
+        // only: decorations, fullscreen, and visibility stay the shell's
+        // business, and restoring a stale `visible: false` would open nothing.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+                )
+                .build(),
+        )
         .manage(Sidecars(Mutex::new(Vec::new())))
         .setup(|app| {
             match find_repo_root() {

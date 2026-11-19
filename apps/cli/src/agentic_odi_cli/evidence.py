@@ -44,6 +44,17 @@ class PromoteTarget(str, Enum):
     OUTCOME = "outcome"
 
 
+class ImpactOption(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class ConfidenceOption(str, Enum):
+    VERIFIED = "verified"
+    CLAIMED = "claimed"
+
+
 def _fail(message: str) -> NoReturn:
     typer.secho(f"Error: {message}", fg="red", err=True)
     raise typer.Exit(1)
@@ -106,6 +117,16 @@ def add(
     job_id: str | None = typer.Option(default=None),
     step_id: str | None = typer.Option(default=None),
     outcome_id: str | None = typer.Option(default=None),
+    impact: ImpactOption = typer.Option(  # noqa: B008
+        ImpactOption.MEDIUM,
+        "--impact",
+        help="How much this evidence moves the outcome score (high|medium|low)",
+    ),
+    confidence: ConfidenceOption = typer.Option(  # noqa: B008
+        ConfidenceOption.CLAIMED,
+        "--confidence",
+        help="How sure we are about this record (verified|claimed)",
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Add a research record as evidence."""
@@ -115,6 +136,8 @@ def add(
         "item_type": item_type,
         "name": name,
         "content": _evidence_content(content, file),
+        "impact": impact,
+        "confidence": confidence,
     }
     if url is not None:
         args["url"] = url
@@ -188,6 +211,11 @@ def promote(
     name: str | None = typer.Option(default=None, help="Job name override"),
     importance: float | None = typer.Option(default=None, min=1.0, max=10.0),
     satisfaction: float | None = typer.Option(default=None, min=1.0, max=10.0),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Promote a quote that already supports an outcome into a second one",
+    ),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Turn an evidence record into a Job or desired Outcome."""
@@ -202,6 +230,8 @@ def promote(
         args["importance"] = importance
     if satisfaction is not None:
         args["satisfaction"] = satisfaction
+    if force:
+        args["force"] = True
     noun = "Job" if to is PromoteTarget.JOB else "Outcome"
     typer.echo(
         render_saved("created", run_tool("promote_evidence", args), as_json=json_output, noun=noun)

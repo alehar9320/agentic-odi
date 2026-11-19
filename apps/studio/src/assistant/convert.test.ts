@@ -34,6 +34,19 @@ function assistant(overrides: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 describe("toThreadMessageLike", () => {
+  it("carries the moment into the runtime metadata so a branch switch keeps it (#737)", () => {
+    const at = "2026-10-22T09:30:00.000Z";
+    const message = toThreadMessageLike(assistant({ content: "Hello.", createdAt: at }));
+
+    expect(message.metadata?.custom?.createdAt).toBe(at);
+  });
+
+  it("sends no timestamp metadata for a turn that has none", () => {
+    const message = toThreadMessageLike(assistant({ content: "Hello." }));
+
+    expect(message.metadata?.custom?.createdAt).toBeUndefined();
+  });
+
   it("maps prose to a text part", () => {
     const message = toThreadMessageLike(assistant({ content: "Hello." }));
 
@@ -144,6 +157,51 @@ describe("toThreadMessageLike", () => {
     )[0];
     expect(part.approval).toEqual({ id: "apv_1", prompt: "Allow the assistant to add job?" });
     expect(part.result).toBeUndefined();
+  });
+
+  it("carries the model's arguments onto the pending call's args", () => {
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "add_job",
+            status: "running",
+            approval: {
+              id: "apv_1",
+              prompt: "Allow the assistant to add job?",
+              arguments: { name: "Retention", description: "Keep accounts" },
+            },
+          },
+        ],
+      }),
+    );
+
+    const part = (
+      message.content as unknown as { args?: Record<string, unknown>; argsText?: string }[]
+    )[0];
+    expect(part.args).toEqual({ name: "Retention", description: "Keep accounts" });
+    expect(part.argsText).toBe('{"name":"Retention","description":"Keep accounts"}');
+  });
+
+  it("sends an empty args object when the gate carried no arguments", () => {
+    const message = toThreadMessageLike(
+      assistant({
+        parts: [
+          {
+            kind: "tool",
+            id: "call-1",
+            name: "add_job",
+            status: "running",
+            approval: { id: "apv_1", prompt: "Allow?" },
+          },
+        ],
+      }),
+    );
+
+    const part = (message.content as unknown as { args?: Record<string, unknown> }[])[0];
+    expect(part.args).toEqual({});
   });
 
   it("maps a source to a document citation", () => {

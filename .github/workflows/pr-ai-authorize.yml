@@ -83,6 +83,12 @@ jobs:
             --description "CI green and trust label present; AI agent may auto-merge" \
             --repo "$REPO" --force
 
+      # The gate below runs scripts/pr_ai_authorize.py, so the job has to have
+      # the repository on disk. Without this checkout that step died with exit
+      # code 2 and every pull request in the repository showed a red label job.
+      - uses: actions/checkout@v7
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+
       - name: Process each pull request
         if: ${{ ! github.event.pull_request.head.repo.fork }}
         env:

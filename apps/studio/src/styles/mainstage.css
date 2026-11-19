@@ -1,0 +1,87 @@
+/*
+ * The mainstage: the inquiry's own bar above the thread, and the anatomy of a
+ * turn inside it (#737). Styles live here, never in `:root` — the type and
+ * colour scales belong to the theme, this file only composes them.
+ */
+
+/* The bar names the inquiry and carries its provenance quietly. It is chrome,
+   not content: it sits above the scroll frame and never scrolls away. */
+.mainstage__bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 10px 22px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* The serif voice from #734. It falls back to the platform serif until that
+   token lands, so this bar is styled the day the scale ships, not before. */
+.mainstage__title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif, Georgia, "Times New Roman", serif);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+/* A sample or an offline board says so where the thread is read, reusing the
+   amber vocabulary the canvas already uses for anything not the person's own. */
+.mainstage__provenance {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mainstage__provenance.is-offline {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--muted);
+}
+
+/* A user turn reads as a column under its own name, with the initial beside it,
+   so a name and a time belong to the turn rather than floating in the row. */
+.message__column--user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
+  max-width: 82%;
+}
+
+/* The bubble keeps the width it had before the column wrapped it. */
+.message--user .message__column--user .message__bubble {
+  max-width: 100%;
+}
+
+.message__byline {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* The initial is the person, not the agent: a neutral surface, never the
+   assistant's indigo gradient. */
+.message__avatar--user {
+  background: var(--surface-hover);
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}

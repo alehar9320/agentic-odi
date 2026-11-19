@@ -90,7 +90,9 @@ async def test_live_registry_snapshot() -> None:
             "add_evidence": {
                 "additionalProperties": False,
                 "properties": {
+                    "confidence": {"default": "claimed", "type": "string"},
                     "content": {"type": "string"},
+                    "impact": {"default": "medium", "type": "string"},
                     "item_type": {
                         "default": "manual",
                         "enum": ["catalog", "manual", "note", "resource", "tool_result"],
@@ -144,6 +146,19 @@ async def test_live_registry_snapshot() -> None:
                         "default": None,
                     },
                     "job_id": {"type": "string"},
+                    "objectives": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "additionalProperties": {"type": "string"},
+                                    "type": "object",
+                                },
+                                "type": "array",
+                            },
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
                     "satisfaction": {
                         "anyOf": [{"type": "null"}, {"type": "number"}],
                         "default": None,
@@ -410,6 +425,67 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["field", "outcome_id", "text"],
                 "type": "object",
             },
+            "links_add": {
+                "additionalProperties": False,
+                "properties": {
+                    "external_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "external_system": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "preview": {
+                        "anyOf": [
+                            {"additionalProperties": True, "type": "object"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
+                    "relationship_type": {"type": "string"},
+                    "source_id": {"type": "string"},
+                    "source_type": {"type": "string"},
+                    "target_id": {"type": "string"},
+                    "target_type": {"type": "string"},
+                },
+                "required": [
+                    "relationship_type",
+                    "source_id",
+                    "source_type",
+                    "target_id",
+                    "target_type",
+                ],
+                "type": "object",
+            },
+            "links_list": {
+                "additionalProperties": False,
+                "properties": {
+                    "limit": {"anyOf": [{"type": "integer"}, {"type": "null"}], "default": None},
+                    "offset": {"anyOf": [{"type": "integer"}, {"type": "null"}], "default": None},
+                    "relationship_type": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "source_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "source_type": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "target_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "target_type": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                },
+                "type": "object",
+            },
+            "links_remove": {
+                "additionalProperties": False,
+                "properties": {"link_id": {"type": "string"}},
+                "required": ["link_id"],
+                "type": "object",
+            },
             "list_candidates": {
                 "additionalProperties": False,
                 "properties": {
@@ -507,6 +583,7 @@ async def test_live_registry_snapshot() -> None:
                 "additionalProperties": False,
                 "properties": {
                     "evidence_id": {"type": "string"},
+                    "force": {"default": False, "type": "boolean"},
                     "importance": {
                         "anyOf": [{"type": "null"}, {"type": "number"}],
                         "default": None,
@@ -686,6 +763,19 @@ async def test_live_registry_snapshot() -> None:
                         "anyOf": [{"type": "null"}, {"type": "number"}],
                         "default": None,
                     },
+                    "objectives": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "additionalProperties": {"type": "string"},
+                                    "type": "object",
+                                },
+                                "type": "array",
+                            },
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                    },
                     "outcome_id": {"type": "string"},
                     "satisfaction": {
                         "anyOf": [{"type": "null"}, {"type": "number"}],
@@ -744,7 +834,9 @@ def test_declared_tool_surface_snapshot() -> None:
             },
             "add_evidence": {
                 "arguments": [
+                    "confidence",
                     "content",
+                    "impact",
                     "item_type",
                     "job_id",
                     "name",
@@ -759,7 +851,7 @@ def test_declared_tool_surface_snapshot() -> None:
                 "required": ["content", "name", "source_kind", "source_name"],
                 "returns": "The created Evidence record.",
                 "stage": None,
-                "summary": "Capture an evidence record from a connector.",
+                "summary": "Capture an evidence record from a connector with optional impact and confidence ratings.",
             },
             "add_job": {
                 "arguments": ["description", "name"],
@@ -774,6 +866,7 @@ def test_declared_tool_surface_snapshot() -> None:
                     "claim_check",
                     "importance",
                     "job_id",
+                    "objectives",
                     "satisfaction",
                     "statement",
                     "step_id",
@@ -1064,6 +1157,53 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": "6",
                 "summary": "Link an Outcome to the V2MOM method or measure it advances.",
             },
+            "links_add": {
+                "arguments": [
+                    "external_id",
+                    "external_system",
+                    "preview",
+                    "relationship_type",
+                    "source_id",
+                    "source_type",
+                    "target_id",
+                    "target_type",
+                ],
+                "effect": "write",
+                "required": [
+                    "relationship_type",
+                    "source_id",
+                    "source_type",
+                    "target_id",
+                    "target_type",
+                ],
+                "returns": "The created Link record.",
+                "stage": None,
+                "summary": "Create a typed link between two agentic-odi entities.",
+            },
+            "links_list": {
+                "arguments": [
+                    "limit",
+                    "offset",
+                    "relationship_type",
+                    "source_id",
+                    "source_type",
+                    "target_id",
+                    "target_type",
+                ],
+                "effect": "write",
+                "required": [],
+                "returns": "A list of Link records.",
+                "stage": None,
+                "summary": "List links, optionally filtered by source/target entity and relationship type.",
+            },
+            "links_remove": {
+                "arguments": ["link_id"],
+                "effect": "write",
+                "required": ["link_id"],
+                "returns": "True if the link was removed, False if not found.",
+                "stage": None,
+                "summary": "Remove a link by ID.",
+            },
             "list_candidates": {
                 "arguments": ["job_id", "limit", "offset", "quote_id", "status"],
                 "effect": "read",
@@ -1147,6 +1287,7 @@ def test_declared_tool_surface_snapshot() -> None:
             "promote_evidence": {
                 "arguments": [
                     "evidence_id",
+                    "force",
                     "importance",
                     "job_id",
                     "name",
@@ -1280,7 +1421,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "summary": "Update a Job's name or description.",
             },
             "update_outcome": {
-                "arguments": ["importance", "outcome_id", "satisfaction", "statement", "step_id"],
+                "arguments": [
+                    "importance",
+                    "objectives",
+                    "outcome_id",
+                    "satisfaction",
+                    "statement",
+                    "step_id",
+                ],
                 "effect": "write",
                 "required": ["outcome_id"],
                 "returns": "The updated Outcome.",
@@ -1635,12 +1783,26 @@ why, and is the parent of the :class:`BetRecord` that tests it.\
             "Evidence": {
                 "description": "A captured research record linked (optionally) to ODI artifacts.",
                 "properties": {
+                    "confidence": {
+                        "default": "claimed",
+                        "description": "Whether the record was confirmed by the person (verified) or asserted without confirmation (claimed)",
+                        "enum": ["claimed", "verified"],
+                        "title": "Confidence",
+                        "type": "string",
+                    },
                     "content": {
                         "description": "Normalized text content of the record",
                         "title": "Content",
                         "type": "string",
                     },
                     "id": {"title": "Id", "type": "string"},
+                    "impact": {
+                        "default": "medium",
+                        "description": "How much this evidence moves the outcome score; mirrors JPD's insights impact rating",
+                        "enum": ["high", "low", "medium"],
+                        "title": "Impact",
+                        "type": "string",
+                    },
                     "item_type": {
                         "default": "manual",
                         "description": "Normalized record kind produced by the connector",
@@ -1732,6 +1894,107 @@ why, and is the parent of the :class:`BetRecord` that tests it.\
                 },
                 "required": ["name"],
                 "title": "Job",
+                "type": "object",
+            },
+            "Link": {
+                "$defs": {
+                    "RelationshipType": {
+                        "description": """\
+Typed relationship between two domain entities.
+
+Mirrors Jira-style issue links but is AI-native: links carry structured
+metadata that LLMs can traverse without guessing.\
+""",
+                        "enum": [
+                            "blocked_by",
+                            "blocking",
+                            "duplicates",
+                            "evidence_for",
+                            "external_github",
+                            "external_jira",
+                            "external_jpd",
+                            "external_linear",
+                            "external_notion",
+                            "implements",
+                            "outcome_of",
+                            "references",
+                            "relates_to",
+                            "serves",
+                            "validates",
+                        ],
+                        "title": "RelationshipType",
+                        "type": "string",
+                    }
+                },
+                "description": """\
+A first-class typed link between two agentic-odi entities.
+
+Links connect jobs, steps, outcomes, evidence, candidates, segments, and
+strategies without changing ODI scoring or segmentation logic. A human
+must approve each link before it is written (human-in-the-loop).\
+""",
+                "properties": {
+                    "created_at": {
+                        "description": "When the link was created",
+                        "format": "date-time",
+                        "title": "Created At",
+                        "type": "string",
+                    },
+                    "external_id": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "External ID in the origin system, if any",
+                        "title": "External Id",
+                    },
+                    "external_system": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "External system that originated the link, if any",
+                        "title": "External System",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "preview": {
+                        "anyOf": [
+                            {"additionalProperties": True, "type": "object"},
+                            {"type": "null"},
+                        ],
+                        "default": None,
+                        "description": "Cached preview of the target entity",
+                        "title": "Preview",
+                    },
+                    "relationship_type": {
+                        "$ref": "#/$defs/RelationshipType",
+                        "description": "The type of relationship",
+                    },
+                    "source_id": {
+                        "description": "The ID of the source entity",
+                        "title": "Source Id",
+                        "type": "string",
+                    },
+                    "source_type": {
+                        "description": "The type of the source entity",
+                        "title": "Source Type",
+                        "type": "string",
+                    },
+                    "target_id": {
+                        "description": "The ID of the target entity",
+                        "title": "Target Id",
+                        "type": "string",
+                    },
+                    "target_type": {
+                        "description": "The type of the target entity",
+                        "title": "Target Type",
+                        "type": "string",
+                    },
+                },
+                "required": [
+                    "relationship_type",
+                    "source_id",
+                    "source_type",
+                    "target_id",
+                    "target_type",
+                ],
+                "title": "Link",
                 "type": "object",
             },
             "MeasurementRecord": {

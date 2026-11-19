@@ -1,3 +1,11 @@
+---
+title: Scoring
+blurb: The opportunity score, its basis, bands, and the landscape.
+nav_group: Build
+nav_order: 9
+slug: scoring
+---
+
 # Scoring and the landscape
 
 An ODI outcome carries two numbers a person is responsible for — **importance**

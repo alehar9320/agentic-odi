@@ -1,3 +1,11 @@
+---
+title: Decisions
+blurb: Brief to decision to bet to measure, and the honest empty states.
+nav_group: Build
+nav_order: 10
+slug: decision
+---
+
 # The decision artifact: brief, decision, bet, measure
 
 A decision is worth nothing until it is written down with its reason and its

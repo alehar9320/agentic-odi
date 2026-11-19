@@ -1,3 +1,11 @@
+---
+title: Interviews
+blurb: Quote to candidate to outcome: propose, review, and accept.
+nav_group: Build
+nav_order: 8
+slug: interviews
+---
+
 # Interviews: quote to candidate to outcome
 
 An interview is a source of quotes. A quote proposes candidate outcomes; a

@@ -92,6 +92,32 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
 #: an imported record. One vocabulary serves the demo loader, the site sample
 #: and imports, so a sample row is never mistaken for the user's own data.
 Origin = Literal["user", "demo", "sample", "imported"]
+#: How much an evidence record's inputs count, by whether the person behind it
+#: confirmed the quote. A score built on a claimed quote must not outrank one
+#: built on verified interviews.
+CONFIDENCE_WEIGHTS: dict[str, float] = {"verified": 1.0, "claimed": 0.5}
+
+#: The lower bound both outcome inputs share. Weighting can push a raw value
+#: below it, so the weighted inputs are clamped to stay a legal Outcome score.
+OUTCOME_INPUT_MIN = 1.0
+
+
+def confidence_weighted_inputs(
+    importance: float, satisfaction: float, confidence: str
+) -> tuple[float, float]:
+    """Discount evidence-derived inputs by the evidence's confidence weight.
+
+    The ODI formula itself is untouched: callers hand these weighted inputs to
+    ``compute_opportunity_score`` exactly as before, so a stored outcome's
+    ``opportunity_score`` still equals the formula over its stored inputs.
+    Unknown confidences weigh as ``claimed``.
+    """
+    weight = CONFIDENCE_WEIGHTS.get(confidence, CONFIDENCE_WEIGHTS["claimed"])
+    return (
+        max(importance * weight, OUTCOME_INPUT_MIN),
+        max(satisfaction * weight, OUTCOME_INPUT_MIN),
+    )
+
 
 JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
@@ -287,6 +313,19 @@ class Evidence(BaseModel):
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
     outcome_id: str | None = Field(None, description="Desired Outcome this evidence supports")
     origin: Origin = Field("user", description="Where this row came from")
+    impact: Literal["high", "medium", "low"] = Field(
+        "medium",
+        description=(
+            "How much this evidence moves the outcome score; mirrors JPD's insights impact rating"
+        ),
+    )
+    confidence: Literal["verified", "claimed"] = Field(
+        "claimed",
+        description=(
+            "Whether the record was confirmed by the person (verified) or "
+            "asserted without confirmation (claimed)"
+        ),
+    )
 
 
 class CustomerOutcome(BaseModel):
@@ -644,3 +683,57 @@ class ScheduledWork(BaseModel):
     last_run_at: str | None = Field(None, description="ISO timestamp of last execution")
     next_run_at: str | None = Field(None, description="ISO timestamp of next scheduled execution")
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
+
+
+class RelationshipType(str, Enum):
+    """Typed relationship between two domain entities.
+
+    Mirrors Jira-style issue links but is AI-native: links carry structured
+    metadata that LLMs can traverse without guessing.
+    """
+
+    references = "references"
+    serves = "serves"
+    blocked_by = "blocked_by"
+    blocking = "blocking"
+    duplicates = "duplicates"
+    relates_to = "relates_to"
+    implements = "implements"
+    validates = "validates"
+    evidence_for = "evidence_for"
+    outcome_of = "outcome_of"
+    external_jira = "external_jira"
+    external_linear = "external_linear"
+    external_jpd = "external_jpd"
+    external_github = "external_github"
+    external_notion = "external_notion"
+
+
+#: The full set of relationship kinds, as plain strings, for consumers that do
+#: not want to import the enum (e.g. JSON-deserializing a row back into a link).
+LINK_RELATIONSHIP_TYPES: list[str] = [member.value for member in RelationshipType]
+
+
+class Link(BaseModel):
+    """A first-class typed link between two agentic-odi entities.
+
+    Links connect jobs, steps, outcomes, evidence, candidates, segments, and
+    strategies without changing ODI scoring or segmentation logic. A human
+    must approve each link before it is written (human-in-the-loop).
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source_type: str = Field(..., description="The type of the source entity")
+    source_id: str = Field(..., description="The ID of the source entity")
+    target_type: str = Field(..., description="The type of the target entity")
+    target_id: str = Field(..., description="The ID of the target entity")
+    relationship_type: RelationshipType = Field(..., description="The type of relationship")
+    external_system: str | None = Field(
+        None, description="External system that originated the link, if any"
+    )
+    external_id: str | None = Field(None, description="External ID in the origin system, if any")
+    preview: dict | None = Field(None, description="Cached preview of the target entity")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When the link was created",
+    )

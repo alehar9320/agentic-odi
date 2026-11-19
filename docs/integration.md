@@ -1,3 +1,11 @@
+---
+title: Integrate an Agent
+blurb: Connect an external agent over MCP: connect, read, write under consent, and errors.
+nav_group: Build
+nav_order: 11
+slug: integration
+---
+
 # Integrate an external agent
 
 Agentic ODI exposes its whole tool surface over the Model Context Protocol
@@ -141,7 +149,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 
 <!-- BEGIN GENERATED TOOLS (scripts/integration_guide.py) -->
 
-65 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
+68 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
 
 | Tool | Effect | Stage | Required arguments | Purpose |
 | ---- | ------ | ----- | ------------------ | ------- |
@@ -210,6 +218,9 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `get_traceability_report` | `read` | 6 | — | Report which outcomes trace to a method and which do not. |
 | `open_study` | `write` | — | `job_id`, `name`, `wave` | Open a named study pass over a Job at a given wave number. |
 | `list_studies` | `read` | — | — | List the studies opened for a Job. |
+| `links_add` | `write` | — | `source_type`, `source_id`, `target_type`, `target_id`, `relationship_type` | Create a typed link between two agentic-odi entities. |
+| `links_list` | `write` | — | — | List links, optionally filtered by source, target, or relationship type. |
+| `links_remove` | `write` | — | `link_id` | Remove a link by ID. |
 
 <!-- END GENERATED TOOLS -->
 

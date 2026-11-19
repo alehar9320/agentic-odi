@@ -29,6 +29,8 @@ from agentic_odi_core.demo import (
     load_demo,
 )
 from agentic_odi_core.errors import (
+    AlreadyPromotedError,
+    ConfigurationError,
     ConflictError,
     NotFoundError,
     OdiError,
@@ -55,6 +57,7 @@ from agentic_odi_core.extraction import (
     extract_candidates,
 )
 from agentic_odi_core.factory import build_repository
+from agentic_odi_core.logging import configure_logging
 from agentic_odi_core.mapping import (
     HeuristicProposalStrategy,
     OutcomeProposal,
@@ -74,8 +77,11 @@ from agentic_odi_core.messages import (
     step_not_found,
 )
 from agentic_odi_core.models import (
+    CONFIDENCE_WEIGHTS,
     JOB_STAGE_INDEX,
     JOB_STAGE_ORDER,
+    LINK_RELATIONSHIP_TYPES,
+    OUTCOME_INPUT_MIN,
     V2MOM,
     BetRecord,
     BusinessImpactCategory,
@@ -91,10 +97,12 @@ from agentic_odi_core.models import (
     EvidenceItemType,
     Job,
     JobStage,
+    Link,
     MeasurementRecord,
     Outcome,
     OutcomeAlignment,
     OutcomeCandidate,
+    RelationshipType,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -109,6 +117,7 @@ from agentic_odi_core.models import (
     StudyStatus,
     ValueMetric,
     compute_opportunity_score,
+    confidence_weighted_inputs,
     create_job,
     job_stage_catalog,
 )
@@ -119,7 +128,12 @@ from agentic_odi_core.remote import (
     parse_tool_result,
     tool_result_text,
 )
-from agentic_odi_core.repository import InMemoryRepository, Repository
+from agentic_odi_core.repository import (
+    InMemoryRepository,
+    Repository,
+    compute_promotion_fingerprint,
+    normalize_quote_text,
+)
 from agentic_odi_core.review import (
     CandidateAlreadyDecidedError,
     CandidateNotFoundError,
@@ -263,10 +277,12 @@ __all__ = [
     "CandidateStatus",
     "CandidateAlreadyDecidedError",
     "CandidateNotFoundError",
+    "CONFIDENCE_WEIGHTS",
     "ClaimCheck",
     "ClaimCheckError",
     "ClaimSkip",
     "ConflictError",
+    "AlreadyPromotedError",
     "CustomerOutcome",
     "CustomerOutcomeNotFoundError",
     "CustomerValue",
@@ -315,6 +331,7 @@ __all__ = [
     "JobStage",
     "JOB_STAGE_INDEX",
     "JOB_STAGE_ORDER",
+    "Link",
     "MCPConnectionConfig",
     "Measurement",
     "MeasurementReader",
@@ -325,6 +342,7 @@ __all__ = [
     "ODIService",
     "ODI_ASSISTANT_PROMPT",
     "ODI_FRAMEWORK_GUIDELINES",
+    "OUTCOME_INPUT_MIN",
     "OdiError",
     "Outcome",
     "OutcomeAlignment",
@@ -332,11 +350,16 @@ __all__ = [
     "OutcomeProposal",
     "OutcomeStatementError",
     "Objective",
+    "RelationshipType",
     "ProposalStatus",
     "ProposalStrategy",
     "HeuristicProposalStrategy",
+    "Link",
+    "RelationshipType",
+    "LINK_RELATIONSHIP_TYPES",
     "LocalOpenAIEngine",
     "RateLimitError",
+    "ConfigurationError",
     "RoutingMode",
     "SerializationError",
     "Step",
@@ -364,6 +387,8 @@ __all__ = [
     "capability_manifest",
     "capability_summary",
     "compute_traceability_report",
+    "compute_promotion_fingerprint",
+    "normalize_quote_text",
     "normalize_objective",
     "objective_key",
     "objectives_from_v2mom",
@@ -381,6 +406,8 @@ __all__ = [
     "TemplateEngine",
     "build_repository",
     "compute_opportunity_score",
+    "confidence_weighted_inputs",
+    "configure_logging",
     "create_job",
     "customer_outcome_not_found",
     "default_spine",

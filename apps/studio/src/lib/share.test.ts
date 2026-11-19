@@ -57,8 +57,52 @@ describe("formatShareExpiry", () => {
     expect(formatShareExpiry(new Date(NOW + DAY).toISOString(), NOW)).toBe("expires in 1 day");
   });
 
-  it("says today when less than a day is left", () => {
-    expect(formatShareExpiry(new Date(NOW + 2 * HOUR).toISOString(), NOW)).toBe("expires today");
+  it("says under a minute when less than a minute is left", () => {
+    expect(formatShareExpiry(new Date(NOW + 30 * 1000).toISOString(), NOW)).toBe(
+      "expires in under a minute",
+    );
+  });
+
+  it("counts minutes under an hour", () => {
+    expect(formatShareExpiry(new Date(NOW + 5 * 60 * 1000).toISOString(), NOW)).toBe(
+      "expires in 5 minutes",
+    );
+  });
+
+  it("uses the singular for one minute", () => {
+    expect(formatShareExpiry(new Date(NOW + 60 * 1000).toISOString(), NOW)).toBe(
+      "expires in 1 minute",
+    );
+  });
+
+  it("counts minutes up to fifty-nine", () => {
+    expect(formatShareExpiry(new Date(NOW + 59 * 60 * 1000).toISOString(), NOW)).toBe(
+      "expires in 59 minutes",
+    );
+  });
+
+  it("counts hours under a day", () => {
+    expect(formatShareExpiry(new Date(NOW + 5 * HOUR).toISOString(), NOW)).toBe(
+      "expires in 5 hours",
+    );
+  });
+
+  it("uses the singular for one hour", () => {
+    expect(formatShareExpiry(new Date(NOW + 61 * 60 * 1000).toISOString(), NOW)).toBe(
+      "expires in 1 hour",
+    );
+  });
+
+  it("counts hours up to twenty-three", () => {
+    expect(formatShareExpiry(new Date(NOW + 23 * HOUR).toISOString(), NOW)).toBe(
+      "expires in 23 hours",
+    );
+  });
+
+  it("never says today for a sub-day link", () => {
+    expect(formatShareExpiry(new Date(NOW + 2 * HOUR).toISOString(), NOW)).not.toBe(
+      "expires today",
+    );
   });
 
   it("returns null once the link has expired", () => {

@@ -18,6 +18,7 @@ from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.candidates import candidates_app
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.data import data_app
 from agentic_odi_cli.demo import demo_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
@@ -65,6 +66,7 @@ app.add_typer(
     name="segments",
     help="Stage 5: segments derived from scored outcomes, never from demographics.",
 )
+app.add_typer(data_app, name="data", help="Inspect the local ODI data files.")
 app.add_typer(
     studies_app,
     name="studies",
@@ -126,6 +128,11 @@ def main(
     mcp_url: str | None = typer.Option(None, "--mcp-url", help="MCP server URL (mcp backend)."),
     no_update: bool = typer.Option(False, "--no-update", help="Disable the startup update check"),
 ) -> None:  # noqa: B008
+    # Imported here, not at module load: ``--version`` and ``--help`` must not
+    # pull the core domain layer in just to print a string (test_startup_perf).
+    from agentic_odi_core.logging import configure_logging
+
+    configure_logging()
     context.set_options(backend=backend, db_path=db, mcp_url=mcp_url)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()

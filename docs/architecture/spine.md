@@ -1,3 +1,11 @@
+---
+title: The ODI Spine
+blurb: Quote to candidate to outcome to score to brief to decision to bet to measure.
+nav_group: Build
+nav_order: 12
+slug: spine
+---
+
 # The ODI spine seam
 
 The product is the spine: **quote → candidate → outcome → score → brief →

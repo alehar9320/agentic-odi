@@ -1,16 +1,19 @@
 import { useState } from "react";
 
 import {
+  confidencePill,
   formatAdvances,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
   opportunityPill,
-  opportunityScore,
+  scoreConfidence,
 } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Outcome } from "../../types";
 import { CopyIcon } from "../icons";
+import { DetailBlock } from "../workspace/DetailBlock";
+import { ScorePopover } from "./ScorePopover";
 
 export function OutcomeCard({
   outcome,
@@ -23,19 +26,18 @@ export function OutcomeCard({
    * the reader straight to the one control that fixes a missing score. */
   startEditing?: boolean;
 }) {
-  const { ask, canvasState, deleteOutcome, pushToast, saveThesis, updateOutcome } = useStudio();
+  const { ask, canvasState, deleteOutcome, pushToast, saveThesis } = useStudio();
   // Records captured against this outcome, with their way back to the source.
   const linkedEvidence = (canvasState.data?.evidence ?? []).filter(
     (item) => item.outcome_id === outcome.id,
   );
   const [showEvidence, setShowEvidence] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editing, setEditing] = useState(startEditing);
+  // The score panel is the one place the arithmetic and its two inputs are seen
+  // together, so the card opens it rather than growing a second edit surface.
+  const [scorePopoverOpen, setScorePopoverOpen] = useState(startEditing);
   const [thesisOpen, setThesisOpen] = useState(false);
   const [rationale, setRationale] = useState("");
-  const [importance, setImportance] = useState(outcome.importance ?? 5);
-  const [satisfaction, setSatisfaction] = useState(outcome.satisfaction ?? 5);
-  const [saving, setSaving] = useState(false);
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
@@ -46,23 +48,33 @@ export function OutcomeCard({
     ? opportunityPill(opp)
     : { label: "Not scored — no ratings recorded", variant: "blue" };
 
-  // The interview behind the number. A score the reader cannot interrogate is the
-  // one thing this card must not present as settled, so an unverified score is
-  // marked apart and a bare number says plainly that nothing was asked.
+  // The interview behind the number, and what stands behind it. A score the
+  // reader cannot interrogate is the one thing this card must not present as
+  // settled, so the level is derived (verified / partly verified / hypothesis)
+  // and the indicator itself is the control that reveals the linked quotes.
   const check = outcome.claim_check ?? null;
-  const asked = check?.asked ?? [];
-  const answers = check?.answers ?? [];
-  const skips = check?.skips ?? [];
-  const verified = check?.verified === true;
-  // Sample rows are already badged as not the reader's work; a by-hand notice
+  const confidence = scoreConfidence(outcome, linkedEvidence);
+  const confidenceBadge = confidencePill(confidence);
+  // Sample rows are already badged as not the reader's work; a backing notice
   // belongs to the numbers they are being asked to trust.
-  const bareNumber = scored && check === null && !sample;
+  const showConfidence = scored && !sample;
 
   return (
     <article className={`card${underserved ? " card--hot" : ""}`} aria-label={`Outcome ${outcomeId}`}>
       <header className="card__head">
         <span className="card__id">{outcomeId}</span>
         <span className={`badge badge--${pill.variant}`}>{pill.label}</span>
+        {showConfidence && (
+          <button
+            type="button"
+            className={`badge badge--${confidenceBadge.variant} badge--button`}
+            aria-expanded={showEvidence}
+            title={`${confidence.label} — ${confidence.basis}. Show the evidence behind this score.`}
+            onClick={() => setShowEvidence((prev) => !prev)}
+          >
+            {confidence.label}
+          </button>
+        )}
         {sample ? (
           <span
             className="badge badge--amber"
@@ -73,62 +85,48 @@ export function OutcomeCard({
         ) : null}
       </header>
 
-      <p className="card__statement">{statement}</p>
+      <DetailBlock eyebrow="What's happening">
+        <p className="card__statement">{statement}</p>
+      </DetailBlock>
 
-      <p className="card__meta">
-        Importance <b>{outcome.importance ?? "—"}</b>
-        <span aria-hidden="true"> · </span>
-        Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
-        <span aria-hidden="true"> · </span>
-        Opportunity <b>{formatOpportunityScore(opp)}</b>
-      </p>
+      <DetailBlock eyebrow="Impact">
+        <p className="card__meta">
+          Importance <b>{outcome.importance ?? "—"}</b>
+          <span aria-hidden="true"> · </span>
+          Satisfaction <b>{outcome.satisfaction ?? "—"}</b>
+          <span aria-hidden="true"> · </span>
+          Opportunity <b>{formatOpportunityScore(opp)}</b>
+        </p>
 
-      <p className="card__advances">{formatAdvances(outcome)}</p>
+        <p className="card__advances">{formatAdvances(outcome)}</p>
+      </DetailBlock>
 
-      {(check || bareNumber) && (
-        <div className={`claim-check${verified ? "" : " claim-check--unverified"}`}>
+      {showConfidence && (
+        <div className={`claim-check claim-check--${confidence.level}`}>
+          <p className="claim-check__head">{confidence.basis}</p>
           {check ? (
-            <>
-              <p className="claim-check__head">
-                <b>{verified ? "Verified" : "Unverified"}</b>
-                <span aria-hidden="true"> · </span>
-                {answers.length} of {asked.length} answered
-                {skips.length > 0 && (
-                  <>
-                    <span aria-hidden="true"> · </span>
-                    {skips.length} skipped
-                  </>
-                )}
-              </p>
-              <ul className="claim-check__list">
-                <li className="claim-check__group">Asked</li>
-                {asked.map((question) => (
-                  <li key={question} className="claim-check__item">
-                    {question}
-                  </li>
-                ))}
-                <li className="claim-check__group">Answered</li>
-                {answers.map((answer) => (
-                  <li key={answer} className="claim-check__item">
-                    {answer}
-                  </li>
-                ))}
-                <li className="claim-check__group">Skipped</li>
-                {skips.map((skip) => (
-                  <li key={skip.question} className="claim-check__item">
-                    {skip.question}
-                    <em>{skip.reason}</em>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="claim-check__head">
-              <b>Unverified</b>
-              <span aria-hidden="true"> · </span>
-              <span>No questions recorded behind this score</span>
-            </p>
-          )}
+            <ul className="claim-check__list">
+              <li className="claim-check__group">Asked</li>
+              {(check.asked ?? []).map((question) => (
+                <li key={question} className="claim-check__item">
+                  {question}
+                </li>
+              ))}
+              <li className="claim-check__group">Answered</li>
+              {(check.answers ?? []).map((answer) => (
+                <li key={answer} className="claim-check__item">
+                  {answer}
+                </li>
+              ))}
+              <li className="claim-check__group">Skipped</li>
+              {(check.skips ?? []).map((skip) => (
+                <li key={skip.question} className="claim-check__item">
+                  {skip.question}
+                  <em>{skip.reason}</em>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       )}
 
@@ -158,58 +156,9 @@ export function OutcomeCard({
           </p>
         ))}
 
-      {editing && (
-        <form
-          className="card__edit"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!outcome.id || saving) {
-              return;
-            }
-            setSaving(true);
-            void updateOutcome(outcomeId, { importance, satisfaction }).finally(() => {
-              setSaving(false);
-              setEditing(false);
-            });
-          }}
-        >
-          <label className="card__slider" htmlFor={`importance-${outcomeId}`}>
-            Importance · {importance.toFixed(1)}
-            <input
-              id={`importance-${outcomeId}`}
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={importance}
-              onChange={(event) => setImportance(Number(event.target.value))}
-            />
-          </label>
-          <label className="card__slider" htmlFor={`satisfaction-${outcomeId}`}>
-            Satisfaction · {satisfaction.toFixed(1)}
-            <input
-              id={`satisfaction-${outcomeId}`}
-              type="range"
-              min={1}
-              max={10}
-              step={0.1}
-              value={satisfaction}
-              onChange={(event) => setSatisfaction(Number(event.target.value))}
-            />
-          </label>
-          <p className="score-preview">
-            Opportunity <b>{formatOpportunityScore(opportunityScore(importance, satisfaction))}</b>
-          </p>
-          <div className="card__edit-actions">
-            <button type="submit" className="button button--ghost" disabled={saving}>
-              {saving ? "Saving…" : "Save scores"}
-            </button>
-            <button type="button" className="quiet-action" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+      {scorePopoverOpen && outcome.id ? (
+        <ScorePopover outcome={outcome} onClose={() => setScorePopoverOpen(false)} />
+      ) : null}
 
       <div className="card__actions">
         <button
@@ -256,10 +205,10 @@ export function OutcomeCard({
           <button
             type="button"
             className="quiet-action"
-            aria-expanded={editing}
-            onClick={() => setEditing((prev) => !prev)}
+            aria-expanded={scorePopoverOpen}
+            onClick={() => setScorePopoverOpen((prev) => !prev)}
           >
-            {editing ? "Stop editing" : "Adjust scores"}
+            {scorePopoverOpen ? "Stop editing" : "Adjust scores"}
           </button>
         )}
         <button
