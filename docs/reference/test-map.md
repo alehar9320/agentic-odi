@@ -46,6 +46,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
 | `apps/cli/tests/test_jobs_cli.py` | Tests for the Jobs CLI command group. |
+| `apps/cli/tests/test_link_outcome_errors.py` | Linking an outcome to an objective that does not exist is a backend error. |
 | `apps/cli/tests/test_mascot.py` | The Odi banner: shape, colour, and when it is allowed to appear. |
 | `apps/cli/tests/test_onboard.py` | Tests for first-run onboarding signal extraction and gating. |
 | `apps/cli/tests/test_paths.py` | — |
@@ -255,6 +256,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/changelogRead.test.ts` | — |
 | `apps/studio/src/lib/commands.test.ts` | — |
 | `apps/studio/src/lib/dashboard.test.ts` | The days really held zero signals, so a flat zero line is honest here — |
+| `apps/studio/src/lib/download.test.ts` | The download helper defers blob-URL revocation (issue #1134). |
 | `apps/studio/src/lib/export.test.ts` | The list item lost its terminal punctuation, so the claim cannot be |
 | `apps/studio/src/lib/focus.test.ts` | — |
 | `apps/studio/src/lib/formula.test.ts` | The opportunity-score ratchet (issue #1087). |
@@ -298,6 +300,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation, asserted from the stylesheet source |
 | `apps/studio/src/test/a11y.test.tsx` | The accessibility gate for every surface that ships. |
 | `apps/studio/src/test/contrast.test.ts` | The walker's own tests (issue #543, parent #331). |
+| `apps/studio/src/test/e2eQuarantine.test.ts` | The ratchet on `apps/studio/e2e/quarantine.ts` (#1118, from #1092). |
 | `apps/studio/src/test/keyboard.test.tsx` | The children keep one control each, so the tab order asserted below is the |
 | `apps/studio/src/test/renderCounts.test.tsx` | The case the budget depends on: a surface that re-renders because it reads |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | A verdict never appears without the confidence behind it. |
@@ -322,6 +325,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_mapping.py` | — |
 | `packages/connectors/tests/test_marketplace.py` | Marketplace normalization, trust matching, caching, and fallback. |
 | `packages/connectors/tests/test_mcp_connector.py` | — |
+| `packages/connectors/tests/test_no_prints.py` | No library code in the connectors package prints to stdout or stderr. |
 | `packages/connectors/tests/test_rate_limit.py` | — |
 | `packages/connectors/tests/test_registry.py` | — |
 | `packages/connectors/tests/test_rest_connector.py` | — |
@@ -377,6 +381,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_spine_stages.py` | The real spine stages: they read and write the store, and never fabricate. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
+| `packages/core/tests/test_steve_jobs.py` | Tier 0 deterministic responder: branch routing, context, and the no-fabrication contract. |
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
 | `packages/core/tests/test_study.py` | A Study is one named pass over a Job, and running it again makes a wave. |
 | `packages/core/tests/test_traceability.py` | Traceability: orphans, unfunded objectives, and drift. |
@@ -385,6 +390,7 @@ isolation, and coverage rules stay in
 | `tests/contract/test_contract_snapshot.py` | ALH-61 / H1 — pin the contract, fail on drift. |
 | `tests/contract/test_contract_snapshot_drift.py` | ALH-61 / H1 — the snapshot gate must actually fail on each kind of drift. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
+| `tests/contract/test_no_unregistered_gitlinks.py` | Index gitlinks must be registered submodules with a url. |
 | `tests/contract/test_protected_files.py` | Protected files must never be deleted on main. |
 | `tests/e2e/__init__.py` | — |
 | `tests/e2e/test_spine.py` | End-to-end proof: one quote travels the whole spine and survives a reopen. |
@@ -406,7 +412,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_hosted_first_run_workflow.py` | The hosted probe has a schedule, a commit to compare against, and no vote. |
 | `tests/scripts/test_label_merge_conflicts.py` | The merge-conflict labeler, pinned against the failures that silenced it. |
 | `tests/scripts/test_migrations_registry.py` | The migration registries are contracts, and these are their guards. |
-| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization script (``scripts/pr_ai_authorize.py``). |
+| `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization and the check-suite gate it reads. |
 | `tests/scripts/test_pr_ai_merge.py` | The AI merge trust labeler, pinned so a silent gate failure cannot ship. |
 | `tests/scripts/test_pr_ai_merge_act.py` | Test the AI merge act workflow (``.github/workflows/pr-ai-merge-act.yml``). |
 | `tests/scripts/test_pr_ai_merge_workflow.py` | The AI merge trust workflow, pinned so the silent failures cannot come back. |
@@ -426,6 +432,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_updater_proof_gate.py` | Where the updater's proof gets read (#613). |
 | `tests/scripts/test_vendor_policy.py` | Tests for scripts/vendor_policy.py (issue #383). |
 | `tests/scripts/test_verify.py` | — |
+| `tests/scripts/test_verify_ci_parity.py` | The pre-PR gate must account for every job the merge waits on. |
 | `tests/scripts/test_verify_hosted_first_run.py` | The hosted probe: what it must answer, and what a failure must look like. |
 | `tests/scripts/test_version_sync.py` | The released version must be the version the workspace declares. |
 | `tests/scripts/test_workflow_triggers.py` | The release workflows must be triggered by the release itself. |
@@ -436,6 +443,7 @@ isolation, and coverage rules stay in
 | `tests/test_docs_method.py` | The eight-stage guide must survive being followed, not just being read. |
 | `tests/test_guide_commands.py` | The spine guides' commands are checked against the live CLI, and run. |
 | `tests/test_integration_example.py` | ALH-129 — the integration guide is executed, not just written. |
+| `tests/test_score_tolerance_parity.py` | The score-mismatch tolerance is one number, not two. |
 | `tests/test_timeout_ceiling.py` | — |
 | `tests/test_tour.py` | The ninety-second tour is generated, executed, and stays current. |
 | `tests/test_underserved_threshold_parity.py` | The boundary between "served" and "underserved" is one number, not two. |

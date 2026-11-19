@@ -51,7 +51,7 @@ class CandidateAlreadyDecidedError(ValidationError):
 
 
 def _require_proposed(repo: Repository, candidate_id: str) -> OutcomeCandidate:
-    candidate = repo.get_candidate(candidate_id)
+    candidate = repo.get_extracted_candidate(candidate_id)
     if candidate is None:
         raise CandidateNotFoundError(candidate_id)
     if candidate.status is not CandidateStatus.PROPOSED:
@@ -93,7 +93,7 @@ def accept_candidate(
         satisfaction=satisfaction,
         step_id=step_id if step_id is not None else candidate.step_id,
     )
-    repo.update_candidate(
+    repo.update_extracted_candidate(
         candidate_id,
         {
             "status": CandidateStatus.ACCEPTED.value,
@@ -113,7 +113,7 @@ def reject_candidate(repo: Repository, candidate_id: str, *, reason: str) -> Out
     if not reason or not reason.strip():
         raise ValidationError("A rejection requires a non-empty reason.")
     _require_proposed(repo, candidate_id)
-    updated = repo.update_candidate(
+    updated = repo.update_extracted_candidate(
         candidate_id,
         {"status": CandidateStatus.REJECTED.value, "rejection_reason": reason.strip()},
     )
@@ -141,7 +141,7 @@ def merge_candidate(
         raise OutcomeNotFoundError(merged_into)
     if candidate.job_id is not None and target.job_id != candidate.job_id:
         raise ValidationError("merged_into outcome does not belong to the candidate's job")
-    updated = repo.update_candidate(
+    updated = repo.update_extracted_candidate(
         candidate_id,
         {
             "status": CandidateStatus.MERGED.value,

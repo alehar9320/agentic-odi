@@ -200,7 +200,7 @@ async def test_one_quote_travels_the_whole_spine_and_survives_a_reopen(server) -
     from agentic_odi_core.factory import build_repository
 
     reopened = build_repository(db)
-    stored = reopened.get_candidate(proposed_id)
+    stored = reopened.get_extracted_candidate(proposed_id)
     assert stored is not None
     assert stored.quote_id == "q-1"
     assert stored.status.value == "accepted"

@@ -1528,6 +1528,76 @@ unknown baseline, not a measured zero.\
                 "title": "BusinessValue",
                 "type": "object",
             },
+            "CandidateSolution": {
+                "$defs": {
+                    "CandidateStatus": {
+                        "description": """\
+Where a proposed outcome sits in the review state machine.
+
+``PROPOSED`` awaits a person; ``ACCEPTED`` became a real :class:`Outcome`;
+``REJECTED`` was declined (with a reason); ``MERGED`` folded into an existing
+outcome. Rejection and merge are kept, never deleted — they are information
+about the extractor.\
+""",
+                        "enum": ["accepted", "merged", "parked", "proposed", "rejected"],
+                        "title": "CandidateStatus",
+                        "type": "string",
+                    },
+                    "StrategyKind": {
+                        "description": "Stage 6's three strategic paths.",
+                        "enum": ["differentiated", "disruptive", "new_market"],
+                        "title": "StrategyKind",
+                        "type": "string",
+                    },
+                },
+                "description": """\
+A proposed solution linked to the underserved outcomes it would serve.
+
+A candidate is the bridge from research to a bet: it names a hypothesis and
+the outcomes that justify it. The model records the claim; the rule that a
+candidate must serve at least one underserved outcome lives at the tool
+layer, where the opportunity scores are available.\
+""",
+                "properties": {
+                    "created_at": {"format": "date-time", "title": "Created At", "type": "string"},
+                    "evidence_ids": {
+                        "description": "Evidence that supports the hypothesis",
+                        "items": {"type": "string"},
+                        "title": "Evidence Ids",
+                        "type": "array",
+                    },
+                    "hypothesis": {
+                        "description": "Why this solution would serve the linked outcomes",
+                        "title": "Hypothesis",
+                        "type": "string",
+                    },
+                    "id": {"title": "Id", "type": "string"},
+                    "outcome_ids": {
+                        "description": "The underserved outcomes this candidate serves",
+                        "items": {"type": "string"},
+                        "title": "Outcome Ids",
+                        "type": "array",
+                    },
+                    "status": {
+                        "$ref": "#/$defs/CandidateStatus",
+                        "default": "proposed",
+                        "description": "Where the candidate is in its life",
+                    },
+                    "strategy_path": {
+                        "anyOf": [{"$ref": "#/$defs/StrategyKind"}, {"type": "null"}],
+                        "default": None,
+                        "description": "The Stage 6 path this candidate bets on, when chosen",
+                    },
+                    "title": {
+                        "description": "Short human label for the proposed solution",
+                        "title": "Title",
+                        "type": "string",
+                    },
+                },
+                "required": ["hypothesis", "title"],
+                "title": "CandidateSolution",
+                "type": "object",
+            },
             "CustomerOutcome": {
                 "$defs": {
                     "BusinessImpactCategory": {
@@ -2240,7 +2310,7 @@ Where a proposed outcome sits in the review state machine.
 outcome. Rejection and merge are kept, never deleted — they are information
 about the extractor.\
 """,
-                        "enum": ["accepted", "merged", "proposed", "rejected"],
+                        "enum": ["accepted", "merged", "parked", "proposed", "rejected"],
                         "title": "CandidateStatus",
                         "type": "string",
                     }

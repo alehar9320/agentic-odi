@@ -67,7 +67,7 @@ def test_the_whole_pipeline_runs_on_real_code_paths(tmp_path) -> None:
     assert len(repo.outcomes) == 1
 
     # 3. the candidate records its decision and links the outcome.
-    decided = repo.get_candidate(_require_id(proposed))
+    decided = repo.get_extracted_candidate(_require_id(proposed))
     assert decided is not None
     assert decided.status is CandidateStatus.ACCEPTED
     assert decided.outcome_id == outcome.id
@@ -75,7 +75,7 @@ def test_the_whole_pipeline_runs_on_real_code_paths(tmp_path) -> None:
     # 4. re-extraction adds nothing and does not reset the decision.
     again = spine.extractor.extract(QUOTE, quote_id="q1", job_id=job.id)
     assert len(again) == len(candidates)
-    re_read = repo.get_candidate(_require_id(proposed))
+    re_read = repo.get_extracted_candidate(_require_id(proposed))
     assert re_read is not None and re_read.status is CandidateStatus.ACCEPTED
 
     repo.close()
@@ -94,9 +94,9 @@ def test_reload_rebuilds_candidates_from_the_event_log(tmp_path) -> None:
     repo.close()
 
     reopened = build_repository(path)
-    reloaded = reopened.list_candidates(quote_id="q1")
+    reloaded = reopened.list_extracted_candidates(quote_id="q1")
     assert len(reloaded) == len(candidates)
-    decided = reopened.get_candidate(_require_id(proposed))
+    decided = reopened.get_extracted_candidate(_require_id(proposed))
     assert decided is not None
     assert decided.status is CandidateStatus.ACCEPTED
     assert decided.outcome_id == outcome.id
@@ -191,7 +191,7 @@ def test_fixture_extractor_proposals_are_validated_before_storage(tmp_path) -> N
     )
     candidates = spine.extractor.extract(INVALID, quote_id="q1", job_id=job.id)
     assert len(candidates) == 1
-    stored = repo.get_candidate(candidates[0].candidate_id)
+    stored = repo.get_extracted_candidate(candidates[0].candidate_id)
     assert stored.status is CandidateStatus.REJECTED
     assert "Minimize" in stored.rationale
     assert repo.outcomes == {}

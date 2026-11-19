@@ -234,7 +234,7 @@ outcomes_db = _repo.outcomes
 customer_outcomes_db = _repo.customer_outcomes
 evidence_db = _repo.evidence
 signals_db = _repo.signals
-candidates_db = _repo.candidates
+candidates_db = _repo.extracted_candidates
 segments_db = _repo.segments
 strategies_db = _repo.strategies
 
@@ -678,9 +678,6 @@ def delete_outcome(outcome_id: str) -> str:
     return f"Outcome deleted successfully: {outcome_id}"
 
 
-# impact and confidence are accepted per the add_evidence contract (impact:
-# high/medium/low, confidence: verified/claimed) but not yet stored;
-# persistence lands in issue #984.
 @mcp.tool
 async def add_evidence(
     ctx: Context,
@@ -1029,7 +1026,7 @@ def list_candidates(
         resolved = CandidateStatus(status) if status is not None else None
     except ValueError as exc:
         return _fail(exc, f"Error: unknown candidate status: {status}")
-    candidates = _repo.list_candidates(
+    candidates = _repo.list_extracted_candidates(
         quote_id=quote_id, job_id=job_id, status=resolved, limit=limit, offset=offset
     )
     return json.dumps([candidate.model_dump(mode="json") for candidate in candidates])
@@ -1038,7 +1035,7 @@ def list_candidates(
 @mcp.tool
 def get_candidate(candidate_id: str) -> str:
     """Get a single proposed outcome by ID."""
-    candidate = _repo.get_candidate(candidate_id)
+    candidate = _repo.get_extracted_candidate(candidate_id)
     if candidate is None:
         return _fail(
             CandidateNotFoundError(candidate_id),

@@ -92,6 +92,13 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
 #: an imported record. One vocabulary serves the demo loader, the site sample
 #: and imports, so a sample row is never mistaken for the user's own data.
 Origin = Literal["user", "demo", "sample", "imported"]
+#: Opportunity scores are compared to one decimal place: a stored score within
+#: half of the last digit of the recomputed value is a rounding difference, not
+#: drift. Half of that digit (0.05) is the Studio's score-mismatch tolerance;
+#: the two sides are pinned by tests/test_score_tolerance_parity.py.
+OPPORTUNITY_SCORE_DECIMALS = 1
+
+
 #: How much an evidence record's inputs count, by whether the person behind it
 #: confirmed the quote. A score built on a claimed quote must not outrank one
 #: built on verified interviews.
@@ -359,6 +366,7 @@ class CandidateStatus(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     MERGED = "merged"
+    PARKED = "parked"
 
 
 class OutcomeCandidate(BaseModel):
@@ -572,6 +580,33 @@ class Strategy(BaseModel):
             "Computed at read time, never stored: whether the store has moved on "
             "since computed_at_event_id. None when no read has labelled it yet."
         ),
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CandidateSolution(BaseModel):
+    """A proposed solution linked to the underserved outcomes it would serve.
+
+    A candidate is the bridge from research to a bet: it names a hypothesis and
+    the outcomes that justify it. The model records the claim; the rule that a
+    candidate must serve at least one underserved outcome lives at the tool
+    layer, where the opportunity scores are available.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = Field(..., description="Short human label for the proposed solution")
+    hypothesis: str = Field(..., description="Why this solution would serve the linked outcomes")
+    outcome_ids: list[str] = Field(
+        default_factory=list, description="The underserved outcomes this candidate serves"
+    )
+    status: CandidateStatus = Field(
+        CandidateStatus.PROPOSED, description="Where the candidate is in its life"
+    )
+    strategy_path: StrategyKind | None = Field(
+        None, description="The Stage 6 path this candidate bets on, when chosen"
+    )
+    evidence_ids: list[str] = Field(
+        default_factory=list, description="Evidence that supports the hypothesis"
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

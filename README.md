@@ -81,7 +81,9 @@ service.
   in `packages/core` describe typed, AI-native relationships between ODI
   entities (such as `evidence` serving an `outcome`, `blocked_by`, or
   `external_jira`/`external_github` references) with optional external
-  identifiers and cached previews, currently scoped to the core domain model.
+  identifiers and cached previews. Both repositories now persist them: a link
+  survives a restart, filters by its endpoints, and rejects a duplicate
+  relationship. The MCP and CLI surfaces are still to come.
 - **One artifact you can hand over.** A read-only link opens a single artifact
   and its evidence on its own page — no rail, no composer, no way into the rest
   of the workspace — and states when the link expires. The link is a capability,

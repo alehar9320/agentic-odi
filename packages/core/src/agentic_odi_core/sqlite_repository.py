@@ -17,6 +17,7 @@ from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
     BetRecord,
+    CandidateSolution,
     CandidateStatus,
     CustomerOutcome,
     DecisionRecord,
@@ -38,6 +39,7 @@ from agentic_odi_core.repository import (
     V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
+    link_identity,
     page,
     rank_signals,
     sort_outcomes,
@@ -102,7 +104,7 @@ class SQLiteRepository(Repository):
         self.proposals: dict[str, OutcomeProposal] = {}
         self.customer_outcomes: dict[str, CustomerOutcome] = {}
         self.evidence: dict[str, Evidence] = {}
-        self.candidates: dict[str, OutcomeCandidate] = {}
+        self.extracted_candidates: dict[str, OutcomeCandidate] = {}
         self.decisions: dict[str, DecisionRecord] = {}
         self.bets: dict[str, BetRecord] = {}
         self.measurements: dict[str, MeasurementRecord] = {}
@@ -110,6 +112,7 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.candidates: dict[str, CandidateSolution] = {}
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
         self.links: dict[str, Link] = {}
@@ -141,8 +144,8 @@ class SQLiteRepository(Repository):
             self.customer_outcomes[p["id"]] = CustomerOutcome.model_validate(p)
         elif et == "EVIDENCE_CREATED":
             self.evidence[p["id"]] = Evidence.model_validate(p)
-        elif et == "CANDIDATE_CREATED":
-            self.candidates[p["id"]] = OutcomeCandidate.model_validate(p)
+        elif et == "EXTRACTED_CANDIDATE_CREATED":
+            self.extracted_candidates[p["id"]] = OutcomeCandidate.model_validate(p)
         elif et == "DECISION_CREATED":
             self.decisions[p["id"]] = DecisionRecord.model_validate(p)
         elif et == "BET_CREATED":
@@ -168,8 +171,8 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.job_id == job_id]:
                 del self.customer_outcomes[key]
-            for key in [k for k, v in self.candidates.items() if v.job_id == job_id]:
-                del self.candidates[key]
+            for key in [k for k, v in self.extracted_candidates.items() if v.job_id == job_id]:
+                del self.extracted_candidates[key]
             self._cascade_decisions()
             #: Do not destroy research evidence: unlink references to the removed
             #: job, its steps and its outcomes instead of deleting the rows.
@@ -192,8 +195,8 @@ class SQLiteRepository(Repository):
                 del self.outcomes[key]
             for key in [k for k, v in self.customer_outcomes.items() if v.step_id == step_id]:
                 del self.customer_outcomes[key]
-            for key in [k for k, v in self.candidates.items() if v.step_id == step_id]:
-                del self.candidates[key]
+            for key in [k for k, v in self.extracted_candidates.items() if v.step_id == step_id]:
+                del self.extracted_candidates[key]
             self._cascade_decisions()
             #: Unlink evidence instead of destroying it.
             for key, record in list(self.evidence.items()):
@@ -211,17 +214,19 @@ class SQLiteRepository(Repository):
                     current = record.model_dump(exclude_unset=True)
                     current["outcome_id"] = None
                     self.evidence[key] = Evidence.model_validate(current)
-            for key in [k for k, v in self.candidates.items() if v.outcome_id == outcome_id]:
-                del self.candidates[key]
+            for key in [
+                k for k, v in self.extracted_candidates.items() if v.outcome_id == outcome_id
+            ]:
+                del self.extracted_candidates[key]
             self._cascade_decisions()
         elif et == "EVIDENCE_DELETED":
             self.evidence.pop(p["id"], None)
         elif et == "EVIDENCE_UPDATED":
             self._merge_updates(self.evidence, p, Evidence)
-        elif et == "CANDIDATE_UPDATED":
-            self._merge_updates(self.candidates, p, OutcomeCandidate)
-        elif et == "CANDIDATE_DELETED":
-            self.candidates.pop(p["id"], None)
+        elif et == "EXTRACTED_CANDIDATE_UPDATED":
+            self._merge_updates(self.extracted_candidates, p, OutcomeCandidate)
+        elif et == "EXTRACTED_CANDIDATE_DELETED":
+            self.extracted_candidates.pop(p["id"], None)
         elif et == "DECISION_DELETED":
             decision_id = p["id"]
             self.decisions.pop(decision_id, None)
@@ -257,6 +262,10 @@ class SQLiteRepository(Repository):
             self.strategies[p["id"]] = Strategy.model_validate(p)
         elif et == "STRATEGY_UPDATED":
             self._merge_updates(self.strategies, p, Strategy)
+        elif et == "CANDIDATE_CREATED":
+            self.candidates[p["id"]] = CandidateSolution.model_validate(p)
+        elif et == "CANDIDATE_UPDATED":
+            self._merge_updates(self.candidates, p, CandidateSolution)
         elif et == "PROPOSAL_CREATED":
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
         elif et == "PROPOSAL_UPDATED":
@@ -705,10 +714,10 @@ class SQLiteRepository(Repository):
                 return True
             return False
 
-    def add_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+    def add_extracted_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
         with self._lock:
             self.store.append(
-                "CANDIDATE_CREATED",
+                "EXTRACTED_CANDIDATE_CREATED",
                 candidate.model_dump(mode="json"),
                 workspace_id=self._workspace_id,
                 device_id=self._device_id,
@@ -716,12 +725,12 @@ class SQLiteRepository(Repository):
             self._sync()
             return candidate
 
-    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+    def get_extracted_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
         with self._lock:
             self._sync()
-            return self.candidates.get(candidate_id)
+            return self.extracted_candidates.get(candidate_id)
 
-    def list_candidates(
+    def list_extracted_candidates(
         self,
         quote_id: str | None = None,
         job_id: str | None = None,
@@ -731,7 +740,7 @@ class SQLiteRepository(Repository):
     ) -> list[OutcomeCandidate]:
         with self._lock:
             self._sync()
-            items = list(self.candidates.values())
+            items = list(self.extracted_candidates.values())
             if quote_id is not None:
                 items = [c for c in items if c.quote_id == quote_id]
             if job_id is not None:
@@ -740,10 +749,12 @@ class SQLiteRepository(Repository):
                 items = [c for c in items if c.status is status]
             return page(items, limit, offset)
 
-    def update_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
+    def update_extracted_candidate(
+        self, candidate_id: str, updates: dict
+    ) -> OutcomeCandidate | None:
         with self._lock:
             self._sync()
-            candidate = self.candidates.get(candidate_id)
+            candidate = self.extracted_candidates.get(candidate_id)
             if not candidate:
                 return None
             # Full dump so the generated id is preserved, never regenerated.
@@ -751,7 +762,7 @@ class SQLiteRepository(Repository):
             current.update(updates)
             new_candidate = candidate.model_validate(current)
             self.store.append(
-                "CANDIDATE_UPDATED",
+                "EXTRACTED_CANDIDATE_UPDATED",
                 {"id": candidate_id, "updates": updates},
                 workspace_id=self._workspace_id,
                 device_id=self._device_id,
@@ -1046,26 +1057,26 @@ class SQLiteRepository(Repository):
 
     def add_link(self, link: Link) -> Link:
         with self._lock:
-            self._sync()
-            for existing in self.links.values():
-                if (
-                    existing.source_type == link.source_type
-                    and existing.source_id == link.source_id
-                    and existing.target_type == link.target_type
-                    and existing.target_id == link.target_id
-                    and existing.relationship_type == link.relationship_type
-                ):
+            # The snapshot read, the duplicate check, and the append share one
+            # write lock: two connections must not both pass the check before
+            # either event is durable.
+            with self.store.write_transaction():
+                self._sync()
+                identity = link_identity(link)
+                if any(link_identity(existing) == identity for existing in self.links.values()):
                     raise ConflictError(
-                        f"Link already exists: {link.source_type}:{link.source_id} -> {link.target_type}:{link.target_id} ({link.relationship_type})"
+                        f"A {link.relationship_type.value} link already connects "
+                        f"{link.source_type}:{link.source_id} to "
+                        f"{link.target_type}:{link.target_id}."
                     )
-            self.store.append(
-                "LINK_CREATED",
-                link.model_dump(mode="json"),
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-            self._sync()
-            return link
+                self.store.append(
+                    "LINK_CREATED",
+                    link.model_dump(mode="json"),
+                    workspace_id=self._workspace_id,
+                    device_id=self._device_id,
+                )
+                self._sync()
+                return link
 
     def get_link(self, link_id: str) -> Link | None:
         with self._lock:
@@ -1084,17 +1095,15 @@ class SQLiteRepository(Repository):
     ) -> list[Link]:
         with self._lock:
             self._sync()
-            items = list(self.links.values())
-            if source_type is not None:
-                items = [link for link in items if link.source_type == source_type]
-            if source_id is not None:
-                items = [link for link in items if link.source_id == source_id]
-            if target_type is not None:
-                items = [link for link in items if link.target_type == target_type]
-            if target_id is not None:
-                items = [link for link in items if link.target_id == target_id]
-            if relationship_type is not None:
-                items = [link for link in items if link.relationship_type == relationship_type]
+            items = [
+                link
+                for link in self.links.values()
+                if (source_type is None or link.source_type == source_type)
+                and (source_id is None or link.source_id == source_id)
+                and (target_type is None or link.target_type == target_type)
+                and (target_id is None or link.target_id == target_id)
+                and (relationship_type is None or link.relationship_type.value == relationship_type)
+            ]
             return page(items, limit, offset)
 
     def remove_link(self, link_id: str) -> bool:
@@ -1155,6 +1164,50 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_strategy
+
+    def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution:
+        with self._lock:
+            self.store.append(
+                "CANDIDATE_CREATED",
+                candidate.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return candidate
+
+    def get_candidate(self, candidate_id: str) -> CandidateSolution | None:
+        with self._lock:
+            self._sync()
+            return self.candidates.get(candidate_id)
+
+    def list_candidates(self) -> list[CandidateSolution]:
+        with self._lock:
+            self._sync()
+            return list(self.candidates.values())
+
+    def update_candidate(
+        self, candidate_id: str, updates: dict[str, Any]
+    ) -> CandidateSolution | None:
+        with self._lock:
+            self._sync()
+            candidate = self.candidates.get(candidate_id)
+            if candidate is None:
+                return None
+            current = candidate.model_dump(exclude_unset=True)
+            current.update(updates)
+            try:
+                new_candidate = candidate.model_validate(current)
+            except ValidationError:
+                return None
+            self.store.append(
+                "CANDIDATE_UPDATED",
+                {"id": candidate_id, "updates": updates},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return new_candidate
 
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
         with self._lock:

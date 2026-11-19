@@ -62,8 +62,10 @@ hung one.
 
 The turn line never carries an API key, an authorization header, or a
 customer's words; the `SENSITIVE_KEYS` list in `observability.py` is the
-contract. The token *counts* are exempt from the "token" substring heuristic
-because they are counts, not secrets.
+contract. Redaction walks every nested mapping and list, so a token inside a
+request object or a quote inside an evidence entry is replaced too, and a
+non-sensitive nested value is still readable. The token *counts* are exempt
+from the "token" substring heuristic because they are counts, not secrets.
 
 Deliberately absent: no cost table, no price inference. Tokens are recorded; a
 fabricated dollar figure would be worse than none.

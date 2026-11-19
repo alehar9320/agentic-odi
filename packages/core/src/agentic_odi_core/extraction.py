@@ -162,7 +162,7 @@ async def extract_candidates(
     raw = await extractor.propose(quote, job_name, stage_hint)
     proposals = _validate_proposals(raw)
 
-    existing = repo.list_candidates(quote_id=quote_id)
+    existing = repo.list_extracted_candidates(quote_id=quote_id)
     seen = {normalisation_key(c.quote_id, c.statement) for c in existing}
 
     for proposal in proposals:
@@ -177,7 +177,7 @@ async def extract_candidates(
         else:
             status = CandidateStatus.REJECTED
             rationale = " ".join(verdict["issues"])
-        repo.add_candidate(
+        repo.add_extracted_candidate(
             OutcomeCandidate(
                 quote_id=quote_id,
                 interview_id=interview_id,
@@ -190,7 +190,7 @@ async def extract_candidates(
             )
         )
 
-    return repo.list_candidates(quote_id=quote_id)
+    return repo.list_extracted_candidates(quote_id=quote_id)
 
 
 __all__ = [

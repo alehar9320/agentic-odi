@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
-import { SESSION_KEY } from "../lib/session";
+import { SESSION_KEY, SESSION_SCHEMA_VERSION } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
 import { getStudioBff } from "../bff/index";
 import {
@@ -258,7 +258,7 @@ function route(
             code: "store_corrupt",
             message:
               "Your database failed its integrity check: /home/me/.odi.db. " +
-              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+              "Last backup: 06:14 local (odi-20260102T061400Z.db).",
             detail: "database disk image is malformed",
             suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
             retryable: false,
@@ -466,7 +466,12 @@ describe("StudioContext memory and resume", () => {
   it("restores the focused subject from the previous session", () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
+      JSON.stringify({
+        schema_version: SESSION_SCHEMA_VERSION,
+        job_id: null,
+        step_id: null,
+        outcome_id: "O-9",
+      }),
     );
 
     const { result } = renderHook(
@@ -497,6 +502,7 @@ describe("StudioContext memory and resume", () => {
 
     expect(result.current.focusedSubject).toEqual({ kind: "job", id: "JOB-7" });
     expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
+      schema_version: SESSION_SCHEMA_VERSION,
       job_id: "JOB-7",
       step_id: null,
       outcome_id: null,

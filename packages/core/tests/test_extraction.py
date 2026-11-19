@@ -67,7 +67,7 @@ def test_rerunning_extraction_does_not_duplicate_candidates() -> None:
         extract_candidates(repo, extractor, quote_id="q1", quote="ignored", job_id=job.id)
     )
     assert len(first) == len(second) == 2
-    assert len(repo.candidates) == 2
+    assert len(repo.extracted_candidates) == 2
 
 
 def test_rerunning_does_not_reset_a_human_decision() -> None:
@@ -77,9 +77,9 @@ def test_rerunning_does_not_reset_a_human_decision() -> None:
         extract_candidates(repo, extractor, quote_id="q1", quote="ignored", job_id=job.id)
     )
     candidate = candidates[0]
-    repo.update_candidate(candidate.id, {"status": CandidateStatus.REJECTED.value})
+    repo.update_extracted_candidate(candidate.id, {"status": CandidateStatus.REJECTED.value})
     _run(extract_candidates(repo, extractor, quote_id="q1", quote="ignored", job_id=job.id))
-    assert repo.get_candidate(candidate.id).status is CandidateStatus.REJECTED
+    assert repo.get_extracted_candidate(candidate.id).status is CandidateStatus.REJECTED
 
 
 def test_normalised_repeat_is_not_duplicated() -> None:
@@ -105,7 +105,7 @@ def test_empty_proposal_list_stores_nothing() -> None:
         extract_candidates(repo, extractor, quote_id="q1", quote="ignored", job_id=job.id)
     )
     assert candidates == []
-    assert repo.candidates == {}
+    assert repo.extracted_candidates == {}
 
 
 def test_empty_quote_is_refused() -> None:
@@ -116,7 +116,7 @@ def test_empty_quote_is_refused() -> None:
                 repo, FixtureStatementExtractor(), quote_id="q1", quote="   ", job_id=job.id
             )
         )
-    assert repo.candidates == {}
+    assert repo.extracted_candidates == {}
 
 
 def test_malformed_payload_is_refused() -> None:
@@ -128,7 +128,7 @@ def test_malformed_payload_is_refused() -> None:
 
     with pytest.raises(ExtractionError):
         _run(extract_candidates(repo, Bad(), quote_id="q1", quote="x", job_id=job.id))
-    assert repo.candidates == {}
+    assert repo.extracted_candidates == {}
 
 
 def test_confidence_outside_range_is_refused() -> None:
@@ -136,7 +136,7 @@ def test_confidence_outside_range_is_refused() -> None:
     extractor = FixtureStatementExtractor([Proposal(statement=VALID, confidence=1.5)])
     with pytest.raises(ExtractionError):
         _run(extract_candidates(repo, extractor, quote_id="q1", quote="x", job_id=job.id))
-    assert repo.candidates == {}
+    assert repo.extracted_candidates == {}
 
 
 def test_empty_statement_is_refused() -> None:

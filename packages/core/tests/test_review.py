@@ -42,7 +42,7 @@ def test_accepting_creates_exactly_one_outcome_and_links_it() -> None:
     candidate = _candidate(repo, job.id)
     outcome = accept_candidate(service, repo, candidate.id, importance=9.0, satisfaction=4.0)
     assert len(repo.outcomes) == 1
-    refreshed = repo.get_candidate(candidate.id)
+    refreshed = repo.get_extracted_candidate(candidate.id)
     assert refreshed.status is CandidateStatus.ACCEPTED
     assert refreshed.outcome_id == outcome.id
     assert outcome.statement == VALID
@@ -57,7 +57,7 @@ def test_accepting_with_edited_statement_validates_it() -> None:
             service, repo, candidate.id, statement="This is bad.", importance=5.0, satisfaction=5.0
         )
     assert repo.outcomes == {}
-    assert repo.get_candidate(candidate.id).status is CandidateStatus.PROPOSED
+    assert repo.get_extracted_candidate(candidate.id).status is CandidateStatus.PROPOSED
 
 
 def test_rejecting_requires_a_non_empty_reason() -> None:
@@ -65,7 +65,7 @@ def test_rejecting_requires_a_non_empty_reason() -> None:
     candidate = _candidate(repo, job.id)
     with pytest.raises(ValidationError):
         reject_candidate(repo, candidate.id, reason="   ")
-    assert repo.get_candidate(candidate.id).status is CandidateStatus.PROPOSED
+    assert repo.get_extracted_candidate(candidate.id).status is CandidateStatus.PROPOSED
 
 
 def test_rejecting_keeps_the_candidate_and_reason() -> None:
@@ -74,7 +74,7 @@ def test_rejecting_keeps_the_candidate_and_reason() -> None:
     updated = reject_candidate(repo, candidate.id, reason="duplicate")
     assert updated.status is CandidateStatus.REJECTED
     assert updated.rejection_reason == "duplicate"
-    assert repo.get_candidate(candidate.id) is not None
+    assert repo.get_extracted_candidate(candidate.id) is not None
 
 
 def test_merging_creates_no_outcome_and_links_target() -> None:
@@ -93,7 +93,7 @@ def test_merging_into_unknown_outcome_is_refused() -> None:
     candidate = _candidate(repo, job.id)
     with pytest.raises(OutcomeNotFoundError):
         merge_candidate(repo, candidate.id, merged_into="nope")
-    assert repo.get_candidate(candidate.id).status is CandidateStatus.PROPOSED
+    assert repo.get_extracted_candidate(candidate.id).status is CandidateStatus.PROPOSED
 
 
 def test_unknown_candidate_is_refused() -> None:
@@ -141,8 +141,8 @@ def test_router_drives_three_decisions_and_asserts_the_store() -> None:
     merge_candidate(repo, candidates[2].id, merged_into=accepted.id)
 
     assert len(repo.outcomes) == 1
-    statuses = {c.id: c.status for c in repo.list_candidates(quote_id="q1")}
+    statuses = {c.id: c.status for c in repo.list_extracted_candidates(quote_id="q1")}
     assert statuses[candidates[0].id] is CandidateStatus.ACCEPTED
     assert statuses[candidates[1].id] is CandidateStatus.REJECTED
     assert statuses[candidates[2].id] is CandidateStatus.MERGED
-    assert repo.list_candidates(status=CandidateStatus.PROPOSED) == []
+    assert repo.list_extracted_candidates(status=CandidateStatus.PROPOSED) == []

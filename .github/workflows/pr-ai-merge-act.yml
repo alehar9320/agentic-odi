@@ -1,19 +1,30 @@
 name: PR AI merge act
 
-# Auto-merges a pull request when it carries ``ai-merge-authorized``:
-#   * ``ai-merge-safe`` (trust label from pr-ai-merge.yml)
-#   * CI green (combined status of the head commit is ``success``)
-#   * ``ready-for-merge`` (no merge conflicts)
+# Merges a pull request only when the full authorization chain holds:
+#   * ``ai-merge-authorized`` (pr-ai-authorize.yml)
+#   * ``ai-merge-safe`` (pr-ai-merge.yml)
+#   * ``ready-for-merge`` (label-merge-conflicts.yml)
+#   * the head commit's check suite is complete and green
+#     (scripts/pr_ai_authorize.py, which both merge workflows share)
 #
-# Human override: if ``do-not-merge`` or ``needs human review`` is present,
-# auto-merge is skipped and a comment explains why.
+# The trigger is deliberately narrow: only the labels this workflow acts on wake
+# it up, and every label is re-read before arming. The previous version ran on
+# every ``labeled`` event and never checked which label was added, so PR #1100
+# was armed nine seconds after an unrelated label and merged without ever
+# carrying ``ai-merge-safe`` or ``ai-merge-authorized`` (ADR 0009).
 #
-# Deterministic: no LLM calls, no pull request code executed. Fork pull
-# requests are skipped per-job because they carry a read-only token.
+# Arming is not the decision. ``--auto`` is a request to GitHub that survives
+# later pushes, so every run re-verifies the head commit and disarms when a gate
+# stops holding. A green verdict never disarms: a request that is already armed
+# is left exactly as it is.
+#
+# Human override: ``do-not-merge`` or ``needs human review`` disarms.
+# Deterministic: no LLM calls, no pull request code executed. Fork pull requests
+# are skipped per-job because they carry a read-only token.
 
 on:
   pull_request:
-    types: [labeled]
+    types: [labeled, unlabeled]
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
@@ -25,7 +36,7 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-  issues: write # gh label create / pr merge live under these APIs
+  issues: write
 
 defaults:
   run:
@@ -34,6 +45,11 @@ defaults:
 jobs:
   merge:
     name: Auto-merge authorized PR
+    # Three labels can change the decision; a run for every label event on every
+    # pull request would be noise.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(fromJSON('["ai-merge-authorized","do-not-merge","needs human review"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -47,9 +63,19 @@ jobs:
         if: ${{ github.event.pull_request.head.repo.fork }}
         run: echo "::notice::Skipping AI merge act for a fork pull request (read-only token)."
 
-      # Resolve which pull request(s) to process. On pull_request labeled we
-      # have a PR number. On schedule / workflow_dispatch we re-scan every
-      # open PR carrying ai-merge-authorized.
+      # The gate is a tested Python entrypoint, so the job needs a tree. Check
+      # out the base ref, not the pull request head: a workflow holding a write
+      # token must never execute pull request code.
+      - name: Checkout base branch
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
+          persist-credentials: false
+
+      # On a label event we have a PR number. On schedule / workflow_dispatch we
+      # re-scan every open PR that carries the authorization label, so a
+      # decision made by hand is revisited instead of drifting.
       - name: Resolve pull request numbers to process
         if: ${{ ! github.event.pull_request.head.repo.fork }}
         env:
@@ -59,55 +85,120 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
           else
+            # `gh pr list` caps at 30 rows without `--limit`; an armed pull
+            # request outside the first page would otherwise never be revisited.
             gh pr list --repo "$REPO" --base main \
-              --state open --label "ai-merge-authorized" \
+              --state open --label "ai-merge-authorized" --limit 1000 \
               --json number -q '.[].number' \
               > "$RUNNER_TEMP/pr-numbers.txt"
           fi
 
-      # Process each pull request.
-      - name: Process each pull request
+      - name: Re-verify the gates and act
         if: ${{ ! github.event.pull_request.head.repo.fork }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          E2E_BLOCKING: ${{ vars.AGENTIC_ODI_E2E_BLOCKING }}
         run: |
           while IFS= read -r PR_NUMBER; do
             [ -z "$PR_NUMBER" ] && continue
 
-            # Human override: do-not-merge or needs human review cancels.
-            LABELS="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels -q '.labels | map(.name) | join(",")')"
-            case ",$LABELS," in
-              *,do-not-merge,*|*,"needs human review",*)
-                {
-                  echo "### AI merge act — PR #$PR_NUMBER"
-                  echo
-                  echo "Skipped: human override label present ($LABELS)."
-                } >> "$GITHUB_STEP_SUMMARY"
-                continue
-                ;;
-            esac
+            META="$(gh pr view "$PR_NUMBER" --repo "$REPO" \
+              --json labels,headRefOid,state,autoMergeRequest)"
+            LABELS="$(jq -r '.labels | map(.name) | join(",")' <<<"$META")"
+            HEAD_SHA="$(jq -r '.headRefOid' <<<"$META")"
+            STATE="$(jq -r '.state' <<<"$META")"
+            ARMED="$(jq -r 'if .autoMergeRequest == null then "no" else "yes" end' <<<"$META")"
 
-            # Re-verify CI green right before arming auto-merge.
-            HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid -q '.headRefOid')"
-            STATUS="$(gh api "repos/$REPO/commits/$HEAD_SHA/status" -q '.state' 2>/dev/null || echo pending)"
-            if [ "$STATUS" != "success" ]; then
-              {
-                echo "### AI merge act — PR #$PR_NUMBER"
-                echo
-                echo "Skipped: CI not green (status: $STATUS)."
-              } >> "$GITHUB_STEP_SUMMARY"
-              continue
+            has() {
+              case ",$LABELS," in
+                *",$1,"*) return 0 ;;
+                *) return 1 ;;
+              esac
+            }
+
+            action=""
+            verdict=""
+            gate_ok="no"
+
+            if [ "$STATE" != "OPEN" ]; then
+              verdict="Pull request is not open (state: $STATE)."
+            elif has "do-not-merge" || has "needs human review"; then
+              verdict="Human override label present ($LABELS)."
+            elif ! has "ai-merge-authorized"; then
+              verdict="Authorization label ai-merge-authorized is absent ($LABELS)."
+            elif ! has "ai-merge-safe"; then
+              verdict="Trust label ai-merge-safe is absent ($LABELS)."
+            elif ! has "ready-for-merge"; then
+              verdict="Merge-state label ready-for-merge is absent ($LABELS)."
             fi
 
-            # Arm auto-merge (squash). GitHub merges once all required checks
-            # pass; since we just verified CI green and no conflicts, this
-            # should merge promptly.
-            gh pr merge --auto --squash "$PR_NUMBER" --repo "$REPO"
+            if [ -z "$verdict" ]; then
+              # The head commit's check suite, never the legacy combined commit
+              # status, which only carries third-party statuses (ADR 0009).
+              checks_file="$RUNNER_TEMP/checks-$PR_NUMBER.json"
+              if ! gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100&filter=latest" \
+                > "$checks_file" 2>/dev/null; then
+                echo '{"check_runs": []}' > "$checks_file"
+              fi
+              jq -n --slurpfile checks "$checks_file" \
+                '{checks: ($checks[0].check_runs // [])}' \
+                > "$RUNNER_TEMP/ci-$PR_NUMBER.json"
 
-            {
-              echo "### AI merge act — PR #$PR_NUMBER"
-              echo
-              echo "Auto-merge armed (squash): ai-merge-authorized present, CI green."
-            } >> "$GITHUB_STEP_SUMMARY"
+              ci="$(AGENTIC_ODI_E2E_BLOCKING="$E2E_BLOCKING" \
+                python3 scripts/pr_ai_authorize.py \
+                --facts "$RUNNER_TEMP/ci-$PR_NUMBER.json" --ci-state)"
+              ci_state="$(jq -r '.state' <<<"$ci")"
+
+              if [ "$ci_state" = "green" ]; then
+                gate_ok="yes"
+                if [ "$ARMED" = "yes" ]; then
+                  verdict="Check suite green on $HEAD_SHA; auto-merge is already armed."
+                else
+                  gh pr merge --auto --squash "$PR_NUMBER" --repo "$REPO"
+                  action="armed"
+                  verdict="Check suite green on $HEAD_SHA; auto-merge armed (squash)."
+                fi
+              else
+                verdict="Head $HEAD_SHA is $ci_state: $(jq -r '.reason' <<<"$ci")"
+              fi
+            fi
+
+            # A gate that stops holding must take the armed request with it.
+            # Keyed on the gate, not on `action`: a green pull request that was
+            # already armed produces no action, and disarming it here would
+            # cancel the very merge the gate just approved.
+            if [ "$gate_ok" != "yes" ] && [ "$ARMED" = "yes" ]; then
+              gh pr merge --disable-auto "$PR_NUMBER" --repo "$REPO"
+              action="disarmed"
+              verdict="$verdict Auto-merge was armed, so it was disarmed."
+            fi
+
+            echo "PR #$PR_NUMBER: ${action:-no change} — $verdict"
+
+            # Comment only when the state changed, so a quiet queue stays quiet.
+            if [ "$action" = "armed" ] || [ "$action" = "disarmed" ]; then
+              {
+                echo "## AI merge act"
+                echo
+                echo "- **Action:** $action"
+                echo "- **Head:** \`$HEAD_SHA\`"
+                echo "- **Why:** $verdict"
+                echo "- **Labels:** \`$LABELS\`"
+              } > "$RUNNER_TEMP/merge-act-$PR_NUMBER.md"
+
+              # Do not pipe `gh api` into `head`: gh exits on SIGPIPE and the
+              # job's `pipefail` would turn a successful lookup into a red step.
+              gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+                --jq '.[] | select(.body | startswith("## AI merge act")) | .id' \
+                > "$RUNNER_TEMP/merge-act-comment-ids-$PR_NUMBER.txt"
+              comment_id="$(head -n 1 "$RUNNER_TEMP/merge-act-comment-ids-$PR_NUMBER.txt")"
+              if [ -n "$comment_id" ]; then
+                gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" \
+                  -F body=@"$RUNNER_TEMP/merge-act-$PR_NUMBER.md" >/dev/null
+              else
+                gh pr comment "$PR_NUMBER" --repo "$REPO" \
+                  --body-file "$RUNNER_TEMP/merge-act-$PR_NUMBER.md"
+              fi
+            fi
           done < "$RUNNER_TEMP/pr-numbers.txt"

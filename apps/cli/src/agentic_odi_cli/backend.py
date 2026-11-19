@@ -707,7 +707,7 @@ class LocalBackend(Backend):
             resolved = CandidateStatus(status_arg) if status_arg is not None else None
         except ValueError:
             raise BackendError(f"unknown candidate status: {status_arg}") from None
-        candidates = self.service.repo.list_candidates(
+        candidates = self.service.repo.list_extracted_candidates(
             quote_id=args.get("quote_id"),
             job_id=args.get("job_id"),
             status=resolved,
@@ -717,7 +717,7 @@ class LocalBackend(Backend):
         return [candidate.model_dump(mode="json") for candidate in candidates]
 
     def _get_candidate(self, args: dict[str, Any]) -> dict[str, Any]:
-        candidate = self.service.repo.get_candidate(args["candidate_id"])
+        candidate = self.service.repo.get_extracted_candidate(args["candidate_id"])
         if candidate is None:
             raise BackendError(f"Candidate with ID {args['candidate_id']} not found.")
         return candidate.model_dump(mode="json")
@@ -969,11 +969,14 @@ class LocalBackend(Backend):
 
     def _link_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
         from agentic_odi_core import OutcomeNotFoundError, outcome_not_found
+        from agentic_odi_core.errors import ValidationError
 
         try:
             outcome = self.service.link_outcome(args["outcome_id"], args["field"], args["text"])
         except OutcomeNotFoundError:
             raise BackendError(outcome_not_found(args["outcome_id"])) from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
         return outcome.model_dump(mode="json")
 
     def _unlink_outcome(self, args: dict[str, Any]) -> dict[str, Any]:
