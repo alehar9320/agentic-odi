@@ -83,8 +83,8 @@ CI_ONLY_REASONS: dict[str, str] = {
         "and owned by the e2e lane"
     ),
     "e2e-smoke": (
-        "drives Chromium against the built Studio and both services; advisory at merge "
-        "time and owned by the e2e lane"
+        "drives Chromium against a built Studio and both services; a real boot, and the "
+        "one browser lane that blocks a merge, so CI owns it"
     ),
 }
 
@@ -93,7 +93,10 @@ TIER_NOTES = {
         "Not run: mypy, studio unit tests/build, website build, e2e, tauri, dependency audit."
     ),
     "default": "Not run: e2e (owned by the e2e lane), tauri, dependency audit.",
-    "full": ("Not run: e2e (owned by the e2e lane), tauri-check, tauri-build, dependency audit."),
+    "full": (
+        "Not run: e2e and e2e-smoke (owned by the e2e lane), tauri-check, tauri-build, "
+        "dependency audit."
+    ),
 }
 
 
