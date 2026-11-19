@@ -2,9 +2,9 @@
 
 ## Tiers (pre-PR)
 See [`.agents/workflows/test.md`](../../.agents/workflows/test.md):
-- `--changed` — PR bar (fast gate on touched files)
-- `--default` — adds `mypy` and `vitest` for touched areas
-- `--full` — CI's responsibility (full matrix)
+- `--changed` — PR bar. Runs every required CI check that is a function of the diff.
+- `--default` — merge-review bar. Adds repo-wide `mypy`, Studio units/build/bundle budget, and the site build.
+- `--full` — CI's responsibility (the local matrix; e2e, Tauri, and the audit stay CI-only).
 
 ```bash
 uv run python scripts/verify.py --changed
@@ -13,8 +13,22 @@ uv run python scripts/verify.py --full
 ```
 
 The full tier is CI's responsibility and is not asked of anyone before they
-open a pull request. The commands below are the manual equivalent of the
-default tier.
+open a pull request. The commands below are the reference for what each tier
+wraps.
+
+### What the gate covers
+
+`scripts/verify.py` declares, in `CI_JOB_COVERAGE`, which tier covers each job
+in `ci-green.needs`, and lists the rest in `CI_ONLY_REASONS` with the reason
+they cannot run locally (the dependency audit needs the network; smoke boots
+both services; contrast and e2e need Chromium; `tauri-*` need the Rust
+toolchain and the webview libraries). It prints that table on every run.
+`tests/scripts/test_verify_ci_parity.py` fails when the declaration and
+`.github/workflows/ci.yml` disagree, so adding a required job is a two-file
+change with a recorded decision, not a silent gap.
+
+A diff that selects no check is a failure. The gate used to print `PASSED`
+having run nothing for a studio-only or website-only diff.
 
 ## Commands (reference)
 

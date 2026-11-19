@@ -8,9 +8,9 @@ Pick the smallest tier that matches your time budget. CI owns the full matrix; a
 
 | Tier | Command | When | Notes |
 |---|---|---|---|
-| `--changed` (fast gate) | `uv run python scripts/verify.py --changed` | **Bar for opening a PR.** Run before opening or updating a PR. Fits inside a 10–30 minute agent budget. | Ruff on touched paths, pytest for selected packages. Prints elapsed seconds per step and what was skipped. Fails loudly if a touched file maps to no test target. |
-| `--default` | `uv run python scripts/verify.py --default` | Before asking for merge review. | Adds `mypy` for touched packages and `vitest` for touched studio files. Still not a substitute for CI. |
-| `--full` | `uv run python scripts/verify.py --full` | **CI's job.** Do not run by default in agent runs. | Runs today's full matrix (Python, website pytest, studio vitest, `npm run build`, Playwright e2e). Per-job budgets are 5–20 minutes in CI. |
+| `--changed` (fast gate) | `uv run python scripts/verify.py --changed` | **Bar for opening a PR.** Run before opening or updating a PR. Fits inside a 10–30 minute agent budget. | Ruff check and format on touched paths, version parity, the generated docs blocks, the docs drift check, bandit for touched Python trees, pytest for selected packages, the brand render, Studio lint + typecheck, website pytest. Prints elapsed seconds and the CI-job coverage table. Fails if the diff selects no check. |
+| `--default` | `uv run python scripts/verify.py --default` | Before asking for merge review. | Adds repo-wide `mypy`, Studio units + build + bundle budget, and the site build. Still not a substitute for CI. |
+| `--full` | `uv run python scripts/verify.py --full` | **CI's job.** Do not run by default in agent runs. | Runs the whole local matrix (Python, website, Studio, docs, bandit, mypy). E2E, Tauri, and the dependency audit stay CI-only; the coverage table says why. Per-job budgets are 5–20 minutes in CI. |
 
 `--full` is CI's responsibility. It budgets 5–20 minutes per job
 (`.github/workflows/ci.yml`), so nobody is asked to run it locally before
@@ -24,6 +24,14 @@ on which files a pull request touched, and `--changed` neither runs it nor skips
 it by selection. Run it by hand when a pull request changes a dependency; the
 commands and the accepted-advisory ledger are in
 [Development](../docs/development.md#linting-formatting--type-checks).
+
+E2E, the contrast gate, and the Tauri jobs stay CI-only for the same kind of
+reason: a browser, a built desktop app, and the Linux webview libraries are not
+part of a 10–30 minute local budget. Every required CI job is either covered by
+a tier or declared in `CI_JOB_COVERAGE` / `CI_ONLY_REASONS` in
+`scripts/verify.py`, with the reason it cannot be. The gate prints that table on
+every run, and `tests/scripts/test_verify_ci_parity.py` fails when the table and
+`ci-green.needs` disagree.
 
 ## PR requirement (honest verification)
 
@@ -47,30 +55,38 @@ slice yourself.
 
 ### Fast tier
 
+`uv run python scripts/verify.py --changed` runs, in order:
+
 ```bash
-uv run pytest packages/<changed>     # pytest on the packages the diff touches
-uv run ruff check .                  # lint (the fast tier stops at lint, not format)
+uv run ruff check <touched .py files>
+uv run ruff format --check <touched .py files>
+uv run python scripts/check_version_parity.py
+uv run python scripts/docs_index.py --check
+uv run python scripts/doc_check.py
+uv run bandit -c pyproject.toml -r apps packages   # when app/package Python changed
+uv run pytest -q <selected packages>               # plus tests/ for docs or contract changes
+npm --prefix apps/studio run lint                  # when the Studio changed
+npm --prefix apps/studio run typecheck             # when the Studio changed
+uv run --directory website pytest tests/           # when the site changed
 ```
 
 This is the answer to "did I break the thing I just edit". It is not a
 statement that the suite passes — it is a statement about the changed slice.
 
-## 2. Default tier — the bar for opening a PR
+### Default tier — the bar for merge review
 
 ```bash
-uv run pytest                # all Python tests
-uv run --directory website pytest tests/
-npm --prefix apps/studio test -- --run          # studio units (jsdom)
-npm --prefix apps/studio run lint               # ESLint
-npm --prefix apps/studio run typecheck          # tsc --noEmit
+uv run python scripts/verify.py --default
 ```
 
-Run this before you open a pull request. If it does not pass, the PR is not
-ready for review.
+On top of the fast tier this adds repo-wide `mypy`, the Studio unit suite, the
+Studio build with its cold-start bundle budget, and the site build. Run it
+before you ask for merge review. If it does not pass, the PR is not ready for
+review.
 
-The browser-level end-to-end suite and the production build are **not** part
-of this tier. They live in the full tier on purpose: they need a browser
-download and a running sidecar, and they are CI's job.
+The browser-level end-to-end suite and the desktop build are **not** part of
+this tier. They need a browser download, a running sidecar, and the Rust
+toolchain, and they are CI's job.
 
 ## 3. Full tier — CI's job
 
