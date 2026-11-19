@@ -12,6 +12,7 @@ vi.mock("../../state/StudioContext", () => ({
 vi.mock("../../lib/commands", () => ({
   isCommandDraft: () => false,
   matchCommands: () => [],
+  STUDIO_COMMANDS: [],
 }));
 
 import { useStudio } from "../../state/StudioContext";

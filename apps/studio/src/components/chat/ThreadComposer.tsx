@@ -194,8 +194,8 @@ function ComposerBody({
   const slashAdapter = unstable_useSlashCommandAdapter({
     commands: STUDIO_COMMANDS.map((command) => ({
       id: command.id,
-      label: command.name,
-      description: command.description,
+      label: command.label,
+      description: `${command.name} — ${command.description}`,
       execute: () => onCommand(command),
     })),
     removeOnExecute: true,
