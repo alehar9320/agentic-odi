@@ -403,7 +403,8 @@ def split_claims(text: str, index: EvidenceIndex | None = None) -> list[Claim]:
         masked_line = masked[line_start : line_start + len(line)]
         if _LIST_PREFIX.match(line):
             body = _LIST_PREFIX.sub("", line, count=1)
-            units = [body]
+            masked_body = masked_line[len(line) - len(body) :]
+            units = _sentences(body, masked_body) or [body]
         else:
             body = line
             masked_body_end = len(masked_line)
