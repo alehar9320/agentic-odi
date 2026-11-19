@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 
 import pytest
+from agentic_odi_core import recovery
 from agentic_odi_core.errors import StoreCorrupt, error_status
 from agentic_odi_core.integrity import (
     BOOT_CHECK_VM_BUDGET,
@@ -441,6 +442,47 @@ def test_backup_database_writes_a_verified_snapshot(tmp_path) -> None:
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
         conn.close()
+
+
+def test_two_backups_in_one_second_are_two_files(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backups = tmp_path / "backups"
+    monkeypatch.setattr(recovery, "_timestamp", lambda: "20260101T000000Z")
+
+    first = backup_database(str(db), directory=backups)
+    second = backup_database(str(db), directory=backups)
+
+    assert first != second
+    assert first.exists() and second.exists()
+    assert len(list(backups.glob("odi-*.db"))) == 2
+
+
+def test_latest_backup_uses_mtime_not_name(tmp_path) -> None:
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    earlier_name = backups / "odi-20260101T060000Z.db"
+    later_name = backups / "odi-20260102T061400Z.db"
+    earlier_name.write_bytes(b"old")
+    later_name.write_bytes(b"new")
+    # The name says 2026-01-01 is older, but the file was written most
+    # recently: the newest backup is the one written last.
+    os.utime(earlier_name, (2_000_000_000, 2_000_000_000))
+    os.utime(later_name, (1_000_000_000, 1_000_000_000))
+
+    found = latest_backup("/home/me/.agentic-odi/odi.db", directory=backups)
+
+    assert found is not None
+    assert found.name == "odi-20260101T060000Z.db"
+
+
+def test_backup_time_handles_a_collision_suffix(tmp_path) -> None:
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
+    assert format_backup_time(tmp_path / "odi-20260102T061400Z-1.db") == expected.strftime("%H:%M")
 
 
 def test_restore_keeps_the_previous_file_as_pre_restore(tmp_path) -> None:
