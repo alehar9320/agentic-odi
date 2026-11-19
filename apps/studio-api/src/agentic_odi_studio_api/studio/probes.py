@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import json
 import os
 import socket
@@ -41,6 +42,22 @@ _PROBE_CACHE_CAP = 512
 #: Allows callers to detect that the cache was invalidated since their last read.
 _CONFIG_GENERATION = 0
 
+#: Salt for the credential fingerprint in the cache key. It scopes the key to
+#: this cache; it is not a secret, because the fingerprint only has to be stable
+#: and distinct per credential, never reversible.
+_CREDENTIAL_FINGERPRINT_KEY = b"agentic-odi-probe-cache"
+
+
+def credential_fingerprint(api_key: str) -> str:
+    """A stable, non-reversible identifier for a credential.
+
+    Keyed rather than a bare digest: the cache only needs two different
+    credentials to land on different keys, and HMAC is the right construction
+    for deriving an identifier from a secret. It is deliberately cheap — this is
+    a cache key, not password storage.
+    """
+    return hmac.new(_CREDENTIAL_FINGERPRINT_KEY, api_key.encode(), hashlib.sha256).hexdigest()[:16]
+
 
 class ProbeResult(NamedTuple):
     """The outcome of one probe, stamped when it was obtained.
@@ -54,7 +71,7 @@ class ProbeResult(NamedTuple):
     checked_at: str  # ISO 8601 UTC
 
 
-#: (endpoint, model, key_hash) -> (monotonic timestamp, ProbeResult). Keyed on
+#: (endpoint, model, credential fingerprint) -> (monotonic timestamp, ProbeResult). Keyed on
 #: the endpoint, model, and a truncated hash of the API key -- never the
 #: credential itself -- so a key rotation is a different entry even if an
 #: invalidator is missed.
@@ -233,7 +250,7 @@ async def probe_llm_health(
     by TTL eviction and a size cap.
     """
 
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    key_hash = credential_fingerprint(api_key)
     key = (base_url, model_name, key_hash)
     t = now()
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 
 from agentic_odi_core import InMemoryRepository
@@ -74,7 +73,7 @@ def test_cache_retains_no_secret_or_response_body(monkeypatch):
     result = asyncio.run(probes.probe_llm_health("http://probe-c/v1", "super-secret", "m", now=now))
     assert "super-secret" not in result["message"]
 
-    key_hash = hashlib.sha256(b"super-secret").hexdigest()[:16]
+    key_hash = probes.credential_fingerprint("super-secret")
     with probes._PROBE_CACHE_LOCK:
         _, stored = probes._PROBE_CACHE[("http://probe-c/v1", "m", key_hash)]
     assert "super-secret" not in stored.message
@@ -210,6 +209,16 @@ def test_saving_config_drops_the_cached_verdict(monkeypatch, tmp_path):
 
     asyncio.run(probes.probe_llm_health("http://probe-cfg/v1", "k", "m", now=now))
     assert counter[0] == 2
+
+
+def test_the_credential_fingerprint_is_stable_and_distinct():
+    """The cache key only needs a stable id per credential, never the secret."""
+    first = probes.credential_fingerprint("key-A")
+
+    assert first == probes.credential_fingerprint("key-A")
+    assert first != probes.credential_fingerprint("key-B")
+    assert "key-A" not in first
+    assert len(first) == 16
 
 
 def test_health_route_reports_checked_at_and_cached(monkeypatch):
