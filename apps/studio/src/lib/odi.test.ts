@@ -127,6 +127,7 @@ describe("scoreMismatch", () => {
     // 5 / 5 produce 5 exactly, so there is no floating-point noise in the
     // recomputed score. Half a twentieth (0.05) is still a rounding difference;
     // anything past it is a real disagreement.
+    expect(scoreMismatch(5.05, 5, 5)).toBe(false);
     expect(scoreMismatch(5.049, 5, 5)).toBe(false);
     expect(scoreMismatch(5.051, 5, 5)).toBe(true);
   });
