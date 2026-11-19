@@ -8,7 +8,7 @@ import sys
 import httpx
 import typer
 
-from agentic_odi_cli import profile
+from agentic_odi_cli import profile, version
 
 # ── PageSignals ──────────────────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ def infer_baseline(signals: PageSignals) -> tuple[profile.Baseline, dict[str, in
 
 # ── URL signal fetching ─────────────────────────────────────────────────────
 
-UA = "agentic-odi/0.1.0"
+UA = f"agentic-odi/{version.__version__}"
 
 
 def fetch_signals(url: str, timeout: float = 8.0) -> tuple[profile.Baseline | PageSignals, bool]:
