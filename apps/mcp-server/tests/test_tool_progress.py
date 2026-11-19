@@ -6,7 +6,6 @@ import json
 from typing import Any, cast
 
 import pytest
-from agentic_odi_mcp_server.mcp_server import mcp
 from fastmcp import Client
 
 
@@ -21,7 +20,9 @@ async def _collect_progress(client: Client, tool: str, arguments: dict) -> tuple
 
 
 @pytest.mark.asyncio
-async def test_evaluate_outcome_reports_progress_before_returning() -> None:
+async def test_evaluate_outcome_reports_progress_before_returning(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         result, events = await _collect_progress(
             client,
@@ -36,7 +37,9 @@ async def test_evaluate_outcome_reports_progress_before_returning() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_evidence_reports_progress_before_returning() -> None:
+async def test_add_evidence_reports_progress_before_returning(
+    mcp,
+) -> None:
     async with Client(mcp) as client:
         result, events = await _collect_progress(
             client,

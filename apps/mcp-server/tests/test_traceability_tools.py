@@ -7,8 +7,9 @@ from typing import Any
 
 import pytest
 from agentic_odi_core.models import V2MOM
-from agentic_odi_mcp_server import mcp, mcp_server
-from fastmcp import Client
+from agentic_odi_core.repository import InMemoryRepository
+from agentic_odi_core.services import ODIService
+from fastmcp import Client, FastMCP
 from mcp_failures import sentence
 
 _METHOD = "Cut time-to-first-value"
@@ -27,10 +28,10 @@ def _payload(result: Any) -> Any:
     return json.loads(text[start:])
 
 
-def _seed_vision() -> None:
+def _seed_vision(repository: InMemoryRepository) -> None:
     # The vision has no MCP write tool yet (#312 owns that surface), so the test
     # seeds it through the same service the tools read.
-    mcp_server.service.save_v2mom(V2MOM(vision="Make onboarding painless", methods=[_METHOD]))
+    ODIService(repository).save_v2mom(V2MOM(vision="Make onboarding painless", methods=[_METHOD]))
 
 
 async def _seed_outcome(client: Client) -> str:
@@ -55,8 +56,10 @@ async def _seed_outcome(client: Client) -> str:
 
 
 @pytest.mark.asyncio
-async def test_an_empty_vision_says_there_is_nothing_to_check() -> None:
-    mcp_server.service.repo.v2mom.clear()
+async def test_an_empty_vision_says_there_is_nothing_to_check(
+    mcp: FastMCP, repository: InMemoryRepository
+) -> None:
+    repository.v2mom.clear()
     async with Client(mcp) as client:
         report = _payload(await client.call_tool("get_traceability_report", {}))
 
@@ -65,8 +68,10 @@ async def test_an_empty_vision_says_there_is_nothing_to_check() -> None:
 
 
 @pytest.mark.asyncio
-async def test_linking_round_trips_and_the_report_counts_it() -> None:
-    _seed_vision()
+async def test_linking_round_trips_and_the_report_counts_it(
+    mcp: FastMCP, repository: InMemoryRepository
+) -> None:
+    _seed_vision(repository)
     async with Client(mcp) as client:
         outcome_id = await _seed_outcome(client)
         linked = _payload(
@@ -83,8 +88,10 @@ async def test_linking_round_trips_and_the_report_counts_it() -> None:
 
 
 @pytest.mark.asyncio
-async def test_linking_unknown_text_is_refused_and_names_what_exists() -> None:
-    _seed_vision()
+async def test_linking_unknown_text_is_refused_and_names_what_exists(
+    mcp: FastMCP, repository: InMemoryRepository
+) -> None:
+    _seed_vision(repository)
     async with Client(mcp) as client:
         outcome_id = await _seed_outcome(client)
         refused = _text(
@@ -100,8 +107,10 @@ async def test_linking_unknown_text_is_refused_and_names_what_exists() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unlinking_returns_the_outcome_to_an_orphan() -> None:
-    _seed_vision()
+async def test_unlinking_returns_the_outcome_to_an_orphan(
+    mcp: FastMCP, repository: InMemoryRepository
+) -> None:
+    _seed_vision(repository)
     async with Client(mcp) as client:
         outcome_id = await _seed_outcome(client)
         linked = _payload(
@@ -119,9 +128,9 @@ async def test_unlinking_returns_the_outcome_to_an_orphan() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_records_objectives_in_one_write() -> None:
+async def test_add_outcome_records_objectives_in_one_write(mcp, repository) -> None:
     """#590: the link travels with the outcome, not in a second call."""
-    _seed_vision()
+    _seed_vision(repository)
     async with Client(mcp) as client:
         job = _payload(await client.call_tool("add_job", {"name": "Onboard a new engineer"}))
         outcome = _payload(
@@ -150,8 +159,10 @@ async def test_add_outcome_records_objectives_in_one_write() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_outcome_refuses_an_unknown_objective_and_names_what_exists() -> None:
-    _seed_vision()
+async def test_add_outcome_refuses_an_unknown_objective_and_names_what_exists(
+    mcp, repository
+) -> None:
+    _seed_vision(repository)
     async with Client(mcp) as client:
         job = _payload(await client.call_tool("add_job", {"name": "Onboard a new engineer"}))
         refused = _text(
@@ -172,8 +183,8 @@ async def test_add_outcome_refuses_an_unknown_objective_and_names_what_exists() 
 
 
 @pytest.mark.asyncio
-async def test_update_outcome_replaces_the_objectives() -> None:
-    mcp_server.service.save_v2mom(
+async def test_update_outcome_replaces_the_objectives(mcp, repository) -> None:
+    ODIService(repository).save_v2mom(
         V2MOM(vision="Make onboarding painless", methods=[_METHOD], measures=[_MEASURE])
     )
     async with Client(mcp) as client:

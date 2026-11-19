@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 
 import pytest
-from agentic_odi_mcp_server import mcp
-from agentic_odi_mcp_server import mcp_server as server
 from fastmcp import Client
 
 
 @pytest.mark.asyncio
-async def test_get_health_reports_accessible_store():
+async def test_get_health_reports_accessible_store(
+    mcp,
+):
     async with Client(mcp) as client:
         res = await client.call_tool("get_health", {})
 
@@ -21,8 +21,8 @@ async def test_get_health_reports_accessible_store():
 
 
 @pytest.mark.asyncio
-async def test_get_health_reports_degraded_store(monkeypatch):
-    monkeypatch.setattr(server._repo, "health", lambda: False)
+async def test_get_health_reports_degraded_store(mcp, repository, monkeypatch):
+    monkeypatch.setattr(repository, "health", lambda: False)
 
     async with Client(mcp) as client:
         res = await client.call_tool("get_health", {})

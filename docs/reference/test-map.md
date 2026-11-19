@@ -76,6 +76,7 @@ isolation, and coverage rules stay in
 | `apps/mcp-server/tests/test_parity.py` | — |
 | `apps/mcp-server/tests/test_port_config.py` | The MCP server port must be overridable for dev and multi-instance runs. |
 | `apps/mcp-server/tests/test_segments.py` | Stage 5 and Stage 6 round-trip through the live MCP registry. |
+| `apps/mcp-server/tests/test_server_import.py` | The MCP server module must be inert to import (issue #461). |
 | `apps/mcp-server/tests/test_server_tools.py` | — |
 | `apps/mcp-server/tests/test_signals.py` | The three signal tools round-trip through the live MCP registry. |
 | `apps/mcp-server/tests/test_tool_branches.py` | Branch coverage for MCP tool prompts, errors, and full updates. |
