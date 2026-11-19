@@ -154,6 +154,17 @@ function securityHeaders(env: Env): Record<string, string> {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    // The hosted Studio is served over HTTPS only, and a first visit over a
+    // hostile network can be downgraded before the redirect lands. HSTS tells
+    // the browser to refuse plaintext for a year, including subdomains.
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    // Isolate the Studio from cross-origin windows and resources. No
+    // `Cross-Origin-Embedder-Policy`: the model-endpoint fetches allowed by
+    // `connect-src` and the blob/image handling in `img-src` require embedding
+    // external content, which `require-corp` would break. This absence is
+    // deliberate; do not "finish the job" by adding it.
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
   };
 }
 
