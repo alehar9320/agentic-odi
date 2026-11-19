@@ -316,3 +316,16 @@ async def test_update_outcome_reports_an_over_long_note() -> None:
     text = _text(result)
     assert failure(text).code.value == "out_of_range"
     assert sentence(text) == "Error: note must be 500 characters or fewer"
+
+
+@pytest.mark.asyncio
+async def test_add_interview_reports_a_missing_job_as_a_typed_failure() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "add_interview",
+            {"title": "Ana — onboarding", "participant_label": "Ana", "job_id": "missing"},
+        )
+
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"
