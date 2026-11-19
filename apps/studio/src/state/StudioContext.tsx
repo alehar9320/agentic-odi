@@ -85,7 +85,7 @@ import {
   type ProbeBreaker,
   type ProbeOutcome,
 } from "./probeBreaker";
-import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { clearSession, loadSession, saveSession, SESSION_SCHEMA_VERSION, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -650,6 +650,7 @@ function loadFocusedSubject(): FocusSubject | null {
 
 function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
   return {
+    schema_version: SESSION_SCHEMA_VERSION,
     job_id: kind === "job" ? id : null,
     step_id: kind === "step" ? id : null,
     outcome_id: kind === "outcome" ? id : null,

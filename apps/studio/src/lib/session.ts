@@ -5,11 +5,13 @@
  * evidence does not overwrite the stored context.
  */
 export interface StudioSession {
+  schema_version: number;
   job_id: string | null;
   step_id: string | null;
   outcome_id: string | null;
 }
 
+export const SESSION_SCHEMA_VERSION = 1;
 export const SESSION_KEY = "studio.session";
 
 function sessionStorage(): Storage | null {
@@ -51,7 +53,12 @@ export function loadSession(): StudioSession | null {
     return null;
   }
   const record = parsed as Record<string, unknown>;
+  if (record.schema_version !== SESSION_SCHEMA_VERSION) {
+    clearSession();
+    return null;
+  }
   return {
+    schema_version: SESSION_SCHEMA_VERSION,
     job_id: asId(record.job_id),
     step_id: asId(record.step_id),
     outcome_id: asId(record.outcome_id),
