@@ -1,5 +1,11 @@
 name: Label merge conflicts
 
+# Applies `merge-conflict` to a pull request that cannot merge, and
+# `ready-for-merge` to one that can. GitHub computes `mergeable` lazily and
+# reports `UNKNOWN` for a moment after every push, so the state is polled until
+# it settles; reading it once labelled nothing, which is why the label had never
+# been applied to a single pull request.
+
 on:
   pull_request:
     branches: [main]
@@ -9,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   issues: write # gh label create lives under the issues API
 
@@ -22,6 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # A write-permission workflow must not run pull request code. Checking out
+      # the base ref (and not persisting credentials, which `gh` does not use)
+      # keeps the checkout to the tree the labels describe.
+      - name: Checkout base branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
+          persist-credentials: false
+
       - name: Ensure labels exist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,8 +66,18 @@ jobs:
         run: |
           while IFS= read -r number; do
             [ -z "$number" ] && continue
-            state="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" \
-              --json mergeStateStatus -q '.mergeStateStatus')"
+
+            # GitHub reports UNKNOWN while it computes mergeability, which it
+            # does lazily after each push. Poll a bounded number of times rather
+            # than reading a state that is not yet decided.
+            state=""
+            for attempt in $(seq 1 10); do
+              state="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" \
+                --json mergeStateStatus -q '.mergeStateStatus')"
+              [ "$state" != "UNKNOWN" ] && break
+              sleep 6
+            done
+
             case "$state" in
               dirty)
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
@@ -66,7 +91,14 @@ jobs:
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
                   --remove-label merge-conflict >/dev/null || true
                 ;;
+              UNKNOWN)
+                # Still undecided after the retries: leave the labels as they
+                # are rather than assert a merge state nobody knows.
+                echo "::notice::PR #$number: merge state still UNKNOWN; leaving labels unchanged"
+                ;;
               *)
+                # behind, blocked, unstable, has_hooks, draft: not a conflict,
+                # so clear the conflict label without claiming the PR is ready.
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \
                   --remove-label merge-conflict >/dev/null || true
                 gh pr edit "$number" --repo "$GITHUB_REPOSITORY" \

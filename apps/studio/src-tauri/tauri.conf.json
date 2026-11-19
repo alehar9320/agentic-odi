@@ -15,7 +15,7 @@
         "label": "main",
         "title": "Living Studio",
         "width": 1100,
-        "height": 760,
+        "height": 700,
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true
