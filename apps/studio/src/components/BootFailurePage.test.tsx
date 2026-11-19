@@ -8,7 +8,7 @@ const STORE_CORRUPT: StudioError = {
   code: "store_corrupt",
   message:
     "Your database failed its integrity check: /home/me/.agentic-odi/odi.db. " +
-    "Last backup: 06:14 (odi-20260102T061400Z.db). The file has been left untouched " +
+    "Last backup: 06:14 local (odi-20260102T061400Z.db). The file has been left untouched " +
     "— restore a backup before opening it again.",
   detail: "database disk image is malformed",
   suggestion:
@@ -24,7 +24,7 @@ describe("BootFailurePage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Your database failed its integrity check: /home/me/.agentic-odi/odi.db",
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14");
+    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14 local");
   });
 
   it("shows the suggestion and keeps the check detail behind a disclosure", () => {

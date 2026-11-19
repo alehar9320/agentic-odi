@@ -218,6 +218,7 @@ describe("StudioBar", () => {
   });
 
   it("exports the conversation as Markdown from the overflow menu", () => {
+    vi.useFakeTimers();
     const createObjectURL = vi.fn(() => "blob:conversation");
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, "createObjectURL", {
@@ -245,8 +246,10 @@ describe("StudioBar", () => {
 
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(0);
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:conversation");
     click.mockRestore();
+    vi.useRealTimers();
   });
 
   it("puts the unread count in the bell's accessible name and opens the inbox", () => {

@@ -64,9 +64,11 @@ from agentic_odi_studio_api.studio.memory import (
 )
 from agentic_odi_studio_api.studio.probes import (
     defaults,
+    invalidate_probe_cache,
     is_endpoint_reachable,
     list_models,
     probe_llm_health,
+    save_profile,
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddAlternativeRequest,
@@ -108,6 +110,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
     RejectProposalRequest,
+    SaveConfigRequest,
     ScheduleWorkRequest,
     SharedArtifactResponse,
     ShareMintResponse,
@@ -256,6 +259,29 @@ def _approvals(request: Request) -> ApprovalRegistry:
 @router.get("/config")
 def get_config() -> dict:
     return {"defaults": defaults()}
+
+
+@router.post("/config")
+def save_config(body: SaveConfigRequest) -> dict:
+    """Persist LLM connection settings and invalidate the probe cache.
+
+    The probe cache is keyed on (endpoint, model, key_hash), so a credential
+    rotation naturally misses the cache. This endpoint additionally clears the
+    cache for base_url or model_name changes, which do not include the key.
+    """
+    merged = save_profile(
+        {
+            "base_url": body.base_url,
+            "api_key": body.api_key,
+            "model": body.model_name,
+            "mcp_url": body.mcp_url,
+        }
+    )
+
+    # Invalidate the probe cache so subsequent probes see the new settings
+    invalidate_probe_cache()
+
+    return {"ok": True, "saved": merged}
 
 
 @router.get("/diagnostics")

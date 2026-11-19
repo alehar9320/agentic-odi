@@ -131,6 +131,15 @@ describe("scoreMismatch", () => {
     expect(scoreMismatch(12.4, 8.6, 4.9)).toBe(true);
   });
 
+  it("agrees at half a twentieth and disagrees just beyond it", () => {
+    // 5 / 5 produce 5 exactly, so there is no floating-point noise in the
+    // recomputed score. Half a twentieth (0.05) is still a rounding difference;
+    // anything past it is a real disagreement.
+    expect(scoreMismatch(5.05, 5, 5)).toBe(false);
+    expect(scoreMismatch(5.049, 5, 5)).toBe(false);
+    expect(scoreMismatch(5.051, 5, 5)).toBe(true);
+  });
+
   it("never mismatches an unscored outcome", () => {
     expect(scoreMismatch(null, 8.6, 4.9)).toBe(false);
     expect(scoreMismatch(undefined, 8.6, 4.9)).toBe(false);
