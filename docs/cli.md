@@ -1,3 +1,11 @@
+---
+title: CLI Reference
+blurb: Backends, chat, entities, and scoring.
+nav_group: Build
+nav_order: 1
+slug: cli
+---
+
 # CLI Reference
 
 The `agentic-odi` CLI is a [`Typer`](https://github.com/fastapi/typer)-based
@@ -40,14 +48,16 @@ machine-readable output. Diagnostics go to stderr and failures exit non-zero
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. Invalid or non-positive values fall back to the default. |
+| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. A value that is not a number greater than zero fails the command. |
 | `AGENTIC_ODI_MCP_KEEPALIVE` | `15.0` | Keepalive interval in seconds for MCP sessions; `0` disables keepalive. |
 
 Both values are parsed by `agentic_odi_core.MCPConnectionConfig.from_env()`.
 The CLI hands the timeout to the FastMCP client for every call, so a frozen
 server fails with a clear error instead of hanging. FastMCP has no
 keepalive-interval setting yet, so the interval is carried for transports that
-support session keepalive.
+support session keepalive. A malformed value stops the command with one line
+naming the variable and the form it accepts; the full register is
+[Configuration](reference/configuration.md).
 
 ## Interactive chat
 
@@ -400,6 +410,19 @@ record is the same `model_dump()` shape the MCP tools return, so each entry can
 be re-validated with the corresponding core Pydantic model. The default
 filename carries a UTC ISO 8601 timestamp (`YYYYMMDDTHHMMSSZ`).
 
+## Inspect the data files
+
+```bash
+agentic-odi data path                 # both resolved paths
+agentic-odi data path --json          # machine-readable JSON
+```
+
+`data path` prints the exact files the *current* configuration uses — the
+`AGENTIC_ODI_DB` and `AGENTIC_ODI_STUDIO_DB` environment overrides included —
+so a person can find the two local SQLite files without guessing
+platform-specific defaults. It never opens a database, prints credentials, or
+creates files: a missing parent directory shows up as a resolved path, nothing
+more.
 
 ## Inspect settings and feature flags
 
@@ -421,12 +444,17 @@ gates raw MCP trace debugging.
 agentic-odi profile show
 agentic-odi profile show --json
 agentic-odi profile set --product-name "My Product" --domain "acme.test"
+agentic-odi profile set --clear core_problem --clear current_focus
 agentic-odi profile path
 agentic-odi setup       # interactive baseline wizard
 ```
 
 `profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+Unset fields render as `—` and explicitly empty strings as `(empty)`.
 `profile set` updates any subset of baseline fields with explicit options.
+Use `--clear <field>` (repeatable) to unset `product_name`, `domain`,
+`primary_user`, `business_model`, `core_problem`, or `current_focus`; an
+unknown name exits 2, and clear is applied after set options in the same call.
 `profile path` prints the baseline file path. `setup` runs the interactive
 baseline wizard.
 

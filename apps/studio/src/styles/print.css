@@ -81,6 +81,7 @@
   .md,
   .md-heading,
   .md-list,
+  .md-table,
   .tool-doc__purpose,
   .card__statement,
   .ui-heading {
@@ -99,7 +100,8 @@
 
   .md-code,
   .ui-code,
-  .md-pre {
+  .md-pre,
+  .md-table__cell {
     border: 1px solid #ccc;
     background: #f4f4f5;
     color: #111;

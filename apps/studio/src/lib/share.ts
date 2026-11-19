@@ -52,15 +52,28 @@ export function isShareExpired(expiresAt: string, now: number = Date.now()): boo
 /**
  * The expiry line the header carries, or `null` when the link has expired (the
  * page says so in its own sentence) or the timestamp will not parse.
+ *
+ * The ladder is honest at every boundary: a link that dies in five minutes and
+ * one that dies in twenty-three hours used to read the same "expires today",
+ * which told a recipient the link was fine for the day when it was nearly dead.
  */
 export function formatShareExpiry(expiresAt: string, now: number = Date.now()): string | null {
   const at = parsedTime(expiresAt);
   if (at === null || at <= now) {
     return null;
   }
-  const days = Math.floor((at - now) / (24 * 60 * 60 * 1000));
-  if (days < 1) {
-    return "expires today";
+  const ms = at - now;
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) {
+    return "expires in under a minute";
   }
+  if (minutes < 60) {
+    return `expires in ${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 24) {
+    return `expires in ${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  const days = Math.floor(ms / 86_400_000);
   return `expires in ${days} day${days === 1 ? "" : "s"}`;
 }

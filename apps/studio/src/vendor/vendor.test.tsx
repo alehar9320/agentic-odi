@@ -18,7 +18,14 @@ describe("vendor tailwind scope", () => {
   });
 
   it("does not generate utilities that only product code uses", () => {
-    expect(vendorCss).not.toContain(".sr-only");
+    // `.sr-only` is the exception: the copied sheet renders its close button
+    // with it, so Tailwind emits it and it matches the product rule of the same
+    // name in theme.css. Every other product class stays out.
+    expect(vendorCss).not.toContain(".lens");
+  });
+
+  it("emits the visually-hidden utility the copied sheet relies on", () => {
+    expect(vendorCss).toContain(".sr-only");
   });
 
   it("leaves the preflight reset out of the product document", () => {

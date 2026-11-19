@@ -107,6 +107,13 @@ RENDERERS: Final[tuple[Renderer, ...]] = (
         "emits-html",
         "ALH-238",
     ),
+    Renderer(
+        "dashboard lens",
+        "apps/studio/src/components/canvas/Dashboard.tsx",
+        "typescript",
+        "emits-html",
+        "ALH-238",
+    ),
     # Asked for by the issue, not built by anything. ALH-252 gives them a renderer.
     Renderer("memo", "", "typescript", "absent", "ALH-252"),
     Renderer("one-pager", "", "typescript", "absent", "ALH-252"),

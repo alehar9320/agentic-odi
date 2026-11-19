@@ -1,5 +1,5 @@
-import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
@@ -22,10 +22,45 @@ export default defineConfig({
     },
   },
   clearScreen: false,
-  // Settings → About reports which build is running; the release workflow's
-  // date is baked in at build time. Applies to vitest transforms too.
+  build: {
+    // Emit `dist/.vite/manifest.json` so the budget script measures the entry
+    // chunk by role rather than by a hashed file name (#529).
+    manifest: true,
+    // The entry chunk is the cold-start budget (#529). Split the heavy vendor
+    // libraries out of it so the shell and the current view are not shipped
+    // behind the assistant runtime, the markdown renderer, or the Tauri API.
+    // `scripts/check_bundle_budget.mjs` ratchets the recorded entry size.
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            // The conversation runtime and its markdown renderer.
+            {
+              name: "assistant",
+              test: /[\\/]node_modules[\\/](@assistant-ui|@radix-ui|remark|rehype|unified|micromark|mdast-util|hast-util|unist-util)[\\/]/,
+            },
+            // The desktop shell's API and updater.
+            { name: "tauri", test: /[\\/]node_modules[\\/]@tauri-apps[\\/]/ },
+            // Everything else that came from node_modules.
+            { name: "vendor", test: /[\\/]node_modules[\\/]/ },
+          ],
+        },
+      },
+    },
+    // The entry chunk is bounded by the budget script, not this warning.
+    chunkSizeWarningLimit: 700,
+  },
+  // Settings → About reports which build is running. The version is
+  // `__STUDIO_VERSION__` from package.json (see src/lib/version.ts), the date is
+  // baked in at build time, and the commit is the CI-provided sha ("dev" in a
+  // source checkout). Applies to vitest transforms too.
   define: {
-    __STUDIO_BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+    __STUDIO_BUILD_DATE__: JSON.stringify(
+      process.env.STUDIO_BUILD_DATE ?? new Date().toISOString().slice(0, 10),
+    ),
+    __STUDIO_BUILD_COMMIT__: JSON.stringify(
+      process.env.STUDIO_BUILD_COMMIT ?? process.env.GITHUB_SHA ?? "dev",
+    ),
     __STUDIO_VERSION__: JSON.stringify(studioPackage.version),
   },
   server: {

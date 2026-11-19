@@ -274,4 +274,55 @@ describe("LocalMemoryService conversations", () => {
     expect(listed[0].id).toBe("c-24");
     expect(listed.map((item) => item.id)).not.toContain("c-4");
   });
+
+  it("renames a thread, trimming and capping the name", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("Old name");
+
+    const renamed = await memory.renameConversation(conv.id, "  Retention work  ");
+
+    expect(renamed.title).toBe("Retention work");
+    expect((await memory.getConversation(conv.id))?.title).toBe("Retention work");
+
+    // The sidecar caps a title at 200 characters; the local path matches it.
+    await memory.renameConversation(conv.id, "x".repeat(250));
+    expect((await memory.getConversation(conv.id))?.title).toHaveLength(200);
+  });
+
+  it("refuses an empty rename and reports an unknown thread", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const conv = await memory.createConversation("Keep me");
+
+    await expect(memory.renameConversation(conv.id, "   ")).rejects.toMatchObject({
+      studioError: { code: "validation" },
+    });
+    expect((await memory.getConversation(conv.id))?.title).toBe("Keep me");
+
+    await expect(memory.renameConversation("missing", "New")).rejects.toMatchObject({
+      studioError: { code: "not_found" },
+    });
+  });
+
+  it("deletes a thread and its turns, and reports an unknown one", async () => {
+    const store = makeStore();
+    const memory = new LocalMemoryService(store);
+    const kept = await memory.createConversation("Keep me");
+    const doomed = await memory.createConversation("Delete me");
+    await memory.appendTurn(doomed.id, "user", "hello", "m-1", null);
+    await memory.appendTurn(doomed.id, "assistant", "hi", "m-2", "m-1");
+
+    await expect(memory.deleteConversation(doomed.id)).resolves.toEqual({ ok: true });
+
+    expect(await memory.getConversation(doomed.id)).toBeUndefined();
+    expect((await memory.listConversations()).map((item) => item.id)).toEqual([kept.id]);
+    await expect(memory.conversationTree(doomed.id)).rejects.toThrow(/not found/i);
+    // The kept thread is untouched: deleting one thread is not clearing the store.
+    expect(await memory.getConversation(kept.id)).toBeDefined();
+
+    await expect(memory.deleteConversation("missing")).rejects.toMatchObject({
+      studioError: { code: "not_found" },
+    });
+  });
 });

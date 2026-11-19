@@ -15,6 +15,7 @@ from agentic_odi_cli.backend import (
     mcp_timeout,
     resolve_backend,
 )
+from agentic_odi_core.errors import ConfigurationError
 
 CUSTOMER_VALUE = {
     "direction": "minimize",
@@ -205,7 +206,8 @@ def test_mcp_timeout_reads_env(monkeypatch):
     monkeypatch.setenv("AGENTIC_ODI_MCP_TIMEOUT", "5.5")
     assert mcp_timeout() == 5.5
     monkeypatch.setenv("AGENTIC_ODI_MCP_TIMEOUT", "nonsense")
-    assert mcp_timeout() == 30.0
+    with pytest.raises(ConfigurationError, match="AGENTIC_ODI_MCP_TIMEOUT"):
+        mcp_timeout()
 
 
 def test_mcp_calls_bound_the_client_with_the_configured_timeout(monkeypatch):

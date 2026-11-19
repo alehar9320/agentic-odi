@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, TypeVar
@@ -55,6 +56,7 @@ from agentic_odi_core.models import (
     Study,
     StudyStatus,
     compute_opportunity_score,
+    confidence_weighted_inputs,
 )
 from agentic_odi_core.repository import (
     Repository,
@@ -458,11 +460,13 @@ class ODIService:
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
             raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         require_outcome_statement(statement)
+        updates = dict(updates)
+        trace = self._resolve_objective_links(updates.pop("objectives", None))
+        if trace is not None:
+            updates["trace"] = trace
         if importance is not None and satisfaction is not None:
-            updates = dict(updates)
             updates["opportunity_score"] = compute_opportunity_score(importance, satisfaction)
         else:
-            updates = dict(updates)
             updates["opportunity_score"] = None
         res = self.repo.update_outcome(outcome_id, updates)
         if not res:
@@ -587,6 +591,7 @@ class ODIService:
         step_id: str | None = None,
         validate_statement: bool = True,
         claim_check: ClaimCheck | dict[str, Any] | None = None,
+        objectives: Sequence[Mapping[str, str]] | None = None,
     ) -> Outcome:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
@@ -601,6 +606,7 @@ class ODIService:
             if not verdict["valid"]:
                 raise InvalidOutcomeStatementError(verdict)
         check = require_claim_check(claim_check)
+        trace = self._resolve_objective_links(objectives) or []
         #: Unscored outcomes stay legal: a score is optional, and an outcome
         #: without one carries no opportunity_score to stand behind.
         if importance is not None and satisfaction is not None:
@@ -615,6 +621,7 @@ class ODIService:
             importance=importance,
             satisfaction=satisfaction,
             opportunity_score=opportunity_score,
+            trace=trace,
             claim_check=check,
         )
         created = self.repo.add_outcome(outcome)
@@ -764,6 +771,8 @@ class ODIService:
         job_id: str | None = None,
         step_id: str | None = None,
         outcome_id: str | None = None,
+        impact: str = "medium",
+        confidence: str = "claimed",
     ) -> Evidence:
         resolved_job_id = job_id
         if step_id is not None:
@@ -798,6 +807,8 @@ class ODIService:
             job_id=resolved_job_id,
             step_id=step_id,
             outcome_id=outcome_id,
+            impact=impact,
+            confidence=confidence,
         )
         #: Dedupe: the same quote imported twice must not become two evidence
         #: records. Return the existing record instead of appending.
@@ -1013,11 +1024,17 @@ class ODIService:
                 raise ValidationError(
                     "Promoting evidence to an outcome requires both importance and satisfaction scores."
                 )
+            #: A quote is only as strong as its confidence: the inputs are
+            #: discounted before the shared scorer runs, so a claimed quote
+            #: cannot outrank a verified one on identical raw inputs.
+            weighted_importance, weighted_satisfaction = confidence_weighted_inputs(
+                importance, satisfaction, evidence.confidence
+            )
             outcome = self.add_outcome(
                 target_job_id,
                 text,
-                importance=importance,
-                satisfaction=satisfaction,
+                importance=weighted_importance,
+                satisfaction=weighted_satisfaction,
                 step_id=evidence.step_id,
             )
             #: Record the bidirectional link: evidence → outcome.
@@ -1167,6 +1184,15 @@ class ODIService:
 
         if proposal.job_id is None:
             raise ValidationError(f"Proposal {proposal_id} has no routed job; cannot approve.")
+
+        #: A proposal is mined from one evidence record. If that record is still
+        #: stored, its confidence discounts the inputs before the shared scorer
+        #: runs — the same rule as a direct promotion.
+        source = self.repo.get_evidence(proposal.evidence_id)
+        if source is not None:
+            final_importance, final_satisfaction = confidence_weighted_inputs(
+                final_importance, final_satisfaction, source.confidence
+            )
 
         outcome = self.add_outcome(
             proposal.job_id,
@@ -1530,6 +1556,34 @@ class ODIService:
         says so rather than returning three empty sections.
         """
         return compute_traceability_report(self.repo.get_v2mom(), list(self.repo.outcomes.values()))
+
+    def _resolve_objective_links(
+        self, objectives: Sequence[Mapping[str, str]] | None
+    ) -> list[dict[str, str]] | None:
+        """Resolve a list of ``{field, text}`` links against the stored vision.
+
+        Every entry must name a method or measure the vision holds *now*; an
+        unknown one is a validation error naming the entries that do exist,
+        never a fuzzy match. ``None`` means "leave the links untouched"; an
+        empty list means "this outcome advances nothing", which is legal and
+        reported as an orphan rather than refused.
+        """
+        if objectives is None:
+            return None
+        resolved: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for entry in objectives:
+            field = str(entry["field"])
+            objective = self._resolve_objective(field, str(entry["text"]))
+            if (objective.field, objective.key) in seen:
+                continue
+            seen.add((objective.field, objective.key))
+            resolved.append(
+                OutcomeAlignment(field=field, key=objective.key, text=objective.text).model_dump(
+                    mode="json"
+                )
+            )
+        return resolved
 
     def _resolve_objective(self, field: str, text: str) -> Objective:
         """Find the current objective named by ``text``, or refuse.

@@ -72,6 +72,7 @@ def test_connectors_add_mcp_then_list(tmp_path: Path) -> None:
 
 
 def test_connectors_add_mcp_with_session_header(tmp_path: Path) -> None:
+    """The Composio session-scoped recipe registers a header with a ${VAR} placeholder."""
     config = tmp_path / "connectors.json"
     result = runner.invoke(
         app,
@@ -95,6 +96,29 @@ def test_connectors_add_mcp_with_session_header(tmp_path: Path) -> None:
     assert settings["headers"] == {"x-api-key": "${COMPOSIO_API_KEY}"}
     assert settings["env_vars"] == ["COMPOSIO_API_KEY"]
     assert "COMPOSIO_API_KEY" in _strip(result.output)
+
+
+def test_connectors_add_mcp_rejects_bad_header(tmp_path: Path) -> None:
+    config = tmp_path / "connectors.json"
+    result = runner.invoke(
+        app,
+        [
+            "connectors",
+            "add",
+            "mcp",
+            "--name",
+            "composio-session",
+            "--url",
+            "https://mcp.composio.dev/session/abc123/mcp",
+            "--header",
+            "broken",
+            "--config",
+            str(config),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "KEY=VALUE" in _strip(result.output)
 
 
 def test_connectors_add_rejects_duplicate(tmp_path: Path) -> None:
