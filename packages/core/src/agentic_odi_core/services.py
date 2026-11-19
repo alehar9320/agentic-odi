@@ -32,16 +32,20 @@ from agentic_odi_core.models import (
     JOB_STAGE_ORDER,
     V2MOM,
     BusinessValue,
+    CandidateStatus,
     ClaimCheck,
     ClaimSkip,
     CustomerOutcome,
     CustomerValue,
     Evidence,
     EvidenceItemType,
+    Interview,
+    InterviewQuote,
     Job,
     JobStage,
     Outcome,
     OutcomeAlignment,
+    OutcomeCandidate,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,
@@ -67,6 +71,7 @@ from agentic_odi_core.segmentation import (
     SegmentationStrategy,
     unclustered_outcomes,
 )
+from agentic_odi_core.similarity import normalize
 from agentic_odi_core.strategy import propose_strategy as build_strategy
 from agentic_odi_core.traceability import (
     Objective,
@@ -137,15 +142,7 @@ class EvidenceNotFoundError(NotFoundError, ValueError):
 
 
 class ValueOutOfRangeError(ValidationError):
-    """A score fell outside the ODI range (1.0–10.0).
-
-    ``field`` names the field that was rejected, so the caller can show the
-    message next to it instead of on top of the whole form.
-    """
-
-    def __init__(self, message: str = "Value out of range.", field: str | None = None) -> None:
-        self.field = field
-        super().__init__(message)
+    pass
 
 
 class SignalNotFoundError(NotFoundError):
@@ -214,6 +211,24 @@ class SignalBudget:
         if _SEVERITY_RANK[severity] < _SEVERITY_RANK[self.min_severity]:
             return False
         return surfaced_today < self.daily_cap
+
+
+class InterviewNotFoundError(NotFoundError):
+    def __init__(self, interview_id: str) -> None:
+        self.interview_id = interview_id
+        super().__init__(interview_id, "interview")
+
+
+class QuoteNotFoundError(NotFoundError):
+    def __init__(self, quote_id: str) -> None:
+        self.quote_id = quote_id
+        super().__init__(quote_id, "quote")
+
+
+class CandidateNotFoundError(NotFoundError):
+    def __init__(self, candidate_id: str) -> None:
+        self.candidate_id = candidate_id
+        super().__init__(candidate_id, "outcome candidate")
 
 
 class InvalidOutcomeStatementError(OutcomeStatementError):
@@ -456,13 +471,9 @@ class ODIService:
         importance = updates.get("importance", existing.importance)
         satisfaction = updates.get("satisfaction", existing.satisfaction)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError(
-                "importance must be between 1.0 and 10.0", field="importance"
-            )
+            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError(
-                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
-            )
+            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         require_outcome_statement(statement)
         updates = dict(updates)
         trace = self._resolve_objective_links(updates.pop("objectives", None))
@@ -556,9 +567,7 @@ class ODIService:
         if self.repo.get_job(job_id) is None:
             raise JobNotFoundError(job_id)
         if not 1 <= order <= 8:
-            raise ValueOutOfRangeError(
-                "Step order must be between 1 and 8 (Ulwick's job map).", field="order"
-            )
+            raise ValueOutOfRangeError("Step order must be between 1 and 8 (Ulwick's job map).")
         existing_outcomes = self.repo.get_outcomes(job_id)
         existing_customer_outcomes = self.repo.list_customer_outcomes(job_id)
         if not existing_outcomes and not existing_customer_outcomes and not allow_empty_job_map:
@@ -604,13 +613,9 @@ class ODIService:
         if step_id is not None and self.repo.get_step(step_id) is None:
             raise StepNotFoundError(step_id)
         if importance is not None and not (1.0 <= importance <= 10.0):
-            raise ValueOutOfRangeError(
-                "importance must be between 1.0 and 10.0", field="importance"
-            )
+            raise ValueOutOfRangeError("importance must be between 1.0 and 10.0")
         if satisfaction is not None and not (1.0 <= satisfaction <= 10.0):
-            raise ValueOutOfRangeError(
-                "satisfaction must be between 1.0 and 10.0", field="satisfaction"
-            )
+            raise ValueOutOfRangeError("satisfaction must be between 1.0 and 10.0")
         if validate_statement:
             verdict = evaluate_outcome_statement(statement)
             if not verdict["valid"]:
@@ -863,6 +868,226 @@ class ODIService:
                 evidence_id,
                 "List the stored records with list_evidence() to find a valid id.",
             )
+
+    def add_interview(
+        self,
+        title: str,
+        participant_label: str,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "manual",
+        notes: str | None = None,
+    ) -> Interview:
+        if job_id is not None and self.repo.get_job(job_id) is None:
+            raise JobNotFoundError(job_id)
+        interview = Interview(
+            id=str(uuid.uuid4()),
+            job_id=job_id,
+            title=title,
+            participant_label=participant_label,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+            notes=notes,
+        )
+        return self.repo.add_interview(interview)
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.repo.get_interview(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        return self.repo.list_interviews(job_id, limit=limit, offset=offset)
+
+    def update_interview(self, interview_id: str, updates: dict[str, Any]) -> Interview:
+        res = self.repo.update_interview(interview_id, updates)
+        if not res:
+            raise InterviewNotFoundError(interview_id)
+        return res
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview; return the ids of the quotes removed with it."""
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        return self.repo.delete_interview(interview_id)
+
+    def add_quote(
+        self,
+        interview_id: str,
+        text: str,
+        speaker: str | None = None,
+        start_ms: int | None = None,
+        end_ms: int | None = None,
+    ) -> InterviewQuote:
+        """Append a quote to an interview.
+
+        The ordinal is assigned here as ``max(ordinal)+1`` within the
+        interview, so two quotes created in the same millisecond still have a
+        deterministic order. A missing interview is rejected before any event
+        is written.
+        """
+        if self.repo.get_interview(interview_id) is None:
+            raise InterviewNotFoundError(interview_id)
+        existing = self.repo.list_quotes(interview_id)
+        next_ordinal = (existing[-1].ordinal + 1) if existing else 0
+        quote = InterviewQuote(
+            id=str(uuid.uuid4()),
+            interview_id=interview_id,
+            speaker=speaker,
+            text=text,
+            ordinal=next_ordinal,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        )
+        return self.repo.add_quote(quote)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        return self.repo.list_quotes(interview_id)
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.repo.get_quote(quote_id)
+
+    def import_transcript(
+        self,
+        text: str,
+        *,
+        title: str,
+        participant_label: str,
+        filename: str | None = None,
+        fmt: str | None = None,
+        job_id: str | None = None,
+        participant_role: str | None = None,
+        conducted_at: str | None = None,
+        source_kind: str = "transcript",
+    ) -> tuple[Interview, list[InterviewQuote]]:
+        """Parse a transcript, then persist it as one interview.
+
+        The parse is pure and runs first, so a malformed transcript raises
+        before any interview or quote is written — there is no partial state.
+        """
+        from agentic_odi_core.transcript import detect_format, parse_transcript
+
+        resolved = fmt or detect_format(text, filename)
+        turns = parse_transcript(text, resolved)
+        interview = self.add_interview(
+            title=title,
+            participant_label=participant_label,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+        )
+        quotes = [
+            self.add_quote(
+                interview.id,
+                turn.text,
+                speaker=turn.speaker,
+                start_ms=turn.start_ms,
+                end_ms=turn.end_ms,
+            )
+            for turn in turns
+        ]
+        return interview, quotes
+
+    def extract_candidates(
+        self,
+        quote_id: str,
+        extractor: Any,
+        stage_hint: str | None = None,
+    ) -> list[OutcomeCandidate]:
+        """Propose candidates from one quote, storing each proposal once.
+
+        Every proposal is validated with :func:`evaluate_outcome_statement`. An
+        invalid one is stored as ``rejected`` with the validator's message in
+        ``rationale`` — the evidence that the extractor is wrong is kept, not
+        hidden. Candidates are keyed on ``(quote_id, normalised_statement)`` so
+        re-running extraction adds nothing and never resets a human decision.
+        No :class:`Outcome` is created here; only a person accepts a candidate.
+        """
+        quote = self.repo.get_quote(quote_id)
+        if quote is None:
+            raise QuoteNotFoundError(quote_id)
+        interview = self.repo.get_interview(quote.interview_id)
+        if interview is None:
+            raise InterviewNotFoundError(quote.interview_id)
+
+        existing = self._candidates_by_key(quote_id)
+        # Validate every proposal before the first write: a malformed payload or
+        # an out-of-range confidence must not leave a partly-written quote.
+        proposals = list(extractor.propose(quote, interview, stage_hint))
+        planned: list[tuple[str, OutcomeCandidate]] = []
+        for proposal in proposals:
+            statement = getattr(proposal, "statement", None)
+            if not isinstance(statement, str):
+                raise ValidationError(
+                    f"extractor returned a proposal without a statement: {proposal!r}"
+                )
+            key = normalize(statement)
+            if key in existing:
+                continue
+            verdict = evaluate_outcome_statement(statement)
+            if verdict["valid"]:
+                status = CandidateStatus.PROPOSED
+                rationale = proposal.rationale
+            else:
+                status = CandidateStatus.REJECTED
+                rationale = " ".join(verdict["issues"])
+            planned.append(
+                (
+                    key,
+                    OutcomeCandidate(
+                        id=str(uuid.uuid4()),
+                        interview_id=interview.id,
+                        quote_id=quote_id,
+                        statement=statement,
+                        rationale=rationale,
+                        confidence=proposal.confidence,
+                        status=status,
+                    ),
+                )
+            )
+            # Collapse repeated statements within this same batch.
+            existing.add(key)
+
+        created: list[OutcomeCandidate] = []
+        for _, candidate in planned:
+            created.append(self.repo.add_outcome_candidate(candidate))
+        return created
+
+    def _candidates_by_key(self, quote_id: str) -> set[str]:
+        """The normalised statements already stored for a quote."""
+        return {
+            normalize(c.statement)
+            for c in self.repo.list_outcome_candidates()
+            if c.quote_id == quote_id
+        }
+
+    def get_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.repo.get_outcome_candidate(candidate_id)
+
+    def list_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        return self.repo.list_outcome_candidates(interview_id, status, limit=limit, offset=offset)
+
+    def update_candidate(self, candidate_id: str, updates: dict[str, Any]) -> OutcomeCandidate:
+        candidate = self.repo.update_outcome_candidate(candidate_id, updates)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        return candidate
+
+    def delete_candidate(self, candidate_id: str) -> None:
+        if not self.repo.delete_outcome_candidate(candidate_id):
+            raise CandidateNotFoundError(candidate_id)
 
     def promote_evidence(
         self,

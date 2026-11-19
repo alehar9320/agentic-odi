@@ -13,11 +13,15 @@ from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
     V2MOM,
     CandidateSolution,
+    CandidateStatus,
     CustomerOutcome,
     Evidence,
+    Interview,
+    InterviewQuote,
     Job,
     Link,
     Outcome,
+    OutcomeCandidate,
     ScheduledWork,
     Segment,
     Signal,
@@ -184,6 +188,9 @@ class Repository(Protocol):
     candidates: dict[str, CandidateSolution]
     v2mom: dict[str, V2MOM]
     studies: dict[str, Study]
+    interviews: dict[str, Interview]
+    quotes: dict[str, InterviewQuote]
+    outcome_candidates: dict[str, OutcomeCandidate]
     links: dict[str, Link]
 
     def add_job(self, job: Job) -> Job: ...
@@ -280,6 +287,19 @@ class Repository(Protocol):
     def get_strategy(self, strategy_id: str) -> Strategy | None: ...
     def list_strategies(self, segment_id: str | None = None) -> list[Strategy]: ...
     def update_strategy(self, strategy_id: str, updates: dict) -> Strategy | None: ...
+    def add_interview(self, interview: Interview) -> Interview: ...
+    def get_interview(self, interview_id: str) -> Interview | None: ...
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]: ...
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None: ...
+    def delete_interview(self, interview_id: str) -> list[str]: ...
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote: ...
+    def get_quote(self, quote_id: str) -> InterviewQuote | None: ...
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]: ...
     def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution: ...
     def get_candidate(self, candidate_id: str) -> CandidateSolution | None: ...
     def list_candidates(self) -> list[CandidateSolution]: ...
@@ -291,10 +311,23 @@ class Repository(Protocol):
     def add_v2mom(self, v2mom: V2MOM) -> V2MOM: ...
     def get_v2mom(self) -> V2MOM | None: ...
 
+    def add_outcome_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate: ...
+    def get_outcome_candidate(self, candidate_id: str) -> OutcomeCandidate | None: ...
+    def list_outcome_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]: ...
+    def update_outcome_candidate(
+        self, candidate_id: str, updates: dict
+    ) -> OutcomeCandidate | None: ...
+    def delete_outcome_candidate(self, candidate_id: str) -> bool: ...
+
     def last_event_id(self) -> int: ...
 
     def last_input_event_id(self) -> int: ...
-
     def clear(self) -> None: ...
     def reload(self) -> None: ...
     def commit(self) -> None: ...
@@ -319,10 +352,14 @@ class InMemoryRepository:
         self.strategies: dict[str, Strategy] = {}
         #: Stage 6's candidates: proposed solutions linked to the outcomes they serve.
         self.candidates: dict[str, CandidateSolution] = {}
+        #: Quote-extracted candidates awaiting review, distinct from stage-6 solutions.
+        self.outcome_candidates: dict[str, OutcomeCandidate] = {}
         #: The store holds one vision; it is keyed by a fixed name rather than a
         #: generated id because a workspace has exactly one V2MOM.
         self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.interviews: dict[str, Interview] = {}
+        self.quotes: dict[str, InterviewQuote] = {}
         self.links: dict[str, Link] = {}
         self._last_event_id = 0
         self._last_input_event_id = 0
@@ -406,6 +443,14 @@ class InMemoryRepository:
                 current = ev.model_dump(exclude_unset=True)
                 current.update(updates)
                 self.evidence[key] = Evidence.model_validate(current)
+        for key in [k for k, v in self.interviews.items() if v.job_id == job_id]:
+            del self.interviews[key]
+            for quote_key in [q for q, v in self.quotes.items() if v.interview_id == key]:
+                del self.quotes[quote_key]
+            for candidate_key in [
+                c for c, v in self.outcome_candidates.items() if v.interview_id == key
+            ]:
+                del self.outcome_candidates[candidate_key]
         return True
 
     def add_step(self, step: Step) -> Step:
@@ -823,6 +868,64 @@ class InMemoryRepository:
         self.strategies[strategy_id] = new_strategy
         return new_strategy
 
+    def add_interview(self, interview: Interview) -> Interview:
+        self._append_event()
+        self.interviews[interview.id] = interview
+        return interview
+
+    def get_interview(self, interview_id: str) -> Interview | None:
+        return self.interviews.get(interview_id)
+
+    def list_interviews(
+        self,
+        job_id: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Interview]:
+        if job_id is None:
+            items = list(self.interviews.values())
+        else:
+            items = [i for i in self.interviews.values() if i.job_id == job_id]
+        return page(items, limit, offset)
+
+    def update_interview(self, interview_id: str, updates: dict) -> Interview | None:
+        interview = self.interviews.get(interview_id)
+        if not interview:
+            return None
+        self._append_event()
+        current = interview.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_interview = interview.model_validate(current)
+        self.interviews[interview_id] = new_interview
+        return new_interview
+
+    def delete_interview(self, interview_id: str) -> list[str]:
+        """Delete an interview and cascade its quotes; return the removed quote ids."""
+        if interview_id not in self.interviews:
+            return []
+        self._append_event()
+        del self.interviews[interview_id]
+        removed = [k for k, v in self.quotes.items() if v.interview_id == interview_id]
+        for quote_id in removed:
+            del self.quotes[quote_id]
+        for candidate_id in [
+            c for c, v in self.outcome_candidates.items() if v.interview_id == interview_id
+        ]:
+            del self.outcome_candidates[candidate_id]
+        return removed
+
+    def add_quote(self, quote: InterviewQuote) -> InterviewQuote:
+        self._append_event()
+        self.quotes[quote.id] = quote
+        return quote
+
+    def get_quote(self, quote_id: str) -> InterviewQuote | None:
+        return self.quotes.get(quote_id)
+
+    def list_quotes(self, interview_id: str) -> list[InterviewQuote]:
+        items = [q for q in self.quotes.values() if q.interview_id == interview_id]
+        return sorted(items, key=lambda q: q.ordinal)
+
     def add_candidate(self, candidate: CandidateSolution) -> CandidateSolution:
         self._append_event()
         self.candidates[candidate.id] = candidate
@@ -852,6 +955,45 @@ class InMemoryRepository:
     def get_v2mom(self) -> V2MOM | None:
         return next(iter(self.v2mom.values()), None)
 
+    def add_outcome_candidate(self, candidate: OutcomeCandidate) -> OutcomeCandidate:
+        self._append_event()
+        self.outcome_candidates[candidate.id] = candidate
+        return candidate
+
+    def get_outcome_candidate(self, candidate_id: str) -> OutcomeCandidate | None:
+        return self.outcome_candidates.get(candidate_id)
+
+    def list_outcome_candidates(
+        self,
+        interview_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[OutcomeCandidate]:
+        items = list(self.outcome_candidates.values())
+        if interview_id is not None:
+            items = [c for c in items if c.interview_id == interview_id]
+        if status is not None:
+            items = [c for c in items if c.status == status]
+        return page(items, limit, offset)
+
+    def update_outcome_candidate(self, candidate_id: str, updates: dict) -> OutcomeCandidate | None:
+        candidate = self.outcome_candidates.get(candidate_id)
+        if not candidate:
+            return None
+        current = candidate.model_dump(exclude_unset=True)
+        current.update(updates)
+        new_candidate = candidate.model_validate(current)
+        self._append_event()
+        self.outcome_candidates[candidate_id] = new_candidate
+        return new_candidate
+
+    def delete_outcome_candidate(self, candidate_id: str) -> bool:
+        if self.outcome_candidates.pop(candidate_id, None) is None:
+            return False
+        self._append_event()
+        return True
+
     def clear(self) -> None:
         #: The event-sourced store empties its log and restarts numbering, so the
         #: counter starts over with it.
@@ -866,6 +1008,11 @@ class InMemoryRepository:
         self.signals.clear()
         self.segments.clear()
         self.strategies.clear()
+        self.interviews.clear()
+        self.quotes.clear()
+        self.outcome_candidates.clear()
+        self.candidates.clear()
+
         self.candidates.clear()
         self.v2mom.clear()
         self.links.clear()

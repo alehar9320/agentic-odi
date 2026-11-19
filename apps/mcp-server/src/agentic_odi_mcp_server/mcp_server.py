@@ -19,10 +19,13 @@ from agentic_odi_core import (
     ODI_ASSISTANT_PROMPT,
     ODI_FRAMEWORK_GUIDELINES,
     TOOL_SPECS,
+    CandidateNotFoundError,
+    CandidateStatus,
     ClaimCheckError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
+    InterviewNotFoundError,
     InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
@@ -31,6 +34,7 @@ from agentic_odi_core import (
     OutcomeNotFoundError,
     OutcomeStatementError,
     ProposalStatus,
+    QuoteNotFoundError,
     ScheduledWorkNotFoundError,
     SignalNotFoundError,
     StepNotFoundError,
@@ -252,6 +256,20 @@ def _evidence_not_found(evidence_id: str, hint: str | None = None) -> str:
     return _fail(EvidenceNotFoundError(evidence_id, hint), message)
 
 
+def _interview_not_found(interview_id: str) -> str:
+    return _fail(
+        InterviewNotFoundError(interview_id), f"Error: Interview with ID {interview_id} not found."
+    )
+
+
+def _quote_not_found(quote_id: str) -> str:
+    return f"Error: Quote with ID {quote_id} not found."
+
+
+def _candidate_not_found(candidate_id: str) -> str:
+    return f"Error: Outcome candidate with ID {candidate_id} not found."
+
+
 @mcp.prompt
 def odi_assistant_prompt() -> str:
     return ODI_ASSISTANT_PROMPT
@@ -351,11 +369,10 @@ def add_outcome(
     """
     if service.get_job(job_id) is None:
         return _fail(JobNotFoundError(job_id), f"Error: Job with ID {job_id} not found.")
-    for score, name in ((importance, "importance"), (satisfaction, "satisfaction")):
+    for score in (importance, satisfaction):
         if score is not None and not (1.0 <= score <= 10.0):
             return _fail(
-                ValueOutOfRangeError(f"{name} must be between 1.0 and 10.0", field=name),
-                f"Error: {name} must be between 1.0 and 10.0",
+                ValueOutOfRangeError("importance and satisfaction must be between 1.0 and 10.0")
             )
     scored = importance is not None or satisfaction is not None
     if scored and claim_check is None:
@@ -693,7 +710,7 @@ async def add_evidence(
             confidence=confidence,
         )
     except JobNotFoundError:
-        return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
+        return job_not_found(job_id or "")
     except StepNotFoundError:
         return _step_not_found(step_id)
     except OutcomeNotFoundError:
@@ -737,6 +754,220 @@ def delete_evidence(evidence_id: str) -> str:
     except EvidenceNotFoundError as exc:
         return _evidence_not_found(evidence_id, exc.hint)
     return f"Evidence deleted successfully: {evidence_id}"
+
+
+@mcp.tool
+def add_interview(
+    title: str,
+    participant_label: str,
+    job_id: str | None = None,
+    participant_role: str | None = None,
+    conducted_at: str | None = None,
+    source_kind: str = "manual",
+    notes: str | None = None,
+) -> str:
+    """Record a research interview: who took part, when, and the job it informs.
+
+    ``participant_label`` is a free-text label such as ``"Ana"`` or
+    ``"Participant 3"`` — never a real name, email, or company.
+    """
+    try:
+        interview = service.add_interview(
+            title=title,
+            participant_label=participant_label,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+            source_kind=source_kind,
+            notes=notes,
+        )
+    except JobNotFoundError:
+        return _fail(JobNotFoundError(job_id or ""), job_not_found(job_id or ""))
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return f"Interview created successfully: {interview.model_dump_json()}"
+
+
+@mcp.tool
+def get_interview(interview_id: str) -> str:
+    interview = service.get_interview(interview_id)
+    if interview is None:
+        return _interview_not_found(interview_id)
+    return interview.model_dump_json()
+
+
+@mcp.tool
+def list_interviews(
+    job_id: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    """List interviews, optionally filtered by job, one page at a time."""
+    items = service.list_interviews(job_id=job_id, limit=limit, offset=offset)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def delete_interview(interview_id: str) -> str:
+    """Delete an interview and the quotes it recorded."""
+    try:
+        service.delete_interview(interview_id)
+    except InterviewNotFoundError:
+        return _interview_not_found(interview_id)
+    return f"Interview deleted successfully: {interview_id}"
+
+
+@mcp.tool
+def add_quote(
+    interview_id: str,
+    text: str,
+    speaker: str | None = None,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+) -> str:
+    """Append a verbatim quote to an interview; the service assigns its ordinal."""
+    try:
+        quote = service.add_quote(
+            interview_id=interview_id,
+            text=text,
+            speaker=speaker,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        )
+    except InterviewNotFoundError:
+        return _interview_not_found(interview_id)
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return f"Quote created successfully: {quote.model_dump_json()}"
+
+
+@mcp.tool
+def list_quotes(interview_id: str) -> str:
+    """List an interview's quotes in ordinal order."""
+    items = service.list_quotes(interview_id)
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def import_transcript(
+    text: str,
+    title: str,
+    participant_label: str,
+    filename: str | None = None,
+    format: str | None = None,
+    job_id: str | None = None,
+    participant_role: str | None = None,
+    conducted_at: str | None = None,
+) -> str:
+    """Parse a transcript and persist it as one interview with its quotes.
+
+    ``format`` is one of ``md``, ``txt``, ``vtt``, or ``srt``; omit it to detect
+    from ``filename`` and the content. A malformed transcript is refused before
+    anything is written, so a failure leaves no partial interview.
+    """
+    from agentic_odi_core.transcript import TranscriptFormatError
+
+    try:
+        interview, quotes = service.import_transcript(
+            text,
+            title=title,
+            participant_label=participant_label,
+            filename=filename,
+            fmt=format,
+            job_id=job_id,
+            participant_role=participant_role,
+            conducted_at=conducted_at,
+        )
+    except JobNotFoundError:
+        return job_not_found(job_id or "")
+    except (TranscriptFormatError, OdiError, ValueError) as exc:
+        return _fail(exc)
+    return json.dumps({"interview": interview.model_dump(), "quote_count": len(quotes)})
+
+
+@mcp.tool
+def extract_candidates(quote_id: str, stage_hint: str | None = None) -> str:
+    """Propose outcome candidates from one quote, storing each proposal once.
+
+    Valid proposals are stored ``proposed``; a proposal that fails the ODI
+    statement check is stored ``rejected`` with the validator's reason, so the
+    evidence that the extractor is wrong is kept. No Outcome is created.
+    """
+    from agentic_odi_core.extraction import FixtureExtractor
+
+    try:
+        candidates = service.extract_candidates(quote_id, FixtureExtractor(), stage_hint)
+    except QuoteNotFoundError:
+        return _quote_not_found(quote_id)
+    except InterviewNotFoundError as exc:
+        return _interview_not_found(exc.interview_id)
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return json.dumps([candidate.model_dump() for candidate in candidates])
+
+
+@mcp.tool
+def list_candidates(
+    interview_id: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    """List outcome candidates, optionally filtered by interview or status."""
+    try:
+        resolved = CandidateStatus(status) if status is not None else None
+    except ValueError:
+        return _fail(ValueError(f"unknown candidate status: {status}"))
+    items = service.list_candidates(
+        interview_id=interview_id, status=resolved, limit=limit, offset=offset
+    )
+    return json.dumps([item.model_dump() for item in items])
+
+
+@mcp.tool
+def get_candidate(candidate_id: str) -> str:
+    """Get a single outcome candidate by ID."""
+    candidate = service.get_candidate(candidate_id)
+    if candidate is None:
+        return _candidate_not_found(candidate_id)
+    return candidate.model_dump_json()
+
+
+@mcp.tool
+def update_candidate(
+    candidate_id: str,
+    status: str | None = None,
+    statement: str | None = None,
+    decision_reason: str | None = None,
+) -> str:
+    """Update a candidate's review state or statement."""
+    updates: dict = {}
+    if status is not None:
+        try:
+            updates["status"] = CandidateStatus(status)
+        except ValueError:
+            return _fail(ValueError(f"unknown candidate status: {status}"))
+    if statement is not None:
+        updates["statement"] = statement
+    if decision_reason is not None:
+        updates["decision_reason"] = decision_reason
+    try:
+        candidate = service.update_candidate(candidate_id, updates)
+    except CandidateNotFoundError:
+        return _candidate_not_found(candidate_id)
+    except (OdiError, ValueError) as exc:
+        return _fail(exc)
+    return candidate.model_dump_json()
+
+
+@mcp.tool
+def delete_candidate(candidate_id: str) -> str:
+    """Delete an outcome candidate."""
+    try:
+        service.delete_candidate(candidate_id)
+    except CandidateNotFoundError:
+        return _candidate_not_found(candidate_id)
+    return f"Candidate deleted successfully: {candidate_id}"
 
 
 @mcp.tool

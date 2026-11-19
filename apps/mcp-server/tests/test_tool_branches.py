@@ -89,8 +89,7 @@ async def test_add_outcome_rejects_out_of_range_scores() -> None:
 
     text = _text(result)
     assert failure(text).code.value == "out_of_range"
-    assert failure(text).field == "importance"
-    assert sentence(text) == "Error: importance must be between 1.0 and 10.0"
+    assert sentence(text) == "Error: importance and satisfaction must be between 1.0 and 10.0"
 
 
 @pytest.mark.asyncio
@@ -258,6 +257,19 @@ async def test_open_study_reports_a_missing_job_as_an_envelope() -> None:
     async with Client(mcp) as client:
         result = await client.call_tool(
             "open_study", {"job_id": "missing", "name": "Q3 sweep", "wave": 1}
+        )
+
+    text = _text(result)
+    assert failure(text).code.value == "not_found"
+    assert sentence(text) == "Job not found: missing"
+
+
+@pytest.mark.asyncio
+async def test_add_interview_reports_a_missing_job_as_a_typed_failure() -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "add_interview",
+            {"title": "Ana — onboarding", "participant_label": "Ana", "job_id": "missing"},
         )
 
     text = _text(result)

@@ -28,7 +28,6 @@ import {
 } from "./claims";
 import { CLAIMS_PART, SURFACE_PART, isArguments } from "./convert";
 import { describeConsequence } from "./consequence";
-import { ClaimCitation } from "../components/chat/ClaimCitation";
 
 /** Prose. Rendered by the assistant-ui markdown primitive, so the transcript
  * reads through the library's own engine with the shared class vocabulary. */
@@ -101,7 +100,7 @@ export function ClaimText({ content, claims }: { content: string; claims: Claim[
       }
       return (
         <span key={index} className="claim claim--cited">
-          <ClaimCitation claim={claim} onOpenRecord={focusEvidence} />
+          {claim.text}
           {claim.evidence.map((citation) => {
             const label = citation.source_name
               ? `${citation.source_name} · ${citation.name}`

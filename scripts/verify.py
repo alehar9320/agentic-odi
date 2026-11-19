@@ -61,6 +61,7 @@ CI_JOB_COVERAGE: dict[str, tuple[str, ...]] = {
     "tauri-check": (),
     "tauri-build": (),
     "e2e": (),
+    "e2e-smoke": (),
 }
 
 CI_ONLY_REASONS: dict[str, str] = {
@@ -80,6 +81,10 @@ CI_ONLY_REASONS: dict[str, str] = {
     "e2e": (
         "drives Chromium against a built Studio and both services; advisory at merge time "
         "and owned by the e2e lane"
+    ),
+    "e2e-smoke": (
+        "drives Chromium against the built Studio and both services; advisory at merge "
+        "time and owned by the e2e lane"
     ),
 }
 
