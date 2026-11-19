@@ -452,6 +452,47 @@ describe("conversationToMarkdown", () => {
     expect(markdown.match(/Ticket 812 backs it up/g)).toHaveLength(1);
   });
 
+  it("prints a claim that is a prefix of another printed sentence", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [
+          {
+            kind: "claims",
+            content: "Rotation costs two engineer-days and a review. [[ev:e1]]",
+            claims: [
+              {
+                index: 0,
+                text: "Rotation costs two engineer-days and a review.",
+                status: "cited",
+                evidence: [
+                  { id: "e1", name: "Call with Acme", source_name: "Gong" },
+                ],
+              },
+              {
+                index: 1,
+                text: "Rotation costs",
+                status: "uncited",
+                evidence: [],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = conversationToMarkdown(messages, exportedAt);
+
+    expect(markdown).toContain(
+      "Rotation costs two engineer-days and a review. (per Gong · Call with Acme, record e1)",
+    );
+    expect(markdown).toContain("Rotation costs (Uncited)");
+    expect(markdown.match(/Rotation costs/g)).toHaveLength(2);
+  });
+
   it("dates the export in the filename", () => {
     expect(exportFilename(exportedAt)).toBe(
       "agentic-odi-conversation-2026-10-24.md",
