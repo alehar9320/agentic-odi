@@ -18,7 +18,9 @@ from agentic_odi_core.models import (
     CustomerValue,
     Evidence,
     Job,
+    Link,
     Outcome,
+    OutcomeAlignment,
     ScheduledWork,
     Segment,
     Step,
@@ -31,6 +33,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Job": Job,
     "Step": Step,
     "Outcome": Outcome,
+    "OutcomeAlignment": OutcomeAlignment,
     "ValueMetric": ValueMetric,
     "CustomerValue": CustomerValue,
     "BusinessValue": BusinessValue,
@@ -41,6 +44,7 @@ _SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "Study": Study,
     "V2MOM": V2MOM,
     "ScheduledWork": ScheduledWork,
+    "Link": Link,
 }
 
 

@@ -17,6 +17,7 @@ from agentic_odi_cli import context, paths, update, version
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.connectors import connectors_app
 from agentic_odi_cli.customer_outcomes import customer_outcomes_app, score
+from agentic_odi_cli.data import data_app
 from agentic_odi_cli.desired_outcomes import desired_outcomes_app
 from agentic_odi_cli.evidence import evidence_app
 from agentic_odi_cli.jobs import jobs_app
@@ -57,6 +58,7 @@ app.add_typer(
     name="segments",
     help="Stage 5: segments derived from scored outcomes, never from demographics.",
 )
+app.add_typer(data_app, name="data", help="Inspect the local ODI data files.")
 app.add_typer(
     studies_app,
     name="studies",
@@ -118,6 +120,11 @@ def main(
     mcp_url: str | None = typer.Option(None, "--mcp-url", help="MCP server URL (mcp backend)."),
     no_update: bool = typer.Option(False, "--no-update", help="Disable the startup update check"),
 ) -> None:  # noqa: B008
+    # Imported here, not at module load: ``--version`` and ``--help`` must not
+    # pull the core domain layer in just to print a string (test_startup_perf).
+    from agentic_odi_core.logging import configure_logging
+
+    configure_logging()
     context.set_options(backend=backend, db_path=db, mcp_url=mcp_url)
     if not no_update:
         threading.Thread(target=_startup_auto_update, args=(no_update,), daemon=True).start()
@@ -610,6 +617,47 @@ def update_cmd(
     typer.echo(f"Updated to v{target}")
     if now:
         _reexec_current()
+
+
+@app.command("backup")
+def backup_cmd(
+    db_path: str | None = typer.Option(  # noqa: B008
+        None, "--db", help="Database to snapshot (default: the local store)."
+    ),
+) -> None:
+    """Write a verified snapshot of the local database."""
+    from agentic_odi_core.recovery import backup_database
+
+    path = db_path or context.config().db_path or _default_db_path()
+    try:
+        out = backup_database(path)
+    except (OSError, RuntimeError) as exc:
+        typer.echo(f"Backup failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Backup written: {out}")
+
+
+@app.command("restore")
+def restore_cmd(
+    backup_file: str = typer.Argument(..., help="Snapshot to restore from."),
+    db_path: str | None = typer.Option(  # noqa: B008
+        None, "--db", help="Database to replace (default: the local store)."
+    ),
+) -> None:
+    """Restore a verified backup, keeping the current file as .pre-restore."""
+    from agentic_odi_core.recovery import restore_database
+
+    path = db_path or context.config().db_path or _default_db_path()
+    try:
+        safety = restore_database(backup_file, path)
+    except (OSError, ValueError) as exc:
+        typer.echo(f"Restore failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Restored. Previous file kept as {safety}")
+
+
+def _default_db_path() -> str:
+    return os.path.expanduser("~/.agentic-odi/odi.db")
 
 
 if __name__ == "__main__":

@@ -7,13 +7,17 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Sunday 06:00 UTC. Scheduled runs only execute from the default branch,
-    # and only the updater-e2e job reacts to this event.
+    # Sunday 06:00 UTC. Scheduled runs only execute from the default branch, and
+    # the two jobs that judge the deployed world rather than a pull request react to
+    # this event: updater-e2e, and hosted-first-run below. Anything that wants a
+    # probe sooner takes `workflow_dispatch`.
     - cron: "0 6 * * 0"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A pull request may cancel its own previous build; a push to main may not,
+  # because the cancelled run is the only CI record that merge would ever get.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -27,7 +31,7 @@ jobs:
   # against, so an empty body fails the build before any expensive job runs.
   pr-body:
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -47,7 +51,7 @@ jobs:
           echo "OK: pull request body is present"
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -66,7 +70,7 @@ jobs:
         run: uv run python brand/tools/render.py --check
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -82,7 +86,7 @@ jobs:
   # it only reports a path that names a known top-level directory and a command
   # that starts with a known entry point.
   docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -93,8 +97,11 @@ jobs:
       - name: Check the documentation against the code
         run: uv run python scripts/doc_check.py
 
+      - name: Check the generated documentation blocks are current
+        run: uv run python scripts/docs_index.py --check
+
   security:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
@@ -106,8 +113,59 @@ jobs:
       - name: Run Bandit (website)
         run: uv run bandit -c pyproject.toml -r website/
 
-  test:
+  # Bandit reads code patterns; it cannot say that a pinned version has a known
+  # advisory. This job asks the advisory databases directly, for the runtime
+  # dependency set of all four ecosystems the repository ships: the Python
+  # workspace, the Studio's npm packages, and the Tauri shell's Cargo tree.
+  # Accepted advisories live in security/audit-ignore.toml with an expiry date,
+  # and scripts/audit_ignore.py is the gate on that ledger (#1090).
+  dependencies:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: apps/studio/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: The ignore ledger is current
+        run: uv run python scripts/audit_ignore.py --check
+
+      # --no-dev: a dev-only advisory is Dependabot's to update, not a reason to
+      # fail a build. The workspace members are skipped by pip-audit because
+      # they are not on PyPI; the third-party set is what is audited.
+      - name: Audit the Python runtime dependencies
+        run: |
+          uv export --all-packages --format requirements-txt --no-hashes --no-dev > "$RUNNER_TEMP/req.txt"
+          ignore="$(uv run python scripts/audit_ignore.py --pip-args)"
+          # shellcheck disable=SC2086
+          uvx pip-audit==2.7.3 -r "$RUNNER_TEMP/req.txt" --skip-editable $ignore
+
+      - name: Audit the Studio npm dependencies
+        run: |
+          npm --prefix apps/studio audit --omit=dev --json > "$RUNNER_TEMP/npm-audit.json" || true
+          uv run python scripts/audit_ignore.py --npm-json "$RUNNER_TEMP/npm-audit.json"
+
+      - name: Install cargo-audit
+        # 0.22.0 is the first release that can parse the CVSS 4.0 vectors the
+        # RustSec database started carrying; 0.21.2 fails to load the database
+        # with "unsupported CVSS version: 4.0".
+        run: cargo install cargo-audit --version 0.22.2 --locked
+
+      - name: Audit the Tauri Cargo dependencies
+        run: |
+          ignore="$(uv run python scripts/audit_ignore.py --cargo-args)"
+          # shellcheck disable=SC2086
+          cargo audit --file apps/studio/src-tauri/Cargo.lock $ignore
+
+  test:
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -142,16 +200,37 @@ jobs:
           if-no-files-found: error
 
       # One upload per run is enough; the 3.12 report is the canonical one.
-      - name: Upload coverage to Codecov
+      # The token is not available to Dependabot or fork runs, so the upload is
+      # skipped there -- loudly, in the log and the job summary, instead of
+      # passing silently behind `fail_ci_if_error: false`.
+      - name: Check whether coverage can be uploaded
+        id: codecov
         if: ${{ matrix.python-version == '3.12' }}
+        env:
+          TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CODECOV_TOKEN is not available to this run (Dependabot or fork). Coverage was produced but not uploaded, so the 90% project floor was not enforced for this commit."
+            {
+              echo "## Coverage"
+              echo ""
+              echo "The floor in \`codecov.yml\` was **not enforced** for this commit: this run had no CODECOV_TOKEN."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage to Codecov
+        if: ${{ matrix.python-version == '3.12' && steps.codecov.outputs.available == 'true' }}
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint, typecheck, security, test]
     timeout-minutes: 15
     steps:
@@ -269,7 +348,7 @@ jobs:
           echo "OK: both services stopped cleanly"
 
   website:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -292,7 +371,7 @@ jobs:
           if-no-files-found: error
 
   studio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -321,6 +400,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check the cold-start bundle budget
+        working-directory: .
+        run: node scripts/check_bundle_budget.mjs
+
       - name: Verify generated API types are up to date
         run: |
           npm run gen:api-types
@@ -336,7 +419,7 @@ jobs:
   # part of the browser suite — no chat, no model, no LLM.
   contrast:
     name: Contrast gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -381,6 +464,14 @@ jobs:
   # sidecar and MCP server, so it is slower than the other jobs and can be
   # flakier than a unit test.
   #
+  # It stays advisory at merge time, but it is no longer silent. The suite
+  # writes a machine-readable report, this job names the failing specs in the
+  # run summary and in a warning annotation, and `ci-green` prints the outcome
+  # in its table instead of folding it into a generic result.
+  #
+  # Set the repository variable AGENTIC_ODI_E2E_BLOCKING to "true" to make a
+  # failure block the merge once the suite is green across a week of main runs.
+  #
   # Two ways to turn it off, neither of which needs a code change:
   #   - set the repository variable AGENTIC_ODI_E2E to "false"
   #   - remove the continue-on-error below
@@ -388,9 +479,15 @@ jobs:
   e2e:
     name: End-to-end
     if: ${{ vars.AGENTIC_ODI_E2E != 'false' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # The lane is non-blocking on purpose, so this flag stays. What changed is
+    # that the suite's own outcome is published as an output: with a job-level
+    # `continue-on-error`, `needs.<job>.result` is always `success`, which is how
+    # a red browser suite went unnoticed. A step outcome is not coerced that way.
     continue-on-error: true
+    outputs:
+      suite: ${{ steps.suite.outcome || 'not-run' }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -414,8 +511,91 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run the end-to-end suite
+        id: suite
         working-directory: apps/studio
-        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: e2e-results.json
+        run: npm run test:e2e -- --reporter=list,html,json
+
+      - name: Summarize the end-to-end outcome
+        if: always()
+        working-directory: apps/studio
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+
+          const REPORT = "e2e-results.json";
+          const lines = ["## End-to-end suite", ""];
+          let passed = 0;
+          let failed = 0;
+          let flaky = 0;
+          let skipped = 0;
+          const failures = [];
+
+          function walk(suites) {
+            for (const suite of suites || []) {
+              for (const spec of suite.specs || []) {
+                for (const test of spec.tests || []) {
+                  const results = test.results || [];
+                  const last = results[results.length - 1] || {};
+                  if (test.status === "expected") {
+                    passed += 1;
+                  } else if (test.status === "flaky") {
+                    flaky += 1;
+                  } else if (test.status === "skipped") {
+                    skipped += 1;
+                  } else {
+                    failed += 1;
+                    const message =
+                      (last.error && last.error.message
+                        ? last.error.message
+                        : "no error message"
+                      )
+                        .split("\n")[0]
+                        .slice(0, 300);
+                    failures.push(spec.title + " -- " + message);
+                  }
+                }
+              }
+              walk(suite.suites);
+            }
+          }
+
+          if (!fs.existsSync(REPORT)) {
+            lines.push(
+              "No JSON report was written, so the suite never reached the reporter: " +
+                "dependency install, the Studio build or the browser install failed " +
+                "before a test ran.",
+            );
+          } else {
+            try {
+              walk(JSON.parse(fs.readFileSync(REPORT, "utf8")).suites);
+              lines.push("- passed: **" + passed + "**");
+              lines.push("- failed: **" + failed + "**");
+              lines.push("- flaky (passed on retry): **" + flaky + "**");
+              lines.push("- skipped: **" + skipped + "**");
+              lines.push("");
+              if (failures.length > 0) {
+                lines.push("### Failing specs", "");
+                for (const failure of failures) {
+                  lines.push("- " + failure);
+                }
+              }
+            } catch (error) {
+              lines.push("The JSON report could not be read: " + error.message);
+            }
+          }
+
+          for (const failure of failures.slice(0, 10)) {
+            const message = failure.replace(/[\r\n]+/g, " ").replace(/::/g, ":");
+            console.log("::warning title=End-to-end::" + message.slice(0, 400));
+          }
+          const summary = process.env.GITHUB_STEP_SUMMARY;
+          if (summary) {
+            fs.appendFileSync(summary, lines.join("\n") + "\n");
+          }
+          console.log(lines.join("\n"));
+          NODE
 
       - name: Upload the Playwright report
         if: always()
@@ -426,8 +606,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Upload the machine-readable results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results
+          path: apps/studio/e2e-results.json
+          if-no-files-found: warn
+          retention-days: 7
+
   tauri-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
@@ -460,7 +649,7 @@ jobs:
         run: cargo check
 
   tauri-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -571,21 +760,52 @@ jobs:
           if-no-files-found: ignore
           path: /tmp/studio-update-e2e/
 
+  # Production deploys on every push to main, and a merged PR is not proof the
+  # change reached the branch that deploys. This knocks on the real URL and reports
+  # one dated line per promise the README makes a visitor. It sits outside
+  # `ci-green`'s `needs:` for the same reason `pr-body` and `updater-e2e` do: a
+  # broken deploy is news about the deploy, not about the pull request that
+  # happened to share the branch, and a suite that is green over a branch nobody
+  # deploys is exactly how #492 and #609 went unnoticed.
+  hosted-first-run:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Probe the hosted first run
+        run: |
+          set +e
+          bash scripts/verify-hosted-first-run.sh --commit "$(git rev-parse HEAD)" \
+            | tee /tmp/hosted-first-run.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error::the hosted first run broke; the dated lines are in the hosted-first-run-log artifact"
+            exit "$status"
+          fi
+
+      - name: Upload the probe output on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-first-run-log
+          if-no-files-found: ignore
+          path: /tmp/hosted-first-run.log
+
   ci-green:
     name: CI green
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, security, test, smoke, website, studio, contrast, tauri-check, tauri-build, e2e]
+    needs: [lint, typecheck, security, dependencies, test, smoke, website, studio, contrast, tauri-check, tauri-build, e2e]
     if: always()
     steps:
-      - name: Verify all required jobs succeeded
+      - name: Verify the required jobs and report what was verified
         env:
-          # The e2e job is optional: it is skipped when the AGENTIC_ODI_E2E
-          # repository variable is set to "false", and that must not turn CI
-          # red. Every other job has to succeed.
-          E2E_RESULT: ${{ needs.e2e.result }}
           LINT: ${{ needs.lint.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
           SECURITY: ${{ needs.security.result }}
+          DEPENDENCIES: ${{ needs.dependencies.result }}
           TEST: ${{ needs.test.result }}
           SMOKE: ${{ needs.smoke.result }}
           WEBSITE: ${{ needs.website.result }}
@@ -593,22 +813,65 @@ jobs:
           CONTRAST: ${{ needs.contrast.result }}
           TAURI_CHECK: ${{ needs.tauri-check.result }}
           TAURI_BUILD: ${{ needs.tauri-build.result }}
+          # The browser suite is the one lane allowed to be red without blocking
+          # a merge. `E2E_JOB` tells us whether the job was skipped; the suite's
+          # own outcome is `E2E_SUITE`, which the job-level continue-on-error hid
+          # behind a coerced `success`.
+          E2E_JOB: ${{ needs.e2e.result }}
+          E2E_SUITE: ${{ needs.e2e.outputs.suite }}
+          E2E_BLOCKING: ${{ vars.AGENTIC_ODI_E2E_BLOCKING }}
         run: |
           failed=0
-          for job in LINT TYPECHECK SECURITY TEST SMOKE WEBSITE STUDIO CONTRAST TAURI_CHECK TAURI_BUILD; do
+          for job in LINT TYPECHECK SECURITY DEPENDENCIES TEST SMOKE WEBSITE STUDIO CONTRAST TAURI_CHECK TAURI_BUILD; do
             result="${!job}"
-            echo "$job: $result"
             if [ "$result" != "success" ]; then
               echo "::error::$job did not succeed ($result)"
               failed=1
             fi
           done
-          echo "e2e: $E2E_RESULT"
-          if [ "$E2E_RESULT" != "success" ] && [ "$E2E_RESULT" != "skipped" ]; then
-            echo "::error::e2e did not succeed ($E2E_RESULT)"
-            failed=1
+
+          if [ "$E2E_JOB" = "skipped" ]; then
+            e2e_state="skipped"
+          elif [ "$E2E_SUITE" = "success" ]; then
+            e2e_state="passed"
+          elif [ "$E2E_SUITE" = "failure" ]; then
+            e2e_state="suite failed"
+          else
+            e2e_state="did not report (install, build or browser failed first)"
           fi
+
+          case "$e2e_state" in
+            passed|skipped)
+              ;;
+            *)
+              if [ "$E2E_BLOCKING" = "true" ]; then
+                echo "::error::the browser suite $e2e_state, and AGENTIC_ODI_E2E_BLOCKING is true"
+                failed=1
+              else
+                echo "::warning::the browser suite $e2e_state. It is advisory, so this run still passes, but it is reported here and in the job summary so it cannot go unnoticed."
+              fi
+              ;;
+          esac
+
+          {
+            echo "## CI verification"
+            echo ""
+            echo "| Check | Result | Gate |"
+            echo "| --- | --- | --- |"
+            printf '| %s | %s | %s |\n' lint "$LINT" required
+            printf '| %s | %s | %s |\n' typecheck "$TYPECHECK" required
+            printf '| %s | %s | %s |\n' security "$SECURITY" required
+            printf '| %s | %s | %s |\n' "test (3.10-3.12)" "$TEST" required
+            printf '| %s | %s | %s |\n' smoke "$SMOKE" required
+            printf '| %s | %s | %s |\n' website "$WEBSITE" required
+            printf '| %s | %s | %s |\n' studio "$STUDIO" required
+            printf '| %s | %s | %s |\n' "contrast gate" "$CONTRAST" required
+            printf '| %s | %s | %s |\n' tauri-check "$TAURI_CHECK" required
+            printf '| %s | %s | %s |\n' tauri-build "$TAURI_BUILD" required
+            printf '| %s | %s | %s |\n' "e2e (browser)" "$e2e_state" "$( [ "$E2E_BLOCKING" = "true" ] && echo required || echo advisory )"
+          } >> "$GITHUB_STEP_SUMMARY"
+
           if [ "$failed" -ne 0 ]; then
             exit 1
           fi
-          echo "OK: all required jobs succeeded"
+          echo "OK: every required job succeeded; advisory lanes are listed above."

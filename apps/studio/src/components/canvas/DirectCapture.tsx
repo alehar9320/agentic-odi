@@ -9,6 +9,26 @@ import { FailurePanel } from "../FailurePanel";
 /** Which field the failure belongs to, so the message lands next to it. */
 type FailureField = "statement" | "range" | "form";
 
+/**
+ * Where to show a failure. The server names the field when it knows one, so a
+ * field-specific failure lands next to the field that needs it; otherwise we
+ * fall back to the code-based heuristic and, failing that, the whole form —
+ * the best guess we have for a failure that predates the field or came from a
+ * peer that only sends text.
+ */
+function fieldForError(error: StudioError): FailureField {
+  if (error.field === "importance" || error.field === "satisfaction") {
+    return "range";
+  }
+  if (error.field === "statement" || error.field === "business_statement") {
+    return "statement";
+  }
+  if (error.code === "out_of_range") {
+    return "range";
+  }
+  return "form";
+}
+
 export function DirectCapture() {
   const { canvas, addOutcome, createJob } = useStudio();
   const jobs = canvas?.jobs ?? [];
@@ -74,15 +94,7 @@ export function DirectCapture() {
       // A fielded error lands beside the input it names; an out-of-range score
       // keeps today's behaviour and lands on the score fields; anything else
       // goes to form level.
-      const field: FailureField =
-        problem.field === "statement"
-          ? "statement"
-          : problem.field === "importance" || problem.field === "satisfaction"
-            ? "range"
-            : problem.code === "out_of_range"
-              ? "range"
-              : "form";
-      setFailure({ error: problem, field });
+      setFailure({ error: problem, field: fieldForError(problem) });
     } finally {
       setBusy(false);
     }

@@ -89,7 +89,8 @@ async def test_add_outcome_rejects_out_of_range_scores() -> None:
 
     text = _text(result)
     assert failure(text).code.value == "out_of_range"
-    assert sentence(text) == "Error: importance and satisfaction must be between 1.0 and 10.0"
+    assert failure(text).field == "importance"
+    assert sentence(text) == "Error: importance must be between 1.0 and 10.0"
 
 
 @pytest.mark.asyncio

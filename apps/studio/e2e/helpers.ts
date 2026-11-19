@@ -36,7 +36,30 @@ export async function openStudio(page: Page): Promise<void> {
   // The composer is present in both the empty and the active conversation
   // states, so it is the one landmark that means the Studio is ready.
   await expect(page.getByRole("textbox", { name: COMPOSER })).toBeVisible();
-  const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
+  await dismissConnectorSuggestion(page);
+}
+
+/**
+ * The connector suggestion dialog, whichever offer it is showing.
+ *
+ * It renders through the shared `Dialog` primitive (#1004), so its accessible
+ * name is the offer's own title ("Connect a suggested system" for an agent
+ * suggestion, "Give the studio something to read" for an empty studio). Match
+ * the one action every offer carries instead of either title, so the locator
+ * survives the copy changing.
+ */
+export function connectorSuggestion(page: Page) {
+  return page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("button", { name: "Not now" }) });
+}
+
+/**
+ * Dismiss the connector suggestion if a fresh studio is offering one. That is
+ * real product behavior, so it is dismissed the way a person would.
+ */
+export async function dismissConnectorSuggestion(page: Page): Promise<void> {
+  const suggestion = connectorSuggestion(page);
   await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
   if (await suggestion.isVisible()) {
     await suggestion.getByRole("button", { name: "Not now" }).click();

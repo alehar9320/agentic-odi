@@ -123,6 +123,35 @@ describe("IndexedDbLocalStore", () => {
     store.close();
   });
 
+  it("renames a conversation without touching its turns or head", async () => {
+    const store = await makeStore();
+    await store.putConversation({
+      id: "c-1",
+      title: "Chat",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      head_id: "m-1",
+    });
+    await store.appendTurn({
+      conversation_id: "c-1",
+      role: "user",
+      content: "hi",
+      created_at: "2026-01-01T00:00:00Z",
+      message_id: "m-1",
+      parent_id: null,
+    });
+
+    const renamed = await store.renameConversation("c-1", "Renamed");
+
+    expect(renamed.title).toBe("Renamed");
+    expect((await store.getConversation("c-1"))?.title).toBe("Renamed");
+    // The rename moves the thread's time and nothing else.
+    expect((await store.getConversation("c-1"))?.head_id).toBe("m-1");
+    expect(await store.listTurns("c-1")).toHaveLength(1);
+    await expect(store.renameConversation("missing", "X")).rejects.toThrow(/not found/i);
+    store.close();
+  });
+
   it("round-trips outbox records and reclaims a stale drain lease", async () => {
     const store = await makeStore();
     await store.enqueueOutbox({
@@ -209,7 +238,7 @@ describe("IndexedDbLocalStore", () => {
     second.close();
   });
 
-  it("migrates a seeded v1 database to v2 with every row and the schema intact", async () => {
+  it("migrates a seeded v1 database to the current version with every row and the schema intact", async () => {
     await seedV1();
 
     const before = await rowsOf(DB_NAME, 1);
@@ -221,18 +250,20 @@ describe("IndexedDbLocalStore", () => {
     for (const name of Object.keys(before)) {
       expect(after[name], `rows in ${name}`).toEqual(before[name]);
     }
-    // The v2 outbox store is added, and it starts empty.
+    // The later stores are added, and they start empty.
     expect(after.outbox).toEqual([]);
+    expect(after.evidence).toEqual([]);
+    expect(after.interview_drafts).toEqual([]);
     store.close();
 
-    // The migrated schema equals a fresh v2 database: same stores, key paths,
+    // The migrated schema equals a fresh database: same stores, key paths,
     // auto-increment flags, and index names.
     const migrated = await schemaOf(DB_NAME, DB_VERSION);
     await clearDb();
     const fresh = await makeStore();
     fresh.close();
     expect(migrated).toEqual(await schemaOf(DB_NAME, DB_VERSION));
-    expect(migrated).toEqual(expectedV2Schema());
+    expect(migrated).toEqual(expectedSchema());
   });
 
   it("closes the old connection and flags a reload when another tab upgrades", async () => {
@@ -258,6 +289,40 @@ describe("IndexedDbLocalStore", () => {
     upgraded.close();
   });
 
+  it("round-trips an interview draft, newest first, scoped to its job", async () => {
+    const store = await makeStore();
+    await store.putInterviewDraft({
+      id: "draft-old",
+      jobId: "j-1",
+      answers: { job: "A job", importance: 8 },
+      index: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await store.putInterviewDraft({
+      id: "draft-new",
+      jobId: "j-1",
+      answers: { job: "A job", importance: 9 },
+      index: 2,
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    });
+    await store.putInterviewDraft({
+      id: "draft-other",
+      jobId: "j-2",
+      answers: { job: "Another job" },
+      index: 0,
+      updatedAt: "2026-01-03T00:00:00.000Z",
+    });
+
+    const forJob = await store.listInterviewDrafts("j-1");
+    expect(forJob.map((draft) => draft.id)).toEqual(["draft-new", "draft-old"]);
+    expect(forJob[0].answers).toEqual({ job: "A job", importance: 9 });
+    expect((await store.getInterviewDraft("draft-new"))?.index).toBe(2);
+
+    await store.deleteInterviewDraft("draft-new");
+    expect(await store.getInterviewDraft("draft-new")).toBeUndefined();
+    store.close();
+  });
+
   it("never needs a reload in the memory-only fallback", () => {
     const store: LocalStore = new MemoryLocalStore();
     expect(store.needsReload).toBe(false);
@@ -271,6 +336,24 @@ describe("IndexedDbLocalStore", () => {
 
     expect(await store.countTurns("c-1")).toBe(2);
     expect(await store.countTurns("c-none")).toBe(0);
+    store.close();
+  });
+
+  it("deletes a conversation and its turns together", async () => {
+    const store = await makeStore();
+    await store.putConversation(conversation("c-1", "2026-01-01T00:00:00Z"));
+    await store.putConversation(conversation("c-2", "2026-01-02T00:00:00Z"));
+    await store.appendTurn(turn("c-1", "m-1"));
+    await store.appendTurn(turn("c-1", "m-2"));
+    await store.appendTurn(turn("c-2", "m-3"));
+
+    await store.deleteConversation("c-1");
+
+    expect(await store.getConversation("c-1")).toBeUndefined();
+    expect(await store.countTurns("c-1")).toBe(0);
+    // The other thread keeps its row and its turn.
+    expect(await store.getConversation("c-2")).toBeDefined();
+    expect(await store.countTurns("c-2")).toBe(1);
     store.close();
   });
 
@@ -420,14 +503,26 @@ async function rowsOf(name: string, version: number) {
   return rows;
 }
 
-/** The v2 schema written out, so the migrated shape is asserted, not assumed. */
-function expectedV2Schema() {
+/** The current schema written out, so the migrated shape is asserted, not assumed. */
+function expectedSchema() {
   return [
     {
       store: "conversations",
       keyPath: "id",
       autoIncrement: false,
       indexes: ["by-updated"],
+    },
+    {
+      store: "evidence",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "interview_drafts",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-updated"],
     },
     {
       store: "jobs",

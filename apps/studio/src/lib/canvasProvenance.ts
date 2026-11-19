@@ -41,6 +41,16 @@ export function canvasHasRecords(data: CanvasData | null | undefined): boolean {
   return data.jobs.length > 0 || data.steps.length > 0 || data.outcomes.length > 0;
 }
 
+/**
+ * The one caption for a board whose newest write was kept by the browser store
+ * because the sidecar was unreachable. `null` when the server holds everything,
+ * so a sidecar write never shows it. Reuses the saved-copy vocabulary rather
+ * than adding a second badge.
+ */
+export function keptByBrowserCaption(data: CanvasData | null | undefined): string | null {
+  return data?.provenance?.kept_by_browser ? "Kept by this browser · will sync" : null;
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -73,13 +83,13 @@ export function savedCopyCaption(
     return "Saved just now";
   }
   if (elapsed < HOUR) {
-    const minutes = Math.round(elapsed / MINUTE);
+    const minutes = Math.floor(elapsed / MINUTE);
     return `Saved ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
   }
   if (elapsed < DAY) {
-    const hours = Math.round(elapsed / HOUR);
+    const hours = Math.floor(elapsed / HOUR);
     return `Saved ${hours} hour${hours === 1 ? "" : "s"} ago`;
   }
-  const days = Math.round(elapsed / DAY);
+  const days = Math.floor(elapsed / DAY);
   return `Saved ${days} day${days === 1 ? "" : "s"} ago`;
 }

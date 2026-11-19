@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { OnboardingProvider } from "../onboarding/OnboardingProvider";
+import { FirstRunWizard, OnboardingProvider } from "../onboarding";
 import { UpdateProvider, createUpdateService } from "../updater";
 import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
@@ -45,6 +45,8 @@ const stubContext = (overrides: Record<string, unknown> = {}) =>
     refreshModels: vi.fn().mockResolvedValue(undefined),
     mcpReachable: false,
     pushToast: vi.fn(),
+    connectorsLoading: false,
+    presetsLoading: false,
     connectors: [{ name: "notion", kind: "mcp", enabled: true }],
     presets: [
       {
@@ -285,17 +287,38 @@ describe("SettingsPanel capabilities", () => {
     expect(llmRow).toBeInTheDocument();
     expect(llmRow).toHaveTextContent(/unavailable/);
   });
+
+  it("says a configured endpoint is not checked instead of unavailable (#515)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        capabilities: [
+          {
+            id: "endpoint-model",
+            label: "Configured",
+            description: "Calls the model endpoint you configured in Settings directly.",
+            status: "unknown",
+          },
+        ],
+      }),
+    );
+
+    renderPanel();
+
+    const row = screen.getByText("Configured").closest("li");
+    expect(row).toHaveTextContent(/configured, not checked/i);
+    expect(row).not.toHaveTextContent(/unavailable/i);
+  });
 });
 
 describe("SettingsPanel about section", () => {
-  it("reports the running version, build date, platform, and update status", async () => {
+  it("reports the build facts and the product essay, not the updater", async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
-    // A supported transport: the unsupported file-level stub never syncs
-    // currentVersion, and About must show real facts, not placeholders.
+    // A browser build has no desktop version to report, so About shows the
+    // build version (#799) beside the commit, date, platform, and essay.
     const aboutService = createUpdateService({
       transport: {
-        supported: () => true,
+        supported: () => false,
         currentVersion: async () => "0.11.0",
         check: async () => null,
         relaunch: async () => undefined,
@@ -312,15 +335,34 @@ describe("SettingsPanel about section", () => {
     );
 
     const about = screen.getByRole("region", { name: "About" });
-    await waitFor(() =>
-      expect(aboutService.getSnapshot().currentVersion).toBe("0.11.0"),
-    );
-    await waitFor(() => expect(aboutService.getSnapshot().phase).not.toBe("checking"));
-
-    expect(within(about).getByText("v0.11.0")).toBeInTheDocument();
+    expect(within(about).getByText(`v${STUDIO_VERSION}`)).toBeInTheDocument();
+    expect(within(about).getByText(__STUDIO_BUILD_COMMIT__)).toBeInTheDocument();
     expect(within(about).getByText(__STUDIO_BUILD_DATE__)).toBeInTheDocument();
     expect(within(about).getByText(/macOS|Windows|Linux|Desktop/)).toBeInTheDocument();
-    expect(within(about).getByText(aboutService.statusLine())).toBeInTheDocument();
+    expect(within(about).getByText(/canvas of human intent/i)).toBeInTheDocument();
+    // The updater's state belongs to the Updates row, not About.
+    expect(within(about).queryByText(aboutService.statusLine())).not.toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel tour entry", () => {
+  it("shows a single 'Take the tour' link and opens the tour from it", async () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    render(
+      <UpdateProvider service={service}>
+        <OnboardingProvider enabled={true}>
+          <SettingsPanel />
+          <FirstRunWizard />
+        </OnboardingProvider>
+      </UpdateProvider>,
+    );
+
+    const tourLinks = screen.getAllByRole("button", { name: "Take the tour" });
+    expect(tourLinks).toHaveLength(1);
+
+    fireEvent.click(tourLinks[0]);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   // #799: in a browser or installed PWA the updater has no version to report,
@@ -381,5 +423,49 @@ describe("SettingsPanel connection survey", () => {
     expect(await screen.findByText("unavailable")).toBeInTheDocument();
     expect(surveyConnections).toHaveBeenCalledOnce();
     expect(recheckConnections).not.toHaveBeenCalled();
+  });
+});
+
+describe("SettingsPanel section modules", () => {
+  it("composes the sections in order", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const { container } = renderPanel();
+
+    // Context, Data, Model, Connections (bridge), Updates, About, Install.
+    expect(screen.getByText(/your context/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Updates" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Data"));
+    expect(text.indexOf("Data")).toBeLessThan(text.indexOf("Model"));
+    expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
+  });
+
+  it("keeps the Model section intact when the connector fetch fails", () => {
+    // #531: a broken connector fetch shows the Connections error and leaves the
+    // model controls beside it working, because each section owns its failure.
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        connectors: [],
+        connectorsError: {
+          code: "mcp_unreachable",
+          message: "The connector list is unreachable.",
+          suggestion: "Check that the sidecar is running, then try again.",
+          retryable: true,
+        },
+        models: ["local-tools-model"],
+      }),
+    );
+
+    renderPanel();
+
+    expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+    expect(screen.getByLabelText(/^model/i)).toHaveValue("m");
+    expect(screen.getByLabelText("Base URL")).toHaveValue("http://x");
   });
 });

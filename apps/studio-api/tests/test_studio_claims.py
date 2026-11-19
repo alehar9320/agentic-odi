@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from agentic_odi_studio_api.studio.claims import (
     MAX_EVIDENCE_PER_CLAIM,
     UNKNOWN_EVIDENCE_ID,
@@ -9,6 +10,28 @@ from agentic_odi_studio_api.studio.claims import (
     EvidenceSnapshot,
     split_claims,
 )
+
+#: Every abbreviation added for corporate suffixes (#1179). Each entry must keep
+#: the sentence it appears in whole, so one case per entry is generated below.
+CORPORATE_SUFFIXES = [
+    "ag",
+    "assn",
+    "bv",
+    "co",
+    "corp",
+    "dept",
+    "esq",
+    "gmbh",
+    "inc",
+    "jr",
+    "llc",
+    "ltd",
+    "plc",
+    "pty",
+    "sa",
+    "sr",
+    "univ",
+]
 
 
 def _index(*records: tuple[str, str, str]) -> EvidenceIndex:
@@ -169,3 +192,46 @@ def test_a_resolver_accepts_an_id_from_the_local_store() -> None:
 
 def test_an_empty_reply_has_no_claims() -> None:
     assert split_claims("   ") == []
+
+
+@pytest.mark.parametrize("suffix", CORPORATE_SUFFIXES)
+def test_a_corporate_suffix_keeps_its_sentence_together(suffix: str) -> None:
+    # The abbreviation is capitalised to match how a company name is written;
+    # ``_last_word`` lowercases, so the entry covers every casing.
+    text = f"We interviewed Acme {suffix.capitalize()}. Their team has two engineers."
+
+    claims = split_claims(text)
+
+    assert len(claims) == 1
+    assert claims[0].text == text
+
+
+def test_a_corporate_suffix_keeps_the_marker_with_its_sentence() -> None:
+    claims = split_claims(
+        "We interviewed Acme Inc. Their team has two engineers. [[ev:E-1]]",
+        _index(("E-1", "Call with Acme", "Gong")),
+    )
+
+    assert [claim.status for claim in claims] == ["cited"]
+    assert claims[0].text == "We interviewed Acme Inc. Their team has two engineers."
+
+
+def test_a_decimal_point_still_splits_where_a_sentence_really_ends() -> None:
+    claims = split_claims("The cost is 2.5 million. That is high.")
+
+    assert [claim.text for claim in claims] == ["The cost is 2.5 million.", "That is high."]
+
+
+def test_a_plain_period_still_splits() -> None:
+    claims = split_claims("It ended. Next sentence.")
+
+    assert [claim.text for claim in claims] == ["It ended.", "Next sentence."]
+
+
+def test_the_existing_abbreviations_still_hold_a_sentence_together() -> None:
+    claims = split_claims("We ran it with tools, e.g. a probe. It worked.")
+
+    assert [claim.text for claim in claims] == [
+        "We ran it with tools, e.g. a probe.",
+        "It worked.",
+    ]

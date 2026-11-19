@@ -1,3 +1,11 @@
+---
+title: Development
+blurb: Lint, types, frontend checks, and the coverage map.
+nav_group: Operate
+nav_order: 1
+slug: development
+---
+
 # Development
 
 Everything below mirrors what CI runs. Install the workspace first:
@@ -21,6 +29,35 @@ uv run --directory website mypy .
 uv run bandit -c pyproject.toml -r apps packages website/
 ```
 
+Bandit reads code patterns. It cannot say that a pinned version has a known
+advisory, so a separate `dependencies` CI job asks the advisory databases
+directly, for the Python runtime export, the Studio's npm packages, and the
+Tauri `Cargo.lock`. Run the same three commands locally:
+
+```bash
+uv export --all-packages --format requirements-txt --no-hashes --no-dev > /tmp/req.txt
+uvx pip-audit==2.7.3 -r /tmp/req.txt --skip-editable
+npm --prefix apps/studio audit --omit=dev --audit-level=high
+cargo audit --file apps/studio/src-tauri/Cargo.lock
+```
+
+An advisory the repository accepts rather than fixes is recorded in
+`security/audit-ignore.toml` with a reason and an `expires` date no more than 90
+days out; `scripts/audit_ignore.py` reads that ledger, builds the tools' ignore
+arguments, filters `npm audit` (which has no ignore flag), and fails the job when
+an entry is expired. Validate the ledger and preview the arguments with:
+
+```bash
+uv run python scripts/audit_ignore.py --check
+uv run python scripts/audit_ignore.py --pip-args
+uv run python scripts/audit_ignore.py --cargo-args
+```
+
+The audit is not part of `scripts/verify.py --changed`: it needs the lockfiles
+rather than the diff, and its result does not depend on which files a pull
+request touched. See
+[ADR 0008](architecture/adr/0008-dependency-advisories-are-a-gate.md).
+
 ## Documentation Checks
 
 `scripts/doc_check.py` keeps the living docs honest against the code:
@@ -29,9 +66,9 @@ uv run bandit -c pyproject.toml -r apps packages website/
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is maintained by hand. No check requires a new capability to
-add a roadmap line, because a shared file every change had to edit conflicted
-with every other change.
+`docs/roadmap.md` is a pointer page; its three lists point at the sources that
+own the facts (the changelog, the open pull-request list, and the ready-for-dev
+issue filter). No check requires a new capability to edit it.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -58,6 +95,13 @@ npm --prefix apps/studio run build       # production build → apps/studio/dist
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
 
+The build version is a single source of truth. `__STUDIO_VERSION__` is baked into
+the Vite build from `apps/studio/package.json` (`vite.config.ts`) and exposed
+through `src/lib/version.ts`; `src/lib/version.test.ts` fails if it drifts from
+`package.json` or `.release-please-manifest.json`. `Settings → About` renders it,
+and the diagnostics bundle records it together with its source (`build` or
+`desktop`).
+
 ### Visual tests
 
 `npm test` runs the jsdom suite and deliberately ignores `*.visual.test.tsx`.
@@ -68,6 +112,26 @@ build on the free 5,000/month allowance, which is why the two suites are split b
 filename instead of running every test in a browser. Browser mode needs Chromium
 locally: `npx playwright install chromium`. See
 [Deployment](deployment.md) for the project setup and budget rules.
+
+### The cold-start bundle budget
+
+The first screen must not wait on everything the app can do, so the Vite build
+splits the assistant runtime, the markdown renderer, and the Tauri API out of the
+entry chunk with `build.rolldownOptions.output.codeSplitting` groups
+(`vite.config.ts`), and emits `dist/.vite/manifest.json` so the budget script can
+find the entry by role rather than by a hashed name.
+
+`scripts/check_bundle_budget.mjs` measures the entry chunk and every chunk a cold
+load pulls statically, and fails when the entry grows past the recorded baseline
+in `scripts/bundle-budget.json` plus a 20% tolerance. CI runs it right after
+`npm run build` in the `studio` job. After a deliberate change, re-record the
+baseline and say why in the pull request:
+
+```bash
+npm --prefix apps/studio run build
+node scripts/check_bundle_budget.mjs           # check
+node scripts/check_bundle_budget.mjs --update  # re-record the baseline
+```
 
 ### Copied components (`src/vendor`)
 
@@ -101,59 +165,9 @@ The agent-composed surfaces, first-minute guidance, and the product tour are
 covered at these levels. `ChatStage.test.tsx` covers the jump-to-latest control
 while following a streamed turn — the arrival count, the polite announcement, the
 return to the live end, and the keyboard path — and `arrivalCount.test.ts` holds
-the pure count arithmetic:
-
-| File | What it covers |
-|---|---|
-| `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
-| `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
-| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, per-node failure isolation, catalog/registry parity |
-| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
-| `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
-| `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
-| `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
-| `apps/studio-api/tests/test_studio_diagnostics.py` | Metadata-only diagnostics response, safe database basename/counts, integrity state, and absence of row contents/config |
-| `apps/studio-api/tests/test_boot_integrity.py` | A damaged store answers every data route with one `store_corrupt` body, health reports degraded, diagnostics and health stay reachable, the idle timer checkpoints and honors `AGENTIC_ODI_CHECKPOINT_SECONDS`, and a clean shutdown checkpoints and closes both stores |
-| `apps/studio-api/tests/test_studio_chat_stream.py` | Streaming chat, opt-in approval decisions for contract writes and unknown tools, and read-only/local-tool classification |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; card actions become messages; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
-| `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
-| `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
-| `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
-| `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
-| `apps/studio/src/assistant/speech.test.ts`, `src/components/chat/Speech.test.tsx` | The speech support gate, speaking a settled reply, stopping on request and on Escape, and the absence of the control where the API is missing |
-| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
-| `apps/studio/src/assistant/queue.test.ts`, `src/components/chat/QueueLane.test.tsx` | The follow-up lane (#410): enqueue preserves order, steer interrupts once, a cancel pauses instead of draining, a failed dispatch restores rather than drops; the lane rows read their text from parts and their Run-now and remove controls act on one item only |
-| `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
-| `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
-| `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
-| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and a starter clicked while a reply streams enqueues instead of being dropped (#410) |
-| `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
-| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, the follow-up queue against a gated stream (#410), branch switching, approval answers |
-| `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
-| `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
-| `apps/studio-api/tests/test_studio_chat_stream.py` | Reasoning and source events, attachment prompt assembly, terminal-event invariants |
-| `apps/studio-api/tests/test_studio_chat_branches.py` | Turn ids and sibling branches: edit and regenerate produce a tree, not a rewrite |
-| `apps/studio-api/tests/test_studio_conversations.py` | Branch tree endpoint, `head_id` patch, legacy linear fallback, conversation list ordering and turn counts, citation round-trip, idempotent retry, count-mismatch drop |
-| `apps/studio-api/tests/test_studio_claims.py` | Claim parser: markers outside code, hypothesis tags, unknown ids downgraded, headings/questions/instructions exempt, list items, decimals, the three-record cap |
-| `apps/studio/src/assistant/claims.test.ts` | Marker hiding while a reply streams (including a split marker and literal code), block splitting, claim-to-sentence mapping, seeded counts |
-| `apps/studio/src/assistant/parts.test.tsx` | Claim chips open the record, hypothesis tag, uncited underline, missing record, sample chips, the no-citation banner, Escape |
-| `apps/studio-api/tests/test_studio_approvals.py` | Gate lifecycle: resolve, timeout, double resolve, unknown id |
-| `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
-| `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
-| `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
-| `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
-| `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
-| `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
-| `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
-| `apps/studio/e2e/first-paint.spec.ts` | Playwright: the shell paints the token colour with JavaScript off and the bundle blocked, a stored theme wins over the system, and the handover to React keeps the colour |
-| `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
-| `apps/studio/src/components/BootFailurePage.test.tsx` | The boot failure page names the file and the last backup, offers recheck, and never offers to delete or overwrite the store |
-| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests, and a complete introduction that saves the brief; a damaged store renders the boot failure page instead of the shell |
-| `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |
-| `apps/studio/src/components/setup/IntroConversation.test.tsx` | Five turns, skip, Escape, in-place summary edits, and the accepted brief with role, team, and evidence |
-| `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | The summary card as one Chromatic snapshot |
+the pure count arithmetic. Every test file, with the one line it says about
+itself, is in [the test map](reference/test-map.md); it is generated from the
+files, so adding a test means writing a docstring, not editing a list here.
 
 ## Website Checks (GitHub Pages)
 
@@ -167,6 +181,14 @@ uv run --directory website pytest tests/
 
 The site is generated at CI time and never committed. CI runs `build_site.py` to
 produce `_site` and uploads it as the `website-site` artifact for review.
+
+Every page that uses the shared shell gets **its own social card**: `build_site.py`
+calls `make_og.render_card()` with the page's own `og:title`, the docs nav group it
+sits under, and the one number the page itself renders (the landing page's stat, the
+MCP reference's tool count). Nothing is invented - a page with no number of its own
+is drawn without one - and a page that ends up with no card fails the build with
+`MissingCardError`. The cards land in the build output under `og/`, never in git.
+`website/tests/test_og_pages.py` asserts the contract.
 
 The landing page's primary call to action points at the **sample workspace**,
 `website/sample/index.html`. Unlike the rest of the site it *is* committed, so
@@ -321,25 +343,180 @@ Labels are managed idempotently: each run removes both merge-state labels, then
 adds the ones the current state implies, so re-pushing a branch corrects the
 label instead of stacking a second one.
 
+### Merge-state labels
+
+The [merge-conflict workflow](.github/workflows/label-merge-conflicts.yml) owns
+the two labels a reviewer reads to know whether a pull request can land:
+
+| Label | Meaning |
+|---|---|
+| `merge-conflict` | The branch cannot merge into `main` as it stands. |
+| `ready-for-merge` | No conflict; the branch merges cleanly. |
+
+GitHub computes mergeability lazily and answers `UNKNOWN` for a moment after
+every push, so the workflow polls `mergeStateStatus` (up to ten times, six
+seconds apart) before it decides. A state that is still `UNKNOWN` after the
+retries leaves both labels untouched rather than guessing; a state that is
+neither `clean` nor `dirty` (for example `behind`) clears `merge-conflict`
+without claiming the PR is ready.
+
+### Which files actually conflict
+
+`scripts/doc_churn.py` ranks the files and top-level directories that appear in
+the most merged pull requests, which is the churn that produces conflicts. It
+is offline by default — it reads the saved fixtures payload — and shells out to
+`gh` only with `--live`:
+
+```bash
+uv run python scripts/doc_churn.py --since 30d            # offline fixtures
+uv run python scripts/doc_churn.py --since 30d --live     # the real history
+uv run python scripts/doc_churn.py --since 30d --live --json
+```
+
+A path repeated inside one pull request counts once: the number is how many
+pull requests touched a file, not how many file entries named it.
+
+### Tiered Automated Triage (shift-left filtering)
+
+The same risk workflow runs a third job, **triage**, which decides whether a
+human may open the diff. It enforces the project's shift-left rule:
+
+> **Humans should never read an unvetted AI PR.**
+
+A pull request is vetted -- and becomes eligible for a human reviewer -- only
+when it carries the `ready for human review` gate label. The triage job applies
+it deterministically (no LLM, no PR code executed) from the provenance, risk
+tier, and size labels the `labels` and `pr-risk` jobs just computed:
+
+| Author | Risk tier | Gate decision | What a human sees |
+|---|---|---|---|
+| Human | any | `ready for human review` | The diff is open for review immediately. |
+| Agent | `safe to merge` (≤ 20) | `ready for human review` | Automated vet complete; fast path to review. |
+| Agent | `safe to merge` + `size/XL` | `needs human review` | Size alone warrants a first reviewer pass. |
+| Agent | `needs a look` (21–50) | `needs human review` | Awaits an assigned reviewer before anyone reads the diff. |
+| Agent | `danger zone` (≥ 51) | `deep dive` | Blocking deep-dive review; never auto-merged. |
+
+The triage job owns the gate labels (`ready for human review`, `needs human
+review`, `deep dive`) and manages them idempotently on every run, so re-pushing
+a branch re-triages the pull request. It creates its own labels (the `labels`
+job manages a different set), runs only on non-fork pull requests, and never
+executes pull request code.
+
+```bash
+python3 scripts/pr_triage.py --labels labels.txt   # print the triage decision
+```
+
+## AI merge trust and authorization labels
+
+Two labels work together to let an AI agent merge safe pull requests without
+human review:
+
+| Label | Meaning | Set by |
+|-------|---------|--------|
+| `ai-merge-safe` | The PR is non-disruptive and non-sensitive (AND-gated on risk, size, telemetry, sensitive areas, hygiene). | `pr-ai-merge.yml` |
+| `ai-merge-authorized` | CI is green and the PR carries `ai-merge-safe` + `ready-for-merge`; an AI agent may auto-merge it. | `pr-ai-authorize.yml` |
+
+### `ai-merge-safe` (labelling only — humans still merge)
+
+The [PR AI merge trust workflow](.github/workflows/pr-ai-merge.yml) applies
+`ai-merge-safe` only when every gate passes, and removes it when any gate
+fails. Deterministic — no LLM calls, no network beyond the GitHub API, no pull
+request code executed. Fork pull requests are skipped per-job.
+
+| Gate | Requirement |
+|------|-------------|
+| Low disruption | `safe to merge` (risk score ≤ 20) |
+| CI green, no conflicts | `ready-for-merge` |
+| Small enough | `size/XS` or `size/S` (< 250 lines changed) |
+| Clean telemetry | none of `breaking change`, `needs deep dive`, `telemetry invalid` |
+| Non-sensitive areas | no CI/infra/release path, no deleted protected file, no dependency change |
+| Hygiene | open, non-draft PR targeting `main` |
+
+```bash
+python3 scripts/pr_ai_merge.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_merge.py --managed            # list owned labels
+```
+
+### `ai-merge-authorized` (CI green → AI agent may auto-merge)
+
+The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
+applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
+head commit's check suite is complete and green, `ready-for-merge` is present
+(no merge conflicts), and hygiene passes (open, non-draft, targets `main`). It
+is removed when any gate fails.
+
+"Green" is `compute_ci_state()` in `scripts/pr_ai_authorize.py`: `CI green` and
+`PR guardrails` must be successful, and every other GitHub Actions check run on
+the head commit must be green except the advisory browser suite (`End-to-end`),
+which `AGENTIC_ODI_E2E_BLOCKING=true` turns into a gate. The legacy combined
+commit status is deliberately not consulted — it carries only third-party
+statuses, so it reads `success` while CI is still queued. See
+[ADR 0009](architecture/adr/0009-ai-merge-gate-reads-the-check-suite.md).
+
+```bash
+python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
+python3 scripts/pr_ai_authorize.py --managed            # list owned labels
+```
+
+### Auto-merge (Phase 2)
+
+The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
+`gh pr merge --auto --squash` only on an open PR that carries
+`ai-merge-authorized`, `ai-merge-safe` and `ready-for-merge`, whose head commit
+passes the check-suite gate, and whose labels it has just re-read. The trigger
+is narrowed to the labels that can change the decision, so an unrelated label
+cannot arm a merge.
+
+Arming is a request, not a decision: every run can disarm. If a gate stops
+holding — the authorization or trust label is removed, a new push resets the
+checks, a human adds `do-not-merge` or `needs human review`, or the suite goes
+red — the workflow calls `gh pr merge --disable-auto` and says why in an
+idempotent `## AI merge act` comment that names the head commit it judged.
+
+### Branch protection (enforced on `main`)
+
+A label is advisory; a status check is not. The `main-requires-ci-green`
+ruleset on `main` requires these checks, and nothing can bypass them:
+
+| Check / requirement | Purpose |
+|---------------------|---------|
+| `CI green` status check | Full CI matrix passes |
+| `PR guardrails` status check | Diff-shape, body-truth, and fabrication gates pass |
+
+The `protect-main` ruleset adds the branch-level rules: no deletion, no
+non-fast-forward push, and every change arrives through a pull request.
+
+A ruleset cannot require a *label* — its rule types are checks, reviews, and push
+rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
+path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
+without it, and `pr-ai-merge-act.yml` arms auto-merge only on that label. A pull
+request can therefore satisfy both checks and still not be auto-merged; what stops
+it is the missing label and the `do-not-merge` / `needs human review` labels, not
+GitHub settings.
+
+Rulesets are repository settings, not files, so this cannot be enforced from the
+checkout. `tests/test_adr_index.py` checks the names the documents claim against
+the job names in `.github/workflows/ci.yml` and
+`.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
+that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
+for the decision and the deferred `label gate` check.
+
 ## Testing
+
+See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
+
+```bash
+uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
+uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
+uv run python scripts/verify.py --full      # full matrix (CI's job)
+```
+
+Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
+`--full`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
-cover, and every test runs from the repository root:
-
-```bash
-uv run pytest                        # everything
-uv run pytest apps/cli               # one app
-uv run pytest packages/core          # one package
-uv run pytest tests/contract         # cross-package contracts
-uv run pytest tests/scripts          # dev launcher
-```
-
-The pre-PR procedure is not "run everything". It is the **default** tier in
-[`.agents/workflows/test.md`](../.agents/workflows/test.md): the fast tier,
-plus type checking, plus the studio units. The full tier — the studio build
-and the browser e2e suite — is CI's job and is not asked of anyone before
-they open a pull request.
+cover.
 
 The MCP server contract test compares the live FastMCP registry with
 `packages/core/src/agentic_odi_core/contract.py`, so add or change a tool in
@@ -404,6 +581,15 @@ Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
 a second sidecar on the MCP passthrough backend. Two projects run against
 them: `chromium` for the local backend (the product default) and
 `mcp-backend` for the passthrough.
+
+A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
+It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
+the `pr-screenshots` directory under `apps/studio` for human review. The
+default `test:e2e` run never sees it. The `pr-screenshots` workflow sets the
+variable, captures the screens against a live backend, and posts them as a
+single comment on the pull request. The job is advisory — `continue-on-error:
+true` and no membership in `ci-green`'s `needs` — so a screenshot failure
+cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none. When a test
@@ -550,7 +736,7 @@ uv run pytest \
 
 | Area | What it covers |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence and its numbered schema-migration ledger, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
 | `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
@@ -560,7 +746,7 @@ uv run pytest \
 | `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
 | `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
 | `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility, and README sync |
+| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility and the per-page social cards, and README sync |
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the

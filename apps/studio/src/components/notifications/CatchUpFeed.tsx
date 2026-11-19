@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { formatRelativeTime } from "../../lib/relativeTime";
+import { formatExactTime, formatRelativeTime } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
 import type { Signal, SignalKind, SignalSeverity } from "../../types";
 import { FailurePanel } from "../FailurePanel";
@@ -201,7 +201,13 @@ export function CatchUpFeed() {
                         {KIND_LABEL[item.kind].toUpperCase()} · {item.severity}
                       </span>
                     </span>
-                    <span className="card__id">{formatRelativeTime(item.created_at)}</span>
+                    <time
+                      className="card__id"
+                      dateTime={item.created_at}
+                      title={formatExactTime(item.created_at)}
+                    >
+                      {formatRelativeTime(item.created_at)}
+                    </time>
                   </div>
 
                   <div className="catchup-card__controls">

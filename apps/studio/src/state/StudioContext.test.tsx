@@ -5,6 +5,7 @@ import "fake-indexeddb/auto";
 
 import { SESSION_KEY } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
+import { getStudioBff } from "../bff/index";
 import {
   CountedStudio,
   expectRenderBudget,
@@ -15,6 +16,8 @@ import {
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
 import { StudioProvider, useStudio } from "./StudioContext";
+import { useToasts } from "./notices/NoticesContext";
+import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
 
 const CONVERSATION = {
   id: "c-1",
@@ -42,8 +45,47 @@ function json(body: unknown): Response {
   });
 }
 
+
+/**
+ * A reply of `count` deltas whose terminal frame carries no content, so what is
+ * rendered is exactly what the deltas accumulated. A delta the frame batching
+ * dropped would show up here as a short string.
+ */
+function streamOfProse(count: number): string {
+  const deltas = Array.from(
+    { length: count },
+    (_unused, index) => `event: delta\ndata: {"text":"w${index} "}\n\n`,
+  ).join("");
+  return deltas + "event: message\ndata: {}\n\n";
+}
+
 function sse(body: string): Response {
   return new Response(body, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+/** The same bytes, released one event per macrotask: what a network delivers. */
+function chunkedSse(body: string): Response {
+  const encoder = new TextEncoder();
+  const blocks = body.split("\n\n").filter((block) => block.trim().length > 0);
+  let index = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const push = () => {
+        if (index >= blocks.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(`${blocks[index]}\n\n`));
+        index += 1;
+        setTimeout(push, 0);
+      };
+      setTimeout(push, 0);
+    },
+  });
+  return new Response(stream, {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   });
@@ -59,6 +101,8 @@ const DEFAULT_CHAT_STREAM =
   'event: message\ndata: {"content":"Hi"}\n\n';
 
 let chatStream: string | null = null;
+/** Deliver the stream one event per macrotask, as a real network does. */
+let chatChunked = false;
 let canvasFails = false;
 /** Extra records the canvas route serves; empty keeps every other test as-is. */
 let canvasRecords: Record<string, unknown> = {};
@@ -70,6 +114,7 @@ let releaseChat: (() => void) | null = null;
 let connectorFetches = 0;
 let llmHealthFetches = 0;
 let llmUnhealthy = false;
+let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
@@ -78,7 +123,12 @@ let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let renamePatches: Record<string, unknown>[] = [];
+/** When true, the conversation PATCH route answers 503 so a rename fails. */
+let renameFails = false;
 let conversationCreates = 0;
+/** When true, the canvas/evidence write routes answer 503 with no structured error. */
+let writeFails = false;
 
 // The follow-up queue (#410) needs a turn that stays in flight so later sends
 // actually line up behind it: /api/chat then returns a stream the test closes
@@ -87,6 +137,8 @@ type GatedTurn = {
   body: Record<string, unknown>;
   aborted: boolean;
   respond: (events: string) => void;
+  /** Release part of the stream without closing it: a reply mid-flight. */
+  emit: (events: string) => void;
   abort: () => void;
 };
 let gateChats = false;
@@ -104,6 +156,9 @@ function gatedChatResponse(
     respond: (events) => {
       streamController?.enqueue(encoder.encode(events));
       streamController?.close();
+    },
+    emit: (events) => {
+      streamController?.enqueue(encoder.encode(events));
     },
     abort: () => {
       turn.aborted = true;
@@ -124,13 +179,31 @@ function gatedChatResponse(
   );
 }
 
+/**
+ * The canvas and evidence write routes. A read is a GET; a write is anything
+ * else against one of these paths.
+ */
+function isCanvasWrite(url: string, method: string | undefined): boolean {
+  if (method === undefined || method === "GET") {
+    return false;
+  }
+  return (
+    url === "/api/jobs" ||
+    url.startsWith("/api/jobs/") ||
+    url === "/api/steps" ||
+    url.startsWith("/api/steps/") ||
+    url === "/api/outcomes" ||
+    url.startsWith("/api/outcomes/") ||
+    url.startsWith("/api/evidence")
+  );
+}
+
 function route(
   input: RequestInfo | URL,
   init?: RequestInit,
   configFails = false,
 ): Response | Promise<Response> {
   const url = String(input);
-
   if (url === "/api/chat") {
     chatBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
     chatAttempts += 1;
@@ -157,6 +230,9 @@ function route(
     }
     if (gateChats) {
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
+    }
+    if (chatChunked) {
+      return chunkedSse(chatStream ?? DEFAULT_CHAT_STREAM);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
@@ -206,6 +282,12 @@ function route(
       });
     }
     return json({ jobs: [], steps: [], outcomes: [], source: "local", ...canvasRecords });
+  }
+  if (writeFails && isCanvasWrite(url, init?.method)) {
+    return new Response(JSON.stringify({ detail: "Sidecar unreachable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   if (url === "/api/connectors/catalog") {
     catalogFetches += 1;
@@ -258,7 +340,19 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    if ("title" in body) {
+      if (renameFails) {
+        return new Response(JSON.stringify({ detail: "nope" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      renamePatches.push({ url, ...body });
+    }
+    if ("head_id" in body) {
+      headPatches.push(body);
+    }
     return json({ conversation: CONVERSATION });
   }
   if (url === "/api/conversations/c-1/tree") {
@@ -321,6 +415,14 @@ function route(
   }
   if (url === "/api/health/llm") {
     llmHealthFetches += 1;
+    // A dead proxy: the request never reaches a model, so nothing answers. The
+    // 502 with a non-sidecar body is what the studio reads as a transport failure.
+    if (llmTransportFails) {
+      return new Response(JSON.stringify({ detail: "bad gateway" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return json(
       llmUnhealthy
         ? { healthy: false, message: "connection refused" }
@@ -348,9 +450,12 @@ describe("StudioContext memory and resume", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -364,13 +469,27 @@ describe("StudioContext memory and resume", () => {
       JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
     );
 
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
   });
 
   it("remembers the subject the user navigates to", () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     act(() => {
       result.current.focusSubject("job", "JOB-7");
@@ -387,13 +506,27 @@ describe("StudioContext memory and resume", () => {
   it("starts clean when the stored session is unreadable", () => {
     localStorage.setItem(SESSION_KEY, "broken");
 
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     expect(result.current.focusedSubject).toBeNull();
   });
 
   it("sends the visible conversation path as model context", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
     await act(async () => {
@@ -408,7 +541,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("regenerates an answer from its existing user turn without duplicating it", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
     await act(async () => {
@@ -427,7 +567,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("edits a user turn by replacing it at its original parent", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
 
     await act(async () => {
@@ -445,7 +592,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("serializes attachments with the sidecar's snake-case fields", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -473,7 +627,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("resumes the latest conversation and loads what it learned", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
     expect(result.current.messages.map((message) => message.content)).toEqual([
@@ -486,7 +647,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("loads the history list on boot, newest first", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.conversations).toHaveLength(2));
     expect(result.current.conversations.map((conversation) => conversation.id)).toEqual([
@@ -497,7 +665,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("opens a past conversation by loading its turns", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -512,7 +687,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("toasts after creating a job and recording an outcome", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -534,7 +716,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("confirms a connector was added", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -550,7 +739,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("persists a saved opportunity thesis", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -574,7 +770,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("sends the conversation id and applies memory events", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -588,7 +791,14 @@ describe("StudioContext memory and resume", () => {
   });
 
   it("clears the thread and starts a fresh conversation", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => result.current.clearChat());
@@ -609,9 +819,12 @@ describe("StudioContext failures", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -622,7 +835,14 @@ describe("StudioContext failures", () => {
   it("keeps the question and the failed turn when the stream reports an error", async () => {
     chatStream =
       'event: error\ndata: {"error":{"code":"mcp_unreachable","message":"MCP server unreachable","retryable":true,"request_id":"req-1"}}\n\n';
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -639,7 +859,14 @@ describe("StudioContext failures", () => {
 
   it("keeps the question when the request itself fails", async () => {
     chatFailure = new Error("network down");
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -651,9 +878,80 @@ describe("StudioContext failures", () => {
     expect(messages.at(-1)?.error?.code).toBe("internal");
   });
 
+  it("drops a failed send and its question when the row is dismissed (#405)", async () => {
+    chatFailure = new Error("network down");
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const before = result.current.messages;
+    const failed = before.at(-1);
+    const question = before.at(-2);
+    expect(question?.role).toBe("user");
+    expect(question?.content).toBe("list the jobs");
+    expect(failed?.role).toBe("assistant");
+    expect(failed?.error).toBeDefined();
+
+    await act(async () => {
+      result.current.dismissFailedTurn(failed?.id ?? null);
+    });
+
+    // Both the question and the dead reply leave together: the pair is one send.
+    // The earlier, answered turns stay.
+    const after = result.current.messages;
+    expect(after.map((message) => message.id)).not.toContain(failed?.id);
+    expect(after.map((message) => message.id)).not.toContain(question?.id);
+    expect(after).toHaveLength(before.length - 2);
+  });
+
+  it("never dismisses a turn that did not fail (#405)", async () => {
+    chatStream = 'event: message\ndata: {"content":"Here you go."}\n\n';
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const answered = result.current.messages.at(-1);
+    expect(answered?.role).toBe("assistant");
+    expect(answered?.error).toBeUndefined();
+    const before = result.current.messages.length;
+
+    await act(async () => {
+      result.current.dismissFailedTurn(answered?.id ?? null);
+    });
+
+    expect(result.current.messages).toHaveLength(before);
+  });
+
   it("reports a stream that ends without a message as an internal failure", async () => {
     chatStream = 'event: status\ndata: {"phase":"model"}\n\n';
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -667,7 +965,14 @@ describe("StudioContext failures", () => {
     chatStream =
       'event: connector\ndata: {"status":"error","error":"preset not found"}\n\n' +
       'event: message\ndata: {"content":"Sorry."}\n\n';
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
     const before = connectorFetches;
 
@@ -696,6 +1001,7 @@ describe("StudioContext first run in a browser with no server", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     configAborts = 0;
     catalogFetches = 0;
     featuredFetches = 0;
@@ -720,7 +1026,14 @@ describe("StudioContext first run in a browser with no server", () => {
     // it go at 1,200 ms and carry on with the defaults it already has.
     configHangs = true;
     vi.useFakeTimers();
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     // Just before the bound the request is still ours to wait on.
     await act(async () => {
@@ -748,7 +1061,14 @@ describe("StudioContext first run in a browser with no server", () => {
     // the config request alongside it and never a gate, and the off-screen reads
     // last — so nothing on the first screen waits on /api/config.
     configHangs = true;
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
     await waitFor(() => expect(result.current.memory).toHaveLength(1));
@@ -760,7 +1080,14 @@ describe("StudioContext first run in a browser with no server", () => {
 
   it("answers the first message instead of refusing it", async () => {
     chatFailure = new TypeError("fetch failed");
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.canvas).not.toBeNull());
 
     await act(async () => {
@@ -782,9 +1109,57 @@ describe("StudioContext first run in a browser with no server", () => {
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
   });
 
+  it("surfaces a real application error instead of falling back", async () => {
+    // A 401 from the sidecar is an application error, not a transport failure:
+    // the local assistant must not answer for it.
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/chat") {
+        chatAttempts += 1;
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "Bad token.", retryable: false } }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    // The error surfaces on the assistant message; no local-served marker.
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last?.role).toBe("assistant");
+      expect(last?.error).toBeDefined();
+    });
+    const last = result.current.messages.at(-1);
+    expect(last?.error).toBeDefined();
+    expect(result.current.offlineReplyFor).toBeNull();
+    // Only one attempt at /api/chat — no fall-through to the browser BFF.
+    expect(chatAttempts).toBe(1);
+  });
+
   it("calls nothing broken until the person asks", async () => {
     vi.useFakeTimers();
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -802,7 +1177,14 @@ describe("StudioContext first run in a browser with no server", () => {
 
   it("gives up the survey when the person starts talking", async () => {
     vi.useFakeTimers();
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
@@ -826,7 +1208,14 @@ describe("StudioContext first run in a browser with no server", () => {
     // that is working exactly as designed.
     llmUnhealthy = true;
     vi.useFakeTimers();
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -840,6 +1229,63 @@ describe("StudioContext first run in a browser with no server", () => {
     expect(result.current.llmHealth.healthy).toBe(false);
   });
 
+  it("stops probing a dead endpoint and counts down to the next try (#536)", async () => {
+    // A proxy that answers 502 is dead, not flaky: after three transport failures
+    // the breaker opens, the scheduled probe stops spending requests, and the
+    // status the bar reads turns into a countdown.
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // Step until the breaker opens, so the assertion below sits at the start of a
+    // fresh window rather than somewhere unknown inside it.
+    for (let i = 0; i < 300 && result.current.probeRetry.state !== "open"; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(result.current.probeRetry.retryInMs).toBeGreaterThan(0);
+    const spent = llmHealthFetches;
+
+    // Well inside the window the cadence keeps ticking, but the breaker forbids
+    // every request, so nothing is spent.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    expect(llmHealthFetches).toBe(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
+  it("lets a person asking through an open breaker (#536)", async () => {
+    llmTransportFails = true;
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200_000);
+    });
+    expect(result.current.probeRetry.state).toBe("open");
+    const spent = llmHealthFetches;
+
+    // "Check now" is the person overruling the breaker: it resets and probes.
+    await act(async () => {
+      await result.current.checkConnections();
+    });
+    expect(llmHealthFetches).toBeGreaterThan(spent);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  });
+
+
   it("asks the browser for idle time, and gives it up when the person types", async () => {
     // The branch every real browser takes — jsdom has no requestIdleCallback, so the
     // timer fallback above is the one those tests exercise. The survey is scheduled for
@@ -849,7 +1295,14 @@ describe("StudioContext first run in a browser with no server", () => {
     vi.stubGlobal("requestIdleCallback", requestIdle);
     vi.stubGlobal("cancelIdleCallback", cancelIdle);
     vi.useFakeTimers();
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
@@ -877,7 +1330,14 @@ describe("StudioContext first run in a browser with no server", () => {
     vi.stubGlobal("requestIdleCallback", requestIdle);
     vi.stubGlobal("cancelIdleCallback", vi.fn());
     vi.useFakeTimers();
-    const { result, unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result, unmount } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
@@ -902,6 +1362,255 @@ describe("StudioContext first run in a browser with no server", () => {
   });
 });
 
+describe("StudioContext writes with no sidecar (#523)", () => {
+  beforeEach(async () => {
+    writeFails = true;
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    canvasRecords = {};
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+    // Each test starts from an empty store: a leftover optimistic record from the
+    // previous test would be overlaid on this one's board.
+    const bff = await getStudioBff();
+    await bff.store.clearAll();
+  });
+
+  afterEach(() => {
+    writeFails = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("saves an outcome on this device and says where it lives, never 'Error'", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId = (await result.current.createJob({ name: "Get a service to production" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time from merge to production",
+        importance: 9,
+        satisfaction: 3,
+      });
+    });
+
+    // The outcome is on the board with its score, and the receipt says where the
+    // change lives instead of reporting a lost edit.
+    await waitFor(() =>
+      expect(
+        (result.current.canvas?.outcomes ?? []).map((outcome) => outcome.statement),
+      ).toContain("Minimize the time from merge to production"),
+    );
+    const messages = result.current.toasts.map((toast) => toast.message);
+    expect(messages).toContain("Saved on this device · will sync");
+    expect(messages.some((message) => message.startsWith("Error"))).toBe(false);
+    expect(messages.some((message) => message.startsWith("Could not"))).toBe(false);
+  });
+
+  it("marks the optimistic outcome pending", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId = (await result.current.createJob({ name: "Job" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+
+    await waitFor(() => {
+      const outcome = (result.current.canvas?.outcomes ?? []).find(
+        (candidate) => candidate.statement === "Minimize the time",
+      );
+      expect(outcome?.pending).toBe(true);
+    });
+  });
+
+  it("keeps the pending outcome through a refresh that answers without it", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let jobId = "";
+    await act(async () => {
+      jobId = (await result.current.createJob({ name: "Job" })) ?? "";
+    });
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+
+    // The sidecar answers a refresh with a canvas that predates the queued write.
+    await act(async () => {
+      await result.current.refreshCanvas();
+    });
+
+    const outcome = (result.current.canvas?.outcomes ?? []).find(
+      (candidate) => candidate.statement === "Minimize the time",
+    );
+    expect(outcome).toBeDefined();
+    expect(outcome?.pending).toBe(true);
+  });
+
+  it("rehydrates a queued write as pending after a reload", async () => {
+    const first = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(first.result.current.canvas).not.toBeNull());
+    let jobId = "";
+    await act(async () => {
+      jobId = (await first.result.current.createJob({ name: "Job" })) ?? "";
+    });
+    await act(async () => {
+      await first.result.current.addOutcome({
+        job_id: jobId,
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+    first.unmount();
+
+    // A reload: fresh providers, same IndexedDB. The write is still queued, so the
+    // board must show it pending rather than lose it.
+    const second = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => {
+      const outcome = (second.result.current.canvas?.outcomes ?? []).find(
+        (candidate) => candidate.statement === "Minimize the time",
+      );
+      expect(outcome?.pending).toBe(true);
+    });
+  });
+
+  it("reports the server acknowledgement, not a local save, when the sidecar answers", async () => {
+    writeFails = false;
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.addOutcome({
+        job_id: "JOB-1",
+        statement: "Minimize the time",
+        importance: 8,
+        satisfaction: 3,
+      });
+    });
+
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "Outcome captured successfully!",
+    );
+    expect(result.current.toasts.map((toast) => toast.message)).not.toContain(
+      "Saved on this device · will sync",
+    );
+  });
+
+  it("still reports a sidecar's own refusal as an error", async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/outcomes" && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            error: { code: "validation", message: "Not an ODI statement.", retryable: false },
+          }),
+          { status: 422, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    let thrown: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.addOutcome({
+          job_id: "JOB-1",
+          statement: "faster",
+          importance: 8,
+          satisfaction: 3,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+    });
+    expect((thrown as Error)?.message).toBe("Not an ODI statement.");
+
+    // A refused write is a real failure: nothing was queued, so no receipt claims
+    // it was saved on this device.
+    expect(result.current.toasts.map((toast) => toast.message)).not.toContain(
+      "Saved on this device · will sync",
+    );
+    const bff = await getStudioBff();
+    expect(await bff.listOutbox()).toHaveLength(0);
+  });
+});
+
+
 describe("StudioContext on a desktop install whose model is down", () => {
   beforeEach(() => {
     llmUnhealthy = true;
@@ -913,6 +1622,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -940,7 +1650,14 @@ describe("StudioContext on a desktop install whose model is down", () => {
       }),
     );
     vi.useFakeTimers();
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_500);
     });
@@ -951,7 +1668,7 @@ describe("StudioContext on a desktop install whose model is down", () => {
   });
 });
 
-describe("StudioContext health polling", () => {
+describe("StudioContext probe scheduling", () => {
   beforeEach(() => {
     localStorage.clear();
     chatBody = null;
@@ -961,34 +1678,198 @@ describe("StudioContext health polling", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
   afterEach(() => {
+    llmUnhealthy = false;
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it("re-probes the model every 30 seconds and when the window comes back", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+  /** Drive `document.visibilityState`, which jsdom reports as a static getter. */
+  function driveVisibility(initial: DocumentVisibilityState = "visible") {
+    let state = initial;
+    const spy = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockImplementation(() => state);
+    return {
+      hide() {
+        state = "hidden";
+      },
+      show() {
+        state = "visible";
+      },
+      restore() {
+        spy.mockRestore();
+      },
+    };
+  }
+
+  it("probes on a jittered cadence while the window is visible", async () => {
+    renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(2_500);
     });
-    const initial = llmHealthFetches;
+    const afterBoot = llmHealthFetches;
+    expect(afterBoot).toBeGreaterThan(0);
+
+    // The scheduler armed at mount for PROBE_BASE_MS ±20%, so from mount nothing
+    // fires before the shortest wait. The boot's own probe has already run.
+    const shortest = PROBE_BASE_MS * (1 - PROBE_JITTER);
+    const longest = PROBE_BASE_MS * (1 + PROBE_JITTER);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(shortest - 2_500 - 1_000);
+    });
+    expect(llmHealthFetches).toBe(afterBoot);
+
+    // ...and one has fired by the longest. The margin covers the boot settle:
+    // the timer can be armed after the mount (a boot report re-arms it), so the
+    // wait is anchored on the longest delay plus the boot's own 2.5 s.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(longest - shortest + 5_000);
+    });
+    expect(llmHealthFetches).toBeGreaterThan(afterBoot);
+  });
+
+  it("makes no request at all while the window is hidden", async () => {
+    const visibility = driveVisibility("hidden");
+    renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const afterBoot = llmHealthFetches;
 
     await act(async () => {
-      vi.advanceTimersByTime(30_000);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
     });
-    expect(llmHealthFetches).toBeGreaterThan(initial);
+    expect(llmHealthFetches).toBe(afterBoot);
+    visibility.restore();
+  });
 
-    const afterInterval = llmHealthFetches;
+  it("probes once when the window comes back after the answer has gone stale", async () => {
+    const visibility = driveVisibility("visible");
+    renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    visibility.hide();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    });
+    const whileHidden = llmHealthFetches;
+
+    visibility.show();
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect(llmHealthFetches).toBeGreaterThan(afterInterval);
-    expect(result.current.llmHealth.healthy).toBe(true);
+    expect(llmHealthFetches).toBe(whileHidden + 1);
+    visibility.restore();
+  });
+
+  it("backs off when the model keeps refusing instead of hammering it", async () => {
+    llmUnhealthy = true;
+    renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const start = llmHealthFetches;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    const refused = llmHealthFetches - start;
+    // Ten minutes at the base cadence is about twenty probes; the ladder asks
+    // fewer than a third of that, and jitter cannot move a count across that gap.
+    expect(refused).toBeGreaterThan(0);
+    expect(refused).toBeLessThan(8);
+  });
+
+  it("collapses a burst of endpoint edits into one debounced probe", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const before = llmHealthFetches;
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8001/v1" });
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8002/v1" });
+      result.current.saveSettings({ ...result.current.settings, base_url: "http://localhost:8003/v1" });
+    });
+    // Typing a URL is many saves in a row; none of them probes yet.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS - 1);
+    });
+    expect(llmHealthFetches).toBe(before);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(llmHealthFetches).toBe(before + 1);
+  });
+
+  it("does not probe when an edit leaves the endpoints alone", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    const before = llmHealthFetches;
+
+    act(() => {
+      result.current.saveSettings({ ...result.current.settings, theme: "light" });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROBE_SETTINGS_DEBOUNCE_MS + 1_000);
+    });
+    expect(llmHealthFetches).toBe(before);
   });
 });
 
@@ -1009,7 +1890,14 @@ describe("StudioContext signal inbox", () => {
   });
 
   it("loads the inbox on boot and keeps polling while the window is visible", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -1042,6 +1930,7 @@ describe("StudioContext theme", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
@@ -1052,7 +1941,14 @@ describe("StudioContext theme", () => {
   });
 
   it("applies the stored theme and persists a change", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     expect(document.documentElement.classList.contains("theme-dark")).toBe(true);
@@ -1066,7 +1962,14 @@ describe("StudioContext theme", () => {
   });
 
   it("cross-fades a theme change and clears the class when it ends", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
 
     act(() => {
@@ -1091,7 +1994,14 @@ describe("StudioContext theme", () => {
       dispatchEvent: vi.fn(() => false),
     }));
 
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(document.documentElement.classList.contains("theme-dark")).toBe(true));
 
     act(() => {
@@ -1104,13 +2014,27 @@ describe("StudioContext theme", () => {
 
   it("keeps the chosen theme across a remount", async () => {
     localStorage.setItem("studio.settings", JSON.stringify({ theme: "light" }));
-    const { unmount } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { unmount } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(document.documentElement.classList.contains("theme-light")).toBe(true));
 
     unmount();
     document.documentElement.className = "";
 
-    const second = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const second = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(second.result.current.settings.theme).toBe("light"));
     expect(document.documentElement.classList.contains("theme-light")).toBe(true);
   });
@@ -1126,9 +2050,12 @@ describe("StudioContext canvas state", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1138,7 +2065,14 @@ describe("StudioContext canvas state", () => {
 
   it("reports a failed canvas as an error state, not as an empty canvas", async () => {
     canvasFails = true;
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.canvasState.kind).toBe("error"));
     expect(result.current.canvasError?.code).toBe("mcp_unreachable");
@@ -1146,7 +2080,14 @@ describe("StudioContext canvas state", () => {
   });
 
   it("reports a canvas with no work as empty, not as ready", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.canvasState.kind).toBe("empty"));
     expect(result.current.canvasError).toBeNull();
@@ -1163,9 +2104,12 @@ describe("StudioContext stopped turns", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1175,7 +2119,14 @@ describe("StudioContext stopped turns", () => {
 
   it("keeps the question but shows no failure when the user stops the turn", async () => {
     chatAborts = true;
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1198,9 +2149,12 @@ describe("StudioContext write approval and branches", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1213,7 +2167,14 @@ describe("StudioContext write approval and branches", () => {
       'event: approval\ndata: {"id":"apv_1","tool_call_id":"call-1","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
       'event: message\ndata: {"content":"Added."}\n\n';
 
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1233,7 +2194,14 @@ describe("StudioContext write approval and branches", () => {
   });
 
   it("asks the server for approval before any write", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1245,7 +2213,14 @@ describe("StudioContext write approval and branches", () => {
   });
 
   it("persists the branch a person switched to", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1271,6 +2246,7 @@ describe("StudioContext boot failure", () => {
     chatAborts = false;
     canvasFails = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     vi.stubGlobal(
       "fetch",
@@ -1283,7 +2259,14 @@ describe("StudioContext boot failure", () => {
   });
 
   it("surfaces a store-corrupt failure as bootError, not as a down sidecar", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.bootError).not.toBeNull());
 
@@ -1294,7 +2277,14 @@ describe("StudioContext boot failure", () => {
   });
 
   it("clears the failure page once a restored store answers cleanly", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
 
     await waitFor(() => expect(result.current.bootError).not.toBeNull());
 
@@ -1331,9 +2321,12 @@ describe("StudioContext startNewThread (#319)", () => {
     canvasFails = false;
     bootCorrupt = false;
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -1350,7 +2343,14 @@ describe("StudioContext startNewThread (#319)", () => {
   });
 
   async function booted() {
-    const harness = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const harness = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(harness.result.current.conversationId).toBe("c-1"));
     return harness;
   }
@@ -1541,7 +2541,14 @@ describe("StudioContext follow-up queue (#410)", () => {
   });
 
   async function openStudio() {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
     await waitFor(() => expect(result.current.queue).not.toBeNull());
     return result;
@@ -1718,9 +2725,12 @@ describe("StudioContext agent focus", () => {
     canvasFails = false;
     canvasRecords = {};
     connectorFetches = 0;
+    llmTransportFails = false;
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -1732,7 +2742,14 @@ describe("StudioContext agent focus", () => {
   });
 
   it("sends the selected record as a pointer the sidecar can verify", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -1746,7 +2763,14 @@ describe("StudioContext agent focus", () => {
   });
 
   it("sends no focus when the screen has nothing selected", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     await act(async () => {
@@ -1757,7 +2781,14 @@ describe("StudioContext agent focus", () => {
   });
 
   it("does not point at a record the sidecar cannot read", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -1770,8 +2801,88 @@ describe("StudioContext agent focus", () => {
     expect(chatBody?.focus ?? null).toBeNull();
   });
 
+  it("opens a detail on the lens that holds its subject, not the panel it named", async () => {
+    canvasRecords = {
+      jobs: [{ id: "J-1", name: "Reconcile invoices" }],
+      steps: [{ id: "S-2", job_id: "J-1", name: "Match each line", order: 2 }],
+    };
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvasState.data?.steps).toHaveLength(1));
+
+    act(() => {
+      result.current.openDetail("landscape", { kind: "step", id: "S-2" });
+    });
+
+    // The subject decides the lens: a step lives in the job map (#739).
+    expect(result.current.activePanel).toBe("jobmap");
+    expect(result.current.detail).toEqual({
+      panel: "jobmap",
+      subject: { kind: "step", id: "S-2" },
+    });
+    expect(result.current.focusedSubject).toEqual({ kind: "step", id: "S-2" });
+    expect(result.current.focusedJobId).toBe("J-1");
+  });
+
+  it("keeps the panel a detail named when its subject names no lens", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("evidence", { kind: "finding", id: "F-1" });
+    });
+
+    // An unwired subject is not guessed at: the panel the action named stands,
+    // and no focus is recorded for a kind the lenses do not know.
+    expect(result.current.activePanel).toBe("evidence");
+    expect(result.current.detail).toEqual({
+      panel: "evidence",
+      subject: { kind: "finding", id: "F-1" },
+    });
+    expect(result.current.focusedSubject).toBeNull();
+  });
+
+  it("opens the panel a detail named when it has no subject", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("catchup");
+    });
+
+    expect(result.current.activePanel).toBe("catchup");
+    expect(result.current.detail).toEqual({ panel: "catchup" });
+  });
+
   it("stops pointing at the screen once the person clears the focus", async () => {
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -1799,7 +2910,14 @@ describe("StudioContext agent focus", () => {
     canvasRecords = {
       outcomes: [{ id: "O-9", statement: "Reduce the time to reconcile a failed payment" }],
     };
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -1817,7 +2935,14 @@ describe("StudioContext agent focus", () => {
     canvasRecords = {
       outcomes: [{ id: "O-9", statement: "An outcome that is still on the board" }],
     };
-    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
     await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
 
     act(() => {
@@ -1920,6 +3045,131 @@ describe("Studio render budget (#502)", () => {
     expectRenderBudget(STREAM_BUDGET);
   });
 
+  it("batches a chunked reply into a frame's worth of renders, not one per delta", async () => {
+    // The network delivers one event per macrotask. Forty deltas that each
+    // published their own render would land as roughly forty renders of every
+    // surface; batching to one frame brings the transcript-only surfaces back
+    // to their quiet baseline.
+    chatChunked = true;
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    const counts = getCounts();
+    expect(counts.landscape ?? 0, "the landscape rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.rail ?? 0, "the rail rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.banners ?? 0, "the banners rendered per delta").toBeLessThanOrEqual(3);
+    chatChunked = false;
+  });
+
+  it("renders the streamed prose exactly as the deltas arrived", async () => {
+    // A turn held open on the wire, then released with forty deltas and the
+    // frame that closes it: the accumulated text must be every delta, in order,
+    // even though the frames batched them.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(streamOfProse(40));
+    });
+
+    const expected = Array.from({ length: 40 }, (_unused, index) => `w${index} `).join("");
+    await waitFor(() => expect(live.current!.messages.at(-1)?.content).toBe(expected));
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("keeps the settled messages identical while the reply streams", async () => {
+    // The assistant message is replaced on every flush; every message before it
+    // keeps its identity, so a reader of the settled transcript is not asked to
+    // render again.
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+    const settled = live.current!.messages.slice();
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+
+    settled.forEach((message, index) => {
+      expect(live.current!.messages[index]).toBe(message);
+    });
+  });
+
+  it("keeps the text that arrived before a cancel, and drops only the placeholder", async () => {
+    // A stop mid-reply: the deltas already received are flushed before the
+    // empty placeholder is removed, so the person keeps what they had read.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].emit('event: delta\ndata: {"text":"half an "}\n\nevent: delta\ndata: {"text":"answer"}\n\n');
+    });
+
+    await act(async () => {
+      live.current!.stopStreaming();
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    expect(live.current!.messages.at(-1)?.content).toBe("half an answer");
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("lands a mid-stream approval after the prose that preceded it", async () => {
+    // Batching prose must not reorder a surface: a tool row that arrives
+    // between two deltas stays between them, not above or below the flush.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("add a job");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(
+        'event: delta\ndata: {"text":"Let me add "}\n\n' +
+          'event: approval\ndata: {"id":"apv_9","tool_call_id":"call-9","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
+          'event: delta\ndata: {"text":"it now."}\n\n' +
+          'event: message\ndata: {"content":"Let me add it now."}\n\n',
+      );
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    const parts = live.current!.messages.at(-1)?.parts ?? [];
+    const kinds = parts.map((part) => part.kind);
+    const approvalAt = kinds.indexOf("tool");
+    const lastTextAt = kinds.lastIndexOf("text");
+    expect(approvalAt).toBeGreaterThan(-1);
+    expect(approvalAt).toBeLessThan(lastTextAt);
+    gateChats = false;
+    gatedTurns = [];
+  });
+
   it("takes twenty keystrokes within its budget", async () => {
     await countedStudio();
     const input = screen.getByRole("textbox", { name: "Message the studio" });
@@ -1940,5 +3190,72 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext rename conversation (#642)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmTransportFails = false;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    renamePatches = [];
+    renameFails = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function booted() {
+    const harness = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(harness.result.current.conversations).toHaveLength(2));
+    return harness;
+  }
+
+  it("renames a thread and re-reads the history", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(renamePatches).toEqual([{ url: "/api/conversations/c-1", title: "Renamed thread" }]);
+    // The list is re-read from the store, not patched by hand.
+    expect(result.current.conversations).toHaveLength(2);
+  });
+
+  it("reports a failed rename and leaves the history as it was", async () => {
+    const { result } = await booted();
+    renameFails = true;
+    const before = result.current.conversations;
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.conversations).toEqual(before);
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "I couldn't rename that conversation.",
+    );
   });
 });

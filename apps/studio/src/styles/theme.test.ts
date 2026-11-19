@@ -138,7 +138,7 @@ describe("theme tokens", () => {
 describe("theme change", () => {
   it("cross-fades only through the fading class", () => {
     expect(themeCss).toMatch(
-      /html\.theme-fading[^{]*\{[^}]*transition-duration:\s*120ms/,
+      /html\.theme-fading[^{]*\{[^}]*transition-duration:\s*var\(--motion-fast\)/,
     );
   });
 });

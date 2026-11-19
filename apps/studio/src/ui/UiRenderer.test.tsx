@@ -1,10 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const toast = vi.hoisted(() => ({ pushToast: vi.fn() }));
+const toast = vi.hoisted(() => ({
+  pushToast: vi.fn(),
+  canvasState: { kind: "ready", data: null } as unknown,
+}));
 
 vi.mock("../state/StudioContext", () => ({
-  useStudio: () => ({ pushToast: toast.pushToast }),
+  useStudio: () => toast,
 }));
 
 import { UiActionContext } from "./actions";
@@ -23,12 +26,13 @@ function nodeOf(spec: unknown): UiNode {
 
 function renderSpec(spec: unknown, overrides: { busy?: boolean } = {}) {
   const onIntent = vi.fn();
+  const onDetail = vi.fn();
   render(
-    <UiActionContext.Provider value={{ onIntent, busy: overrides.busy ?? false }}>
+    <UiActionContext.Provider value={{ onIntent, onDetail, busy: overrides.busy ?? false }}>
       <UiRenderer node={nodeOf(spec)} />
     </UiActionContext.Provider>,
   );
-  return { onIntent };
+  return { onIntent, onDetail };
 }
 
 describe("UiRenderer", () => {
@@ -191,6 +195,47 @@ describe("UiRenderer", () => {
     expect(onIntent).toHaveBeenCalledWith("Simulate a bet on O-1");
   });
 
+  it("opens a detail from a detail action without sending a message", () => {
+    const { onIntent, onDetail } = renderSpec({
+      type: "outcome-card",
+      props: {
+        id: "O-1",
+        statement: "x",
+        importance: 9,
+        satisfaction: 3,
+        actions: [
+          {
+            kind: "detail",
+            label: "See the finding",
+            target: { panel: "landscape", subject: { kind: "outcome", id: "O-1" } },
+          },
+        ],
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "See the finding" }));
+    expect(onDetail).toHaveBeenCalledWith({
+      panel: "landscape",
+      subject: { kind: "outcome", id: "O-1" },
+    });
+    expect(onIntent).not.toHaveBeenCalled();
+  });
+
+  it("drops a detail action that cannot name a panel", () => {
+    renderSpec({
+      type: "outcome-card",
+      props: {
+        id: "O-1",
+        statement: "x",
+        importance: 9,
+        satisfaction: 3,
+        actions: [{ kind: "detail", label: "Broken", target: { subject: { kind: "outcome", id: "O-1" } } }],
+      },
+    });
+
+    expect(screen.queryByRole("button", { name: "Broken" })).toBeNull();
+  });
+
   it("disables actions while a reply is streaming", () => {
     renderSpec(
       {
@@ -277,5 +322,140 @@ describe("impact simulation provenance", () => {
       );
       expect(result.ok).toBe(false);
     }
+  });
+});
+
+describe("finding card", () => {
+  const canvas = {
+    jobs: [],
+    outcomes: [],
+    source: "mcp",
+    steps: [
+      { id: "S-2", name: "Match each line", order: 2 },
+      { id: "S-3", name: "Review the exceptions", order: 3 },
+    ],
+  };
+
+  function finding(overrides: Record<string, unknown> = {}) {
+    return {
+      type: "finding-card",
+      props: {
+        kind: "key_finding",
+        headline: "Waiting on IT approval",
+        impact: "high",
+        metric: { label: "Drop-off at Step 2", value: "34%" },
+        step: "Match each line",
+        detail: "The drop-off is internal waiting.",
+        actions: [
+          {
+            kind: "detail",
+            label: "View breakdown",
+            target: { panel: "jobmap", subject: { kind: "step", id: "S-2" } },
+            tone: "primary",
+          },
+        ],
+        ...overrides,
+      },
+    };
+  }
+
+  beforeEach(() => {
+    toast.canvasState = { kind: "ready", data: canvas };
+  });
+
+  afterEach(() => {
+    toast.canvasState = { kind: "ready", data: null };
+  });
+
+  it("renders the claim, the number, and the step the canvas holds", () => {
+    renderSpec(finding());
+
+    expect(
+      screen.getByRole("article", { name: "Finding: Waiting on IT approval" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Key finding")).toBeInTheDocument();
+    expect(screen.getByText("High impact")).toBeInTheDocument();
+    expect(screen.getByText("Drop-off at Step 2")).toBeInTheDocument();
+    expect(screen.getByText("34%")).toBeInTheDocument();
+    expect(screen.getByText("Step 2 of 2 · Match each line")).toBeInTheDocument();
+    expect(screen.getByText("The drop-off is internal waiting.")).toBeInTheDocument();
+  });
+
+  it("opens the breakdown as a detail action instead of sending a message", () => {
+    const { onIntent, onDetail } = renderSpec(finding());
+    const button = screen.getByRole("button", { name: "View breakdown" });
+
+    // The arrow is decoration: the accessible name stays the label.
+    expect(button).toHaveTextContent("View breakdown →");
+    fireEvent.click(button);
+
+    expect(onDetail).toHaveBeenCalledWith({
+      panel: "jobmap",
+      subject: { kind: "step", id: "S-2" },
+    });
+    expect(onIntent).not.toHaveBeenCalled();
+  });
+
+  it("counts the step against its own job, not every step on the canvas", () => {
+    toast.canvasState = {
+      kind: "ready",
+      data: {
+        ...canvas,
+        steps: [
+          { id: "S-2", job_id: "J-1", name: "Match each line", order: 2 },
+          { id: "S-3", job_id: "J-1", name: "Review the exceptions", order: 3 },
+          { id: "S-9", job_id: "J-2", name: "File the invoice", order: 1 },
+          { id: "S-10", job_id: "J-2", name: "Chase the approval", order: 2 },
+        ],
+      },
+    };
+
+    renderSpec(finding());
+
+    expect(screen.getByText("Step 2 of 2 · Match each line")).toBeInTheDocument();
+  });
+
+  it("names no step when the canvas does not hold that step", () => {
+    renderSpec(finding({ step: "A step nobody captured" }));
+
+    expect(screen.queryByText("Step 2 of 2 · Match each line")).toBeNull();
+    expect(screen.getByText("Waiting on IT approval")).toBeInTheDocument();
+  });
+
+  it("drops a bad impact band and keeps the finding", () => {
+    renderSpec(finding({ impact: "severe" }));
+
+    expect(screen.queryByText("High impact")).toBeNull();
+    expect(screen.getByText("Waiting on IT approval")).toBeInTheDocument();
+  });
+
+  it("badges a finding drawn from a sample canvas", () => {
+    toast.canvasState = {
+      kind: "ready",
+      data: {
+        ...canvas,
+        provenance: {
+          kind: "seed",
+          reason: "demo",
+          generated_at: "2026-11-01T00:00:00Z",
+          record_counts: { jobs: 0, steps: 2, outcomes: 0, evidence: 0 },
+        },
+      },
+    };
+
+    renderSpec(finding());
+
+    expect(screen.getByText("Sample")).toHaveAttribute(
+      "title",
+      "This is bundled sample data, not yours.",
+    );
+  });
+
+  it("strips an undeclared prop instead of trusting it", () => {
+    renderSpec(finding({ dangerouslySetInnerHTML: "<script/>" }));
+
+    expect(
+      screen.getByRole("article", { name: "Finding: Waiting on IT approval" }),
+    ).toBeInTheDocument();
   });
 });

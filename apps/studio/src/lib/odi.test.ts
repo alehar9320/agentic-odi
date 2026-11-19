@@ -1,17 +1,103 @@
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
+  confidencePill,
   formatMemberMean,
   formatOpportunityScore,
   hasScore,
   isUnderserved,
+  isUnderservedPoint,
   opportunityPill,
   opportunityScore,
+  scoreConfidence,
+  scoreMismatch,
   scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
+  underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
+  UNSCORED_LABEL,
 } from "./odi";
+
+// The fixture is the contract between the Python service and the TypeScript
+// client. It lives in `packages/core/tests/fixtures/opportunity-score.json` and
+// is read by both languages; neither side may re-derive its expected values.
+const FIXTURE_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../packages/core/tests/fixtures/opportunity-score.json",
+);
+
+function loadScoreFixture() {
+  return JSON.parse(readFileSync(FIXTURE_PATH, "utf8")) as {
+    formula: string;
+    cases: Array<{
+      id: string;
+      importance: number | null;
+      satisfaction: number | null;
+      score: number | null;
+    }>;
+  };
+}
+
+describe("the shared scoring fixture", () => {
+  it("is valid JSON with the documented formula and no comments", () => {
+    const fixture = loadScoreFixture();
+    expect(fixture.formula).toBe("importance + max(importance - satisfaction, 0)");
+    expect(Array.isArray(fixture.cases)).toBe(true);
+    expect(fixture.cases.length).toBeGreaterThan(0);
+    // A comment would make the file invalid JSON, so parsing it is the check.
+    expect(() => JSON.parse(readFileSync(FIXTURE_PATH, "utf8"))).not.toThrow();
+  });
+
+  it("covers importance 0-20, satisfaction above, equal and below, plus a null pair", () => {
+    const fixture = loadScoreFixture();
+    const importances = fixture.cases
+      .map((c) => c.importance)
+      .filter((v): v is number => v !== null);
+    expect(Math.min(...importances)).toBe(0);
+    expect(Math.max(...importances)).toBe(20);
+    expect(fixture.cases.some((c) => c.importance === null && c.satisfaction === null)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! > c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! < c.satisfaction!)).toBe(true);
+    expect(fixture.cases.some((c) => c.importance! === c.satisfaction!)).toBe(true);
+  });
+
+  it("agrees with the shared function on every scored case", () => {
+    const fixture = loadScoreFixture();
+    for (const c of fixture.cases) {
+      if (c.importance === null || c.satisfaction === null) {
+        expect(c.score).toBeNull();
+        continue;
+      }
+      expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score ?? 0, 5);
+    }
+  });
+
+  it("fails when the fixture's expected value drifts from the function", () => {
+    // The fixture is the contract: editing a case's `score` must break this
+    // assertion, so the two sides cannot drift apart while each keeps passing.
+    const fixture = loadScoreFixture();
+    const drifted = {
+      ...fixture,
+      cases: fixture.cases.map((c) =>
+        c.importance !== null && c.satisfaction !== null && c.score !== null
+          ? { ...c, score: c.score + 1 }
+          : c,
+      ),
+    };
+    expect(() => {
+      for (const c of drifted.cases) {
+        if (c.importance === null || c.satisfaction === null || c.score === null) continue;
+        expect(opportunityScore(c.importance, c.satisfaction)).toBeCloseTo(c.score, 5);
+      }
+    }).toThrow();
+  });
+});
 
 describe("opportunityScore", () => {
   it("computes importance + max(importance - satisfaction, 0)", () => {
@@ -21,6 +107,25 @@ describe("opportunityScore", () => {
   it("never subtracts when satisfaction exceeds importance", () => {
     expect(opportunityScore(4, 9)).toBeCloseTo(4, 5);
     expect(opportunityScore(8, 8)).toBeCloseTo(8, 5);
+  });
+});
+
+describe("scoreMismatch", () => {
+  it("flags a stored score that no longer matches its inputs", () => {
+    // 8.6 / 4.9 produce 12.3, not the 14.0 the record holds.
+    expect(scoreMismatch(14, 8.6, 4.9)).toBe(true);
+  });
+
+  it("tolerates a rounding difference within a twentieth", () => {
+    // 8.6 / 4.9 produce 12.3; four hundredths away is a rounding difference.
+    expect(scoreMismatch(12.34, 8.6, 4.9)).toBe(false);
+    // A tenth away is a real disagreement.
+    expect(scoreMismatch(12.4, 8.6, 4.9)).toBe(true);
+  });
+
+  it("never mismatches an unscored outcome", () => {
+    expect(scoreMismatch(null, 8.6, 4.9)).toBe(false);
+    expect(scoreMismatch(undefined, 8.6, 4.9)).toBe(false);
   });
 });
 
@@ -56,9 +161,9 @@ describe("hasScore", () => {
 });
 
 describe("formatOpportunityScore (regression: crash when opp is None)", () => {
-  it("renders N/A for nullish scores", () => {
-    expect(formatOpportunityScore(null)).toBe("N/A");
-    expect(formatOpportunityScore(undefined)).toBe("N/A");
+  it("renders the shared label for nullish scores", () => {
+    expect(formatOpportunityScore(null)).toBe(UNSCORED_LABEL);
+    expect(formatOpportunityScore(undefined)).toBe(UNSCORED_LABEL);
   });
 
   it("formats real scores to one decimal", () => {
@@ -75,11 +180,44 @@ describe("opportunityPill", () => {
     });
   });
 
-  it("marks served outcomes green and never crashes on null", () => {
-    expect(opportunityPill(null)).toEqual({
-      label: "✓ Served (Opp: N/A)",
+  it("marks served outcomes green", () => {
+    expect(opportunityPill(8)).toEqual({
+      label: "✓ Served (Opp: 8.0)",
       variant: "green",
     });
+  });
+
+  // A missing score is not a verdict. The pill must not read "Served", and it
+  // must not print "N/A" inside a sentence that claims something about the outcome.
+  it("returns a neutral Not scored descriptor for a missing score", () => {
+    expect(opportunityPill(null)).toEqual({ label: UNSCORED_LABEL, variant: "blue" });
+    expect(opportunityPill(undefined)).toEqual({ label: UNSCORED_LABEL, variant: "blue" });
+    expect(opportunityPill(null).label).not.toContain("Served");
+    expect(opportunityPill(null).label).not.toContain("N/A");
+  });
+});
+
+describe("the underserved boundary", () => {
+  it("solves 2·importance − satisfaction = 10 for importance", () => {
+    expect(underservedBoundaryImportance(0)).toBe(5);
+    expect(underservedBoundaryImportance(4.9)).toBeCloseTo(7.45, 5);
+    expect(underservedBoundaryImportance(10)).toBe(10);
+  });
+
+  it("agrees with isUnderserved at and around the boundary", () => {
+    // At satisfaction 8 the boundary importance is (10 + 8) / 2 = 9, and the
+    // values are exactly representable so the two rules cannot diverge on
+    // floating-point noise rather than on the boundary itself.
+    const cases: Array<[number, number, boolean]> = [
+      [4, 8, false], // score 4 -> served
+      [9, 8, false], // score 10 -> on the line, not underserved
+      [9.5, 8, true], // score 11 -> underserved
+      [5.5, 0, true], // score 11 -> underserved
+    ];
+    for (const [importance, satisfaction, expected] of cases) {
+      expect(isUnderservedPoint(importance, satisfaction)).toBe(expected);
+      expect(isUnderserved(opportunityScore(importance, satisfaction))).toBe(expected);
+    }
   });
 });
 
@@ -149,7 +287,7 @@ describe("formatMemberMean", () => {
   });
 
   it("renders Not scored instead of a fake zero, NaN, or dash", () => {
-    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe("Not scored");
+    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe(UNSCORED_LABEL);
   });
 });
 
@@ -162,5 +300,150 @@ describe("segmentBasisLine", () => {
 
   it("claims only that the people were named when they were", () => {
     expect(segmentBasisLine(false)).toBe("People named from your evidence.");
+  });
+});
+
+describe("scoreConfidence", () => {
+  const base = {
+    id: "O-101",
+    statement: "Minimize the time to sync secrets when a deployment starts.",
+    importance: 9,
+    satisfaction: 2,
+    opportunity_score: 16,
+  };
+
+  const quote = (id: string, source_name?: string) => ({
+    id,
+    outcome_id: "O-101",
+    content: `A customer quote ${id}`,
+    source_name,
+  });
+
+  it("reads a fully answered, verified check as verified", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?", "What today?"],
+        answers: ["Every week.", "A script."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, [quote("E-1", "Linear")]);
+
+    expect(result.level).toBe("verified");
+    expect(result.label).toBe("Verified");
+    expect(result.basis).toContain("2 of 2 answered");
+    expect(result.quotes).toBe(1);
+    expect(result.sources).toEqual(["Linear"]);
+  });
+
+  it("reads a verified check with a skipped question as partly verified", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?", "What today?", "What does it cost?"],
+        answers: ["Every week.", "A script."],
+        skips: [{ question: "What does it cost?", reason: "never measured" }],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, []);
+
+    expect(result.level).toBe("partial");
+    expect(result.label).toBe("Partly verified");
+    expect(result.basis).toContain("2 of 3 answered");
+    expect(result.basis).toContain("1 skipped");
+  });
+
+  it("reads a score with no check as a hypothesis, never a midpoint", () => {
+    const result = scoreConfidence(base, []);
+
+    expect(result.level).toBe("hypothesis");
+    expect(result.label).toBe("Hypothesis");
+    expect(result.basis).toBe("nothing backs this yet");
+    expect(result.quotes).toBe(0);
+    expect(result.sources).toEqual([]);
+  });
+
+  it("reads a check with no answers as a hypothesis", () => {
+    const outcome = {
+      ...base,
+      claim_check: { asked: ["How often?"], answers: [], skips: [], verified: false },
+    };
+    const result = scoreConfidence(outcome, []);
+
+    expect(result.level).toBe("hypothesis");
+    expect(result.basis).toContain("0 of 1 answered");
+    expect(result.basis).toContain("no quotes linked");
+  });
+
+  it("counts quotes even when the check itself is unverified", () => {
+    const outcome = {
+      ...base,
+      claim_check: { asked: ["How often?"], answers: [], skips: [], verified: false },
+    };
+    const result = scoreConfidence(outcome, [quote("E-1", "Zendesk"), quote("E-2", "Zendesk")]);
+
+    expect(result.level).toBe("hypothesis");
+    expect(result.quotes).toBe(2);
+    // A repeated source counts once.
+    expect(result.sources).toEqual(["Zendesk"]);
+    expect(result.basis).toContain("2 quotes from Zendesk");
+  });
+
+  it("names several distinct sources, ignoring blanks", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?"],
+        answers: ["Every week."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, [
+      quote("E-1", "Linear"),
+      quote("E-2", "Zendesk"),
+      quote("E-3", "  "),
+      quote("E-4"),
+    ]);
+
+    expect(result.level).toBe("verified");
+    expect(result.quotes).toBe(4);
+    expect(result.sources).toEqual(["Linear", "Zendesk"]);
+    expect(result.basis).toContain("4 quotes from Linear, Zendesk");
+  });
+
+  it("says quotes were captured by hand when none names a source", () => {
+    const outcome = {
+      ...base,
+      claim_check: {
+        asked: ["How often?"],
+        answers: ["Every week."],
+        skips: [],
+        verified: true,
+      },
+    };
+    const result = scoreConfidence(outcome, [quote("E-1")]);
+
+    expect(result.basis).toContain("1 quote captured by hand");
+  });
+});
+
+describe("confidencePill", () => {
+  it("reads verified as settled, partial as caution, and hypothesis as neutral", () => {
+    expect(
+      confidencePill({ level: "verified", label: "Verified", basis: "", quotes: 0, sources: [] })
+        .variant,
+    ).toBe("green");
+    expect(
+      confidencePill({ level: "partial", label: "Partly verified", basis: "", quotes: 0, sources: [] })
+        .variant,
+    ).toBe("amber");
+    expect(
+      confidencePill({ level: "hypothesis", label: "Hypothesis", basis: "", quotes: 0, sources: [] })
+        .variant,
+    ).toBe("blue");
   });
 });

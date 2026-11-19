@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { fetchConfig, healthLlm } from "./api/studioApi";
+import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
   fetchConfig: vi.fn(async () => ({
@@ -56,6 +57,8 @@ vi.mock("./api/studioApi", () => ({
   dismissSignal: vi.fn(async () => ({ id: "sig-1" })),
   fetchConnectorCatalog: vi.fn(async () => []),
   fetchConnectors: vi.fn(async () => []),
+  // The probe breaker (#536) asks this to tell a flaky network from a refusal.
+  isTransportFailure: () => false,
   asStudioError: (error: unknown) => {
     // Mirror the real helper: a StudioApiError carries the sidecar's whole
     // error body, so a structured failure survives the mock.
@@ -128,7 +131,11 @@ beforeEach(() => {
   // The old five-field panel is the subject of its own suite below.
   window.localStorage.setItem("studio.flags.firstRunIntro", "off");
   window.localStorage.setItem("studio.brief", JSON.stringify(BRIEF));
+  // Reset before the default, so a `*Once` answer left over from a test that
+  // did not consume it cannot leak into this one.
+  vi.mocked(fetchConfig).mockReset();
   vi.mocked(fetchConfig).mockResolvedValue(SIDECAR_CONFIG);
+  vi.mocked(healthLlm).mockReset();
   vi.mocked(healthLlm).mockResolvedValue({
     healthy: true,
     message: "LLM backend is reachable.",
@@ -221,6 +228,8 @@ describe("studio shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
     fireEvent.click(await screen.findByRole("button", { name: /adjust scores/i }));
+    // The panel saves only a change: nudge an assumption before pressing Save.
+    fireEvent.change(screen.getByLabelText("Importance"), { target: { value: "9.5" } });
     fireEvent.click(screen.getByRole("button", { name: /save scores/i }));
 
     await waitFor(() => {
@@ -339,7 +348,7 @@ describe("studio shell", () => {
 
   it("is still quiet after the deferred probe and the health poll have run", async () => {
     // The probes are deferred, not cancelled: two seconds after the paint the studio
-    // measures what it can reach, and every thirty seconds after that. On a hosted page
+    // measures what it can reach, and on a widening cadence after that. On a hosted page
     // with no sidecar every one of those measurements is a refusal, and none of them is
     // a strip across the top of the window.
     vi.mocked(fetchConfig).mockRejectedValue(new Error("no sidecar"));
@@ -357,9 +366,10 @@ describe("studio shell", () => {
     }
   });
 
-  it("does say so when a sidecar it had been reaching stops answering", async () => {
-    // The control for the two tests above: the strips are deferred, never missing. A
-    // studio that was talking to a sidecar and then was not has a real outage to name.
+  it("stays quiet when a sidecar it had been reaching stops answering", async () => {
+    // #511: the assistant answers from the built-in fallback when the sidecar is
+    // unreachable, so a sidecar that goes away is no longer an outage to name.
+    // The reply carries the "Built-in assistant" tag instead of a banner.
     vi.useFakeTimers();
     try {
       render(<App />);
@@ -369,13 +379,13 @@ describe("studio shell", () => {
       expect(document.querySelectorAll(".banner")).toHaveLength(0);
 
       vi.mocked(fetchConfig).mockRejectedValue(new Error("the sidecar went away"));
+      // The next probe lands within one base cadence ±20%, so advance past the
+      // longest wait the jitter can produce, not the nominal thirty seconds.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(31_000);
+        await vi.advanceTimersByTimeAsync(PROBE_BASE_MS * (1 + PROBE_JITTER) + 5_000);
       });
 
-      const banners = document.querySelectorAll(".banner");
-      expect(banners.length).toBeGreaterThan(0);
-      expect(banners[0].textContent).toMatch(/sidecar/i);
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
@@ -501,7 +511,7 @@ describe("first-run tour", () => {
       await screen.findByText("A quick look at your instruments."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Make it real" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
@@ -521,7 +531,7 @@ describe("first-run tour", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByText("A quick look at your instruments.");
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Find my next opportunity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start your own job" }));
 
     expect(
       await screen.findByText(/I need to find the next opportunity worth chasing/),
@@ -806,6 +816,73 @@ describe("composer shortcuts (#692)", () => {
     expect(composer).toHaveValue("");
     expect(composer).toHaveFocus();
     expect(screen.queryByRole("listbox", { name: /commands/i })).toBeNull();
+  });
+
+  it("takes the shell out of reach while the changelog is open, and gives it back", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /open what's new changelog/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    // The shared Dialog is modal: it announces itself as such, which is what
+    // the shell's `dialogOpen` gate reads to keep its shortcuts out of reach.
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    // It portals to the document root, so it stays reachable while the page
+    // behind it is hidden.
+    expect(document.querySelector(".studio-app")?.contains(dialog)).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("returns focus to the What's New control after the changelog closes", async () => {
+    render(<App />);
+
+    const opener = await screen.findByRole("button", { name: /open what's new changelog/i });
+    opener.focus();
+    fireEvent.click(opener);
+    await screen.findByRole("dialog");
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("closes the changelog on Escape without stopping the reply behind it", async () => {
+    const { streamChat } = await import("./api/studioApi");
+    vi.mocked(streamChat).mockImplementationOnce(
+      (_request, _onEvent, signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        }),
+    );
+    render(<App />);
+
+    const composer = await screen.findByRole("textbox", { name: /message the studio/i });
+    fireEvent.change(composer, { target: { value: "Where do I start?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send message/i }));
+    await screen.findByRole("button", { name: /stop generating/i });
+
+    fireEvent.click(screen.getByRole("button", { name: /open what's new changelog/i }));
+    await screen.findByRole("dialog");
+
+    // One Escape closes the changelog; the reply keeps streaming. The Escape is
+    // dispatched on the document, which is where the shared Dialog listens for
+    // it, before it bubbles on to the shell's window handler.
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
+
+    // A second Escape, with nothing open, stops it.
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /stop generating/i })).toBeNull();
+    });
   });
 
   it("gives Escape somewhere to go when nothing else is open", async () => {

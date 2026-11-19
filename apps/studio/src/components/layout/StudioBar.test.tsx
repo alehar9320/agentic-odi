@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -18,8 +18,10 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   conversationId: null,
   conversations: [],
   llmHealth: { healthy: true, message: "ok" },
+  probeRetry: { state: "closed", retryInMs: 0 },
   messages: [],
   openConversation: vi.fn(),
+  deleteConversation: vi.fn(async () => true),
   refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
@@ -117,6 +119,20 @@ describe("StudioBar", () => {
 
     expect(
       screen.getByRole("button", { name: /model status: live\. qwen3 is answering\./i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a retry countdown, not a spinner, while the breaker is open (#536)", () => {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({
+        llmHealth: { healthy: false, message: "The model did not answer." },
+        probeRetry: { state: "open", retryInMs: 240_000 },
+      }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+
+    expect(
+      screen.getByRole("button", { name: /model status: retrying in 4 min\./i }),
     ).toBeInTheDocument();
   });
 
@@ -337,7 +353,7 @@ describe("StudioBar", () => {
     expect(refreshConversations).toHaveBeenCalledOnce();
     expect(within(menu).getByText("Where does onboarding leak?")).toBeInTheDocument();
     expect(within(menu).getByText("Price the churn spike")).toBeInTheDocument();
-    expect(within(menu).getByText("Just now")).toBeInTheDocument();
+    expect(within(menu).getByText(/Just now · 4 turns/)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -556,5 +572,362 @@ describe("StudioBar new thread control (#319)", () => {
     expect(onNew).toHaveBeenCalledTimes(1);
     expect(onNew).not.toHaveBeenCalledWith({ stop: true });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+// Shared by the history tests: one thread, and a bar with its list open.
+const conversation = (id: string, title: string, updatedAt: string, turnCount: number) => ({
+  id,
+  title,
+  created_at: updatedAt,
+  updated_at: updatedAt,
+  head_id: null,
+  turn_count: turnCount,
+});
+
+function openHistory(overrides: Record<string, unknown>) {
+  vi.mocked(useStudio).mockReturnValue(stubContext(overrides) as never);
+  const view = render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  return {
+    menu: screen.getByRole("menu", { name: "Recent conversations" }),
+    unmount: view.unmount,
+  };
+}
+
+describe("history opens on the thread in view (#694 D11)", () => {
+  it("opens on the thread in view, gliding unless motion is reduced", () => {
+    const scrollIntoView = vi.fn();
+    const received: Element[] = [];
+    const original = (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value: function (this: Element, options: ScrollIntoViewOptions) {
+        received.push(this);
+        scrollIntoView(options);
+      },
+    });
+
+    const media = (matches: boolean) =>
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-motion") ? matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }));
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: media(true) });
+
+    try {
+      const conversations = [
+        conversation("c-2", "The thread on screen", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-1", "An older thread", new Date(2026, 9, 20, 9, 0).toISOString(), 1),
+      ];
+
+      const reduced = openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+      expect(received[0]).toBe(
+        within(reduced.menu).getByRole("menuitem", { name: /the thread on screen/i }),
+      );
+
+      reduced.unmount();
+      scrollIntoView.mockClear();
+      received.length = 0;
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: media(false) });
+
+      openHistory({ conversationId: "c-2", conversations });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    } finally {
+      if (original === undefined) {
+        delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      } else {
+        Object.defineProperty(Element.prototype, "scrollIntoView", {
+          configurable: true,
+          value: original,
+        });
+      }
+      Object.defineProperty(window, "matchMedia", { configurable: true, value: originalMatchMedia });
+    }
+  });
+});
+
+describe("history says when and how much (#694 D12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads when it happened and how many turns it holds", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "Pricing the churn spike", new Date(2026, 9, 22, 8, 0).toISOString(), 6),
+      ],
+    });
+
+    expect(within(menu).getByText("2h ago · 6 turns")).toBeInTheDocument();
+  });
+
+  it("gives a thread with no turns no meta line at all", () => {
+    const { menu } = openHistory({
+      conversations: [
+        conversation("c-1", "A fresh thread", new Date(2026, 9, 22, 9, 0).toISOString(), 0),
+      ],
+    });
+
+    expect(within(menu).getByText("A fresh thread")).toBeInTheDocument();
+    expect(menu.querySelector(".bar__history-meta")).toBeNull();
+    expect(within(menu).queryByText(/turns?/)).toBeNull();
+  });
+});
+
+describe("history is grouped by day (#694 D13)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function groupingOf(row: Element): number {
+    let groups = 0;
+    for (let node = row.parentElement; node; node = node.parentElement) {
+      if (node.getAttribute("role") === "group") {
+        groups += 1;
+      }
+    }
+    return groups;
+  }
+
+  it("heads the list by day, in order, only where there are rows", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-3", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 2),
+        conversation("c-2", "Last night", new Date(2026, 9, 21, 23, 0).toISOString(), 1),
+        conversation("c-1", "Last week", new Date(2026, 9, 15, 9, 0).toISOString(), 3),
+      ],
+    });
+
+    const headings = Array.from(document.querySelectorAll(".bar__history-day")).map(
+      (node) => node.textContent,
+    );
+    expect(headings).toEqual(["Today", "Yesterday", "Earlier"]);
+
+    expect(
+      within(screen.getByRole("group", { name: "Today" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+    expect(
+      within(screen.getByRole("group", { name: "Yesterday" })).getAllByRole("menuitem"),
+    ).toHaveLength(1);
+
+    // A row sits under exactly one heading, never repeated under two.
+    for (const row of screen.getAllByRole("menuitem")) {
+      const group = row.closest('[role="group"]') as HTMLElement;
+      expect(group.querySelectorAll(".bar__history-day")).toHaveLength(1);
+      expect(groupingOf(row)).toBe(1);
+    }
+  });
+
+  it("leaves out a day with nothing in it", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0));
+
+    openHistory({
+      conversations: [
+        conversation("c-1", "This morning", new Date(2026, 9, 22, 9, 0).toISOString(), 1),
+      ],
+    });
+
+    expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
+  });
+});
+
+describe("StudioBar delete conversation (#643)", () => {
+  const conversations = [
+    conversation("c-2", "Current thread", new Date(2026, 9, 22, 9, 0).toISOString(), 4),
+    conversation("c-1", "An older thread", new Date(2026, 9, 21, 9, 0).toISOString(), 1),
+  ];
+
+  function openHistory(overrides: Record<string, unknown> = {}) {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ conversationId: "c-2", conversations, ...overrides }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  }
+
+  it("asks before deleting, and says what goes with the thread", () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+
+    // Nothing is deleted until the ask is answered: the question is not the act.
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "Delete Current thread?" })).toHaveTextContent(
+      "Delete “Current thread”? Its 4 turns go with it.",
+    );
+  });
+
+  it("keeps the thread when the confirmation is declined", () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Delete Current thread?" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete Current thread" })).toBeInTheDocument();
+  });
+
+  it("deletes the thread once, and closes the list when it was the open one", async () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-2"));
+    expect(deleteConversation).toHaveBeenCalledOnce();
+    // The row being read is gone, so the list closes rather than framing a gap.
+    await waitFor(() =>
+      expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull(),
+    );
+  });
+
+  it("leaves the list open when a thread other than the open one is deleted", async () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+    expect(screen.getByRole("menu", { name: "Recent conversations" })).toBeInTheDocument();
+  });
+
+  it("shows the row again when the delete fails", async () => {
+    const deleteConversation = vi.fn(async () => false);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+    // A failed delete is not a hidden row: the thread is still there to retry.
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete An older thread" })).toBeInTheDocument();
+  });
+
+  it("names an untitled thread in the confirmation rather than quoting nothing", () => {
+    openHistory({
+      conversations: [conversation("c-9", "", new Date(2026, 9, 22, 9, 0).toISOString(), 0)],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete New conversation" }));
+
+    expect(screen.getByRole("group", { name: "Delete New conversation?" })).toHaveTextContent(
+      "This cannot be undone.",
+    );
+  });
+});
+
+describe("StudioBar rename conversation (#642)", () => {
+  const conversations = [
+    conversation("c-2", "Current thread", new Date(2026, 9, 22, 9, 0).toISOString(), 4),
+    conversation("c-1", "An older thread", new Date(2026, 9, 21, 9, 0).toISOString(), 1),
+  ];
+
+  function openHistory(overrides: Record<string, unknown> = {}) {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ conversationId: "c-2", conversations, ...overrides }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  }
+
+  it("opens an inline editor seeded with the current name", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename Current thread" }));
+
+    expect(screen.getByRole("textbox", { name: "Rename Current thread" })).toHaveValue(
+      "Current thread",
+    );
+    // Nothing is written just by opening the editor.
+    expect(renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("commits the new name on Enter, once", async () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.change(input, { target: { value: "Renamed thread" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(renameConversation).toHaveBeenCalledWith("c-1", "Renamed thread"));
+    expect(renameConversation).toHaveBeenCalledOnce();
+  });
+
+  it("cancels on Escape and writes nothing", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.change(input, { target: { value: "Thrown away" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    // Escape unmounts the input, which fires a last blur; that blur must not
+    // commit the name Escape just discarded.
+    fireEvent.blur(input);
+
+    expect(renameConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+  });
+
+  it("treats an unchanged name as no rename at all", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("does not write a blank name over the thread", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("renames an untitled thread through the neutral label", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({
+      renameConversation,
+      conversations: [conversation("c-9", "", new Date(2026, 9, 22, 9, 0).toISOString(), 0)],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename New conversation" }));
+
+    expect(screen.getByRole("textbox", { name: "Rename New conversation" })).toHaveValue("");
   });
 });

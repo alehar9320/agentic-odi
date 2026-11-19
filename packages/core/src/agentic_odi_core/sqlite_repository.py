@@ -10,13 +10,16 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.events import DEFAULT_DEVICE, DEFAULT_WORKSPACE, Event
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.mapping import OutcomeProposal, ProposalStatus
 from agentic_odi_core.models import (
+    V2MOM,
     CustomerOutcome,
     Evidence,
     Job,
+    Link,
     Outcome,
     ScheduledWork,
     Segment,
@@ -24,15 +27,32 @@ from agentic_odi_core.models import (
     Step,
     Strategy,
     Study,
-    compute_opportunity_score,
 )
+from agentic_odi_core.paths import default_odi_db_path
 from agentic_odi_core.repository import (
+    V2MOM_ID,
     Repository,
     compute_evidence_fingerprint,
     page,
     rank_signals,
     sort_outcomes,
     unread_signals,
+)
+
+#: Writes that are derived from the store rather than inputs to it. Their own
+#: revision must not make a later derivation look stale. Signals are facts
+#: *about* the store, and segmentation reads jobs, steps, and outcomes — never
+#: signals — so recording one is not an input a later derivation would read.
+_DERIVED_EVENT_TYPES = frozenset(
+    {
+        "SEGMENT_CREATED",
+        "SEGMENT_UPDATED",
+        "STRATEGY_CREATED",
+        "STRATEGY_UPDATED",
+        "SIGNAL_CREATED",
+        "SIGNAL_READ",
+        "SIGNAL_DISMISSED",
+    }
 )
 
 
@@ -44,7 +64,7 @@ class SQLiteRepository(Repository):
         device_id: str | None = None,
     ) -> None:
         if db_path is None:
-            db_path = os.environ.get("AGENTIC_ODI_DB", os.path.expanduser("~/.agentic-odi/odi.db"))
+            db_path = str(default_odi_db_path())
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
         self._lock = threading.RLock()
         self.db_path = db_path
@@ -54,9 +74,8 @@ class SQLiteRepository(Repository):
         self._device_id = device_id or os.environ.get("AGENTIC_ODI_DEVICE_ID", DEFAULT_DEVICE)
         self.store = IntentStore(db_path, check_same_thread=False)
         self._last_event_id = 0
-        self._backfilled = False
+        self._last_input_event_id = 0
         self._load_snapshot()
-        self._backfill_legacy_outcomes()
 
     def _load_snapshot(self) -> None:
         self.jobs: dict[str, Job] = {}
@@ -69,48 +88,13 @@ class SQLiteRepository(Repository):
         self.scheduled_work: dict[str, ScheduledWork] = {}
         self.segments: dict[str, Segment] = {}
         self.strategies: dict[str, Strategy] = {}
+        self.v2mom: dict[str, V2MOM] = {}
         self.studies: dict[str, Study] = {}
+        self.links: dict[str, Link] = {}
         self._last_event_id = 0
+        self._last_input_event_id = 0
         for ev in self.store.get_stream(workspace_id=self._workspace_id, replay_order=True):
             self._apply_event(ev)
-
-    def _backfill_legacy_outcomes(self) -> None:
-        """One-time migration: backfill null scores on legacy outcomes.
-
-        Assigns importance=5.0, satisfaction=5.0 to any outcome missing either
-        score, records an OUTCOME_BACKFILLED event per outcome, and marks the
-        repository as backfilled so reloads do not repeat the migration.
-        """
-        if self._backfilled:
-            return
-        needs_backfill = [
-            o for o in self.outcomes.values() if o.importance is None or o.satisfaction is None
-        ]
-        if not needs_backfill:
-            self._backfilled = True
-            return
-        for outcome in needs_backfill:
-            updates: dict[str, Any] = {}
-            importance = outcome.importance
-            if importance is None:
-                importance = 5.0
-                updates["importance"] = importance
-            satisfaction = outcome.satisfaction
-            if satisfaction is None:
-                satisfaction = 5.0
-                updates["satisfaction"] = satisfaction
-            updates["opportunity_score"] = compute_opportunity_score(
-                importance,
-                satisfaction,
-            )
-            self.store.append(
-                "OUTCOME_BACKFILLED",
-                {"id": outcome.id, "updates": updates},
-                workspace_id=self._workspace_id,
-                device_id=self._device_id,
-            )
-        self._sync()
-        self._backfilled = True
 
     def _sync(self) -> None:
         # Only the events appended since the last apply. Reading the whole log
@@ -222,11 +206,19 @@ class SQLiteRepository(Repository):
             self.proposals[p["id"]] = OutcomeProposal.model_validate(p)
         elif et == "PROPOSAL_UPDATED":
             self._merge_updates(self.proposals, p, OutcomeProposal)
+        elif et == "V2MOM_UPDATED":
+            self.v2mom[V2MOM_ID] = V2MOM.model_validate(p)
         elif et == "STUDY_CREATED":
             self.studies[p["id"]] = Study.model_validate(p)
         elif et == "STUDY_UPDATED":
             self._merge_updates(self.studies, p, Study)
+        elif et == "LINK_CREATED":
+            self.links[p["id"]] = Link.model_validate(p)
+        elif et == "LINK_DELETED":
+            self.links.pop(p["id"], None)
         self._last_event_id = max(self._last_event_id, ev["id"])
+        if et not in _DERIVED_EVENT_TYPES:
+            self._last_input_event_id = max(self._last_input_event_id, ev["id"])
 
     @staticmethod
     def _merge_updates(entities: dict[str, Any], p: dict, model: type[BaseModel]) -> None:
@@ -245,6 +237,18 @@ class SQLiteRepository(Repository):
         with self._lock:
             self._sync()
             return self._last_event_id
+
+    def last_input_event_id(self) -> int:
+        """Rowid of the most recent event that is an input to derivation.
+
+        Segments and strategies are derived *from* the store, so their own
+        writes are not inputs a later derivation would read. Leaving them out of
+        the revision lets a freshly derived artifact read as current while a
+        later outcome rescore makes it stale.
+        """
+        with self._lock:
+            self._sync()
+            return self._last_input_event_id
 
     def add_job(self, job: Job) -> Job:
         with self._lock:
@@ -838,6 +842,73 @@ class SQLiteRepository(Repository):
             self._sync()
             return new_study
 
+    def add_link(self, link: Link) -> Link:
+        with self._lock:
+            self._sync()
+            for existing in self.links.values():
+                if (
+                    existing.source_type == link.source_type
+                    and existing.source_id == link.source_id
+                    and existing.target_type == link.target_type
+                    and existing.target_id == link.target_id
+                    and existing.relationship_type == link.relationship_type
+                ):
+                    raise ConflictError(
+                        f"Link already exists: {link.source_type}:{link.source_id} -> {link.target_type}:{link.target_id} ({link.relationship_type})"
+                    )
+            self.store.append(
+                "LINK_CREATED",
+                link.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return link
+
+    def get_link(self, link_id: str) -> Link | None:
+        with self._lock:
+            self._sync()
+            return self.links.get(link_id)
+
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]:
+        with self._lock:
+            self._sync()
+            items = list(self.links.values())
+            if source_type is not None:
+                items = [link for link in items if link.source_type == source_type]
+            if source_id is not None:
+                items = [link for link in items if link.source_id == source_id]
+            if target_type is not None:
+                items = [link for link in items if link.target_type == target_type]
+            if target_id is not None:
+                items = [link for link in items if link.target_id == target_id]
+            if relationship_type is not None:
+                items = [link for link in items if link.relationship_type == relationship_type]
+            return page(items, limit, offset)
+
+    def remove_link(self, link_id: str) -> bool:
+        with self._lock:
+            self._sync()
+            if link_id not in self.links:
+                return False
+            self.store.append(
+                "LINK_DELETED",
+                {"id": link_id},
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return True
+
     def add_strategy(self, strategy: Strategy) -> Strategy:
         with self._lock:
             self.store.append(
@@ -882,6 +953,22 @@ class SQLiteRepository(Repository):
             )
             self._sync()
             return new_strategy
+
+    def add_v2mom(self, v2mom: V2MOM) -> V2MOM:
+        with self._lock:
+            self.store.append(
+                "V2MOM_UPDATED",
+                v2mom.model_dump(mode="json"),
+                workspace_id=self._workspace_id,
+                device_id=self._device_id,
+            )
+            self._sync()
+            return v2mom
+
+    def get_v2mom(self) -> V2MOM | None:
+        with self._lock:
+            self._sync()
+            return next(iter(self.v2mom.values()), None)
 
     def clear(self) -> None:
         with self._lock:

@@ -7,7 +7,7 @@
  * added in exactly two files.
  */
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActionBarPrimitive,
@@ -32,12 +32,14 @@ import {
   ToolPart,
   TypingPart,
 } from "../../assistant/parts";
+import { formatDayHeading, formatTurnTime, startsNewDay } from "../../lib/relativeTime";
 import { useStudio } from "../../state/StudioContext";
-import type { StudioError } from "../../types";
+import type { ChatMessage, StudioError } from "../../types";
 import { UiActionContext } from "../../ui/actions";
 import { FailurePanel } from "../FailurePanel";
 import { CheckIcon, CopyIcon, SpeakerIcon } from "../icons";
 import { Markdown } from "./Markdown";
+import { PendingCalls } from "./PendingCalls";
 import { StallNotice } from "./StallNotice";
 import { WorkBlock } from "./WorkBlock";
 import { workGrouping } from "./workGrouping";
@@ -55,9 +57,62 @@ function phaseLabel(phase: string | null): string {
   return PHASE_LABEL[phase] ?? "Thinking";
 }
 
-function AssistantMessage() {
-  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+/**
+ * Where each turn sits in the studio's own list, so a message can read its own
+ * timestamp and the one before it. The runtime draws the turns but keeps no
+ * clock of its own; the model that does is the one the transcript came from.
+ */
+const TranscriptClockContext = createContext<{
+  order: Map<string, number>;
+  messages: ChatMessage[];
+} | null>(null);
+
+interface MessageStamp {
+  iso: string;
+  clock: string;
+  previousIso?: string;
+}
+
+function useMessageStamp(): MessageStamp | null {
+  const transcript = useContext(TranscriptClockContext);
   const id = useAuiState((state) => state.message.id);
+  const index = transcript?.order.get(id);
+  if (!transcript || index === undefined) {
+    return null;
+  }
+  const iso = transcript.messages[index]?.createdAt;
+  if (!iso) {
+    return null;
+  }
+  // Recent turns read as a summary ("14m ago"); older ones as a wall clock.
+  return {
+    iso,
+    clock: formatTurnTime(iso),
+    previousIso: transcript.messages[index - 1]?.createdAt,
+  };
+}
+
+/**
+ * The line between two calendar days: Today and Yesterday are said in words,
+ * anything older is dated. Only drawn where the day actually changes.
+ */
+function DayDivider() {
+  const stamp = useMessageStamp();
+  if (!stamp || !startsNewDay(stamp.iso, stamp.previousIso)) {
+    return null;
+  }
+  const heading = formatDayHeading(stamp.iso);
+  return (
+    <div className="conversation__day" role="separator" aria-label={heading}>
+      {heading}
+    </div>
+  );
+}
+
+function AssistantMessage() {
+  const { thinkingPhase, offlineReplyFor, sendMessage, dismissFailedTurn } = useStudio();
+  const id = useAuiState((state) => state.message.id);
+  const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
   const copied = useAuiState((state) => state.message.isCopied);
   const parts = useAuiState((state) => state.message.parts);
@@ -73,21 +128,25 @@ function AssistantMessage() {
   );
 
   return (
-    // `aria-busy` keeps a screen reader from announcing every streamed token;
-    // it reads the reply once the turn settles.
-    <article className="message message--assistant" aria-busy={running}>
+    <>
+      <DayDivider />
+      {/* `aria-busy` keeps a screen reader from announcing every streamed token;
+          it reads the reply once the turn settles. The primitive owns the
+          wrapper — hover state and the top anchor come from it — and renders
+          the same `article` the turn had before. */}
+      <MessagePrimitive.Root
+        className="message message--assistant"
+        aria-busy={running}
+        render={<article />}
+      >
       <AssistantAvatar />
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
             said once instead of warned about in a strip above the work. */}
         {offlineReplyFor === id ? (
-          <button
-            type="button"
-            className="message__tag"
-            onClick={() => openPanel("settings")}
-          >
-            Local draft, no model connected
-          </button>
+          <span className="message__tag" aria-label="This reply came from the built-in assistant">
+            Built-in assistant
+          </span>
         ) : null}
 
         {/* One row for the work a turn did, and the answer on its own. The
@@ -140,6 +199,7 @@ function AssistantMessage() {
             error={error}
             retryText={retryText}
             onRetry={(text) => void sendMessage(text)}
+            onDelete={() => dismissFailedTurn(id)}
           />
         ) : null}
 
@@ -171,12 +231,20 @@ function AssistantMessage() {
         </AuiIf>
 
         {!running ? (
+          // The exact time rides with the actions: visible on hover or focus,
+          // and spoken as part of the group's name for touch and for readers
+          // who never see a hover at all.
           <ActionBarPrimitive.Root
             className="message__actions"
             role="group"
-            aria-label="Reply actions"
+            aria-label={stamp ? `Reply actions, ${stamp.clock}` : "Reply actions"}
             hideWhenRunning
           >
+            {stamp ? (
+              <time className="message__time" dateTime={stamp.iso}>
+                {stamp.clock}
+              </time>
+            ) : null}
             <ActionBarPrimitive.Copy
               className="quiet-action"
               aria-label={copied ? "Reply copied" : "Copy reply"}
@@ -216,12 +284,21 @@ function AssistantMessage() {
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
-    </article>
+      </MessagePrimitive.Root>
+    </>
   );
 }
 
 function UserMessage() {
+  const { displayName } = useStudio();
   const copied = useAuiState((state) => state.message.isCopied);
+  const stamp = useMessageStamp();
+  // One name source: the same `displayName` the greeting and settings use.
+  // Nobody has named themselves yet, so the turn says "You" rather than
+  // inventing a person (#737).
+  const name = displayName.trim() || "You";
+  const initial = name.slice(0, 1).toUpperCase();
+
   // A pasted document is a message, not the screen. The bubble starts clamped at
   // eight lines; when the text fits, the clamp and its control disappear. Copy
   // still reads the turn, so the whole message is what gets copied (#696).
@@ -238,7 +315,11 @@ function UserMessage() {
   }, []);
 
   return (
-    <article className="message message--user">
+    <>
+      <DayDivider />
+      <MessagePrimitive.Root className="message message--user" render={<article />}>
+      <div className="message__column message__column--user">
+      <p className="message__byline">{name}</p>
       <div
         ref={bubbleRef}
         className={`message__bubble${clamped && !expanded ? " is-clamped" : ""}`}
@@ -280,8 +361,13 @@ function UserMessage() {
       <ActionBarPrimitive.Root
         className="message__actions message__actions--user"
         role="group"
-        aria-label="Message actions"
+        aria-label={stamp ? `Message actions, ${stamp.clock}` : "Message actions"}
       >
+        {stamp ? (
+          <time className="message__time" dateTime={stamp.iso}>
+            {stamp.clock}
+          </time>
+        ) : null}
         <ActionBarPrimitive.Edit className="quiet-action" aria-label="Edit message">
           Edit
         </ActionBarPrimitive.Edit>
@@ -292,15 +378,23 @@ function UserMessage() {
           {copied ? "Copied" : "Copy"}
         </ActionBarPrimitive.Copy>
       </ActionBarPrimitive.Root>
-    </article>
+      </div>
+      <span className="message__avatar message__avatar--user" aria-hidden="true">
+        {initial}
+      </span>
+      </MessagePrimitive.Root>
+    </>
   );
 }
 
 function SystemMessage() {
   return (
-    <article className="message message--notice">
-      <MessagePrimitive.Parts components={{ Text: TextPart }} />
-    </article>
+    <>
+      <DayDivider />
+      <MessagePrimitive.Root className="message message--notice" render={<article />}>
+        <MessagePrimitive.Parts components={{ Text: TextPart }} />
+      </MessagePrimitive.Root>
+    </>
   );
 }
 
@@ -324,7 +418,7 @@ function EditComposer() {
 }
 
 export function Conversation() {
-  const { sendMessage, streaming, thinkingPhase, messages } = useStudio();
+  const { sendMessage, streaming, thinkingPhase, messages, openDetail } = useStudio();
 
   // Only the newest reply is announcement-worthy. Keeping it out of the log
   // means a reader can move through history without every delta replaying it.
@@ -342,9 +436,22 @@ export function Conversation() {
     return "";
   }, [messages]);
 
+  // The clock the transcript reads from, kept beside the turn list it describes.
+  const clock = useMemo(
+    () => ({
+      order: new Map(messages.map((message, index) => [message.id, index])),
+      messages,
+    }),
+    [messages],
+  );
+
   return (
     <UiActionContext.Provider
-      value={{ onIntent: (intent) => void sendMessage(intent), busy: streaming }}
+      value={{
+        onIntent: (intent) => void sendMessage(intent),
+        onDetail: (target) => openDetail(target.panel, target.subject),
+        busy: streaming,
+      }}
     >
       {/* The phase lives outside the log: the streaming reply is `aria-busy`,
           and a status message inside it would not be announced until the
@@ -353,16 +460,22 @@ export function Conversation() {
       <p className="sr-only" role="status" aria-live="polite" aria-busy={streaming}>
         {streaming ? phaseLabel(thinkingPhase) : latestReply}
       </p>
-      <div className="conversation" role="log" aria-label="Conversation">
-        <ThreadPrimitive.Messages
-          components={{
-            UserMessage,
-            AssistantMessage,
-            SystemMessage,
-            EditComposer,
-          }}
-        />
-      </div>
+      <TranscriptClockContext.Provider value={clock}>
+        <div className="conversation" role="log" aria-label="Conversation">
+          <ThreadPrimitive.Messages
+            components={{
+              UserMessage,
+              AssistantMessage,
+              SystemMessage,
+              EditComposer,
+            }}
+          />
+          {/* The calls still in flight, below the last message: the transcript
+              is the record of what happened, and this is the one place that
+              answers what has not happened yet. */}
+          <PendingCalls />
+        </div>
+      </TranscriptClockContext.Provider>
     </UiActionContext.Provider>
   );
 }

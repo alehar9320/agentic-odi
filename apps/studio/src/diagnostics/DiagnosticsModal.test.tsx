@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OnboardingProvider } from "../onboarding/OnboardingProvider";
@@ -53,7 +53,9 @@ function stubContext(): StudioContextValue {
     mcpReachable: false,
     sidecarReachable: false,
     connectors: [],
+    connectorsLoading: false,
     presets: [],
+    presetsLoading: false,
     addConnector: vi.fn().mockResolvedValue(undefined),
     deleteConnector: vi.fn().mockResolvedValue(undefined),
     refreshConnectors: vi.fn().mockResolvedValue(undefined),
@@ -92,18 +94,33 @@ describe("DiagnosticsModal", () => {
     expect(screen.getByText(/sidecar is unavailable/i)).toBeInTheDocument();
   });
 
-  it("traps keyboard focus and closes on Escape", () => {
+  it("moves focus into the dialog and closes on Escape", () => {
     render(<DiagnosticsModal {...modalProps} />);
 
-    const dialog = screen.getByRole("dialog");
-    const close = screen.getByRole("button", { name: "Cancel diagnostics export" });
-    const save = screen.getByRole("button", { name: "Save .json" });
+    const close = screen.getByRole("button", { name: "Close dialog" });
     expect(close).toHaveFocus();
-    save.focus();
-    fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(close).toHaveFocus();
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(modalProps.onClose).toHaveBeenCalledOnce();
+  });
+
+  it("takes the page behind the dialog out of reach while it is open", async () => {
+    const { unmount } = render(
+      <div className="studio-app">
+        <DiagnosticsModal {...modalProps} />
+      </div>,
+    );
+
+    const shell = document.querySelector(".studio-app");
+    // The primitive hides the page behind from assistive technology (and marks
+    // it inert where the browser supports it) by hiding every sibling of the
+    // portaled content, so an ancestor of the shell is hidden, not the shell.
+    await waitFor(() => expect(shell?.closest('[aria-hidden="true"]')).not.toBeNull());
+    // The dialog sits outside the hidden subtree, so it stays reachable.
+    const hidden = shell?.closest('[aria-hidden="true"]') as HTMLElement | null;
+    expect(hidden?.contains(screen.getByRole("dialog"))).toBe(false);
+
+    unmount();
+    expect(shell?.closest('[aria-hidden="true"]')).toBeNull();
   });
 
   it("creates a local JSON download only when Save is pressed", () => {
@@ -118,6 +135,33 @@ describe("DiagnosticsModal", () => {
     expect(create).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:diagnostics");
     expect(click).toHaveBeenCalledOnce();
+  });
+
+  it("clears the copy confirmation after two seconds", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: write },
+    });
+    render(<DiagnosticsModal {...modalProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(screen.getByText("Diagnostics copied.")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByText("Diagnostics copied.")).toBeNull();
+    vi.useRealTimers();
   });
 
   it("still prepares a local bundle when the sidecar is unavailable", async () => {
