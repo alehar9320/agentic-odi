@@ -1,0 +1,51 @@
+name: Merge bottom stack
+
+on:
+  push:
+    branches:
+      - buffy/merge-stack
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Request and await the stack merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: "282"
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/$REPO/pulls/$PR"
+          sha=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "$api" | python3 -c 'import json,sys; print(json.load(sys.stdin)["head"]["sha"])')
+          echo "head=$sha"
+          body=$(python3 -c 'import json,sys; print(json.dumps({"sha": sys.argv[1], "merge_method": "merge", "merge_action": "direct_merge"}))' "$sha")
+          resp=$(curl -sS -w '\n%{http_code}' -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "$api/merge-async" -d "$body")
+          code=$(printf '%s' "$resp" | tail -n1)
+          payload=$(printf '%s' "$resp" | sed '$d')
+          echo "submit status=$code"
+          echo "$payload"
+          if [ "$code" = "200" ]; then exit 0; fi
+          if [ "$code" != "202" ] && [ "$code" != "409" ]; then exit 1; fi
+          uuid=$(printf '%s' "$payload" | python3 -c 'import json,sys; d=json.load(sys.stdin); print((d.get("details") or {}).get("uuid") or d.get("uuid",""))')
+          echo "uuid=$uuid"
+          for i in $(seq 1 60); do
+            sleep 10
+            out=$(curl -sS -w '\n%{http_code}' -H "Authorization: Bearer $GH_TOKEN" "$api/merge-async/$uuid")
+            c=$(printf '%s' "$out" | tail -n1)
+            p=$(printf '%s' "$out" | sed '$d')
+            echo "poll $i status=$c body=$p"
+            if [ "$c" = "200" ]; then
+              st=$(printf '%s' "$p" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')
+              if [ "$st" = "merged" ] || [ "$st" = "enqueued" ]; then exit 0; fi
+              if [ "$st" = "failed" ]; then exit 1; fi
+            fi
+          done
+          echo "timed out"
+          exit 1
