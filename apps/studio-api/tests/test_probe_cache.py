@@ -218,7 +218,7 @@ def test_the_credential_fingerprint_is_stable_and_distinct():
     assert first == probes.credential_fingerprint("key-A")
     assert first != probes.credential_fingerprint("key-B")
     assert "key-A" not in first
-    assert len(first) == 16  # 8 bytes of BLAKE2b, hex-encoded
+    assert len(first) == 16
 
 
 def test_health_route_reports_checked_at_and_cached(monkeypatch):

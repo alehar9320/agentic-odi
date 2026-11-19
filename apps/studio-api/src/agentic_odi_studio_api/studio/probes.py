@@ -46,18 +46,27 @@ _CONFIG_GENERATION = 0
 #: and distinct per credential, never reversible.
 _CREDENTIAL_FINGERPRINT_KEY = b"agentic-odi-probe-cache"
 
+#: Iteration count for the fingerprint. A credential is fed to this function, so
+#: it uses a deliberately slow KDF rather than a plain digest: a fast hash of a
+#: secret is trivially attackable offline, and static analysis rejects it
+#: outright. One call costs a few tens of milliseconds, which is lost in the
+#: noise next to the network probe it precedes.
+_CREDENTIAL_FINGERPRINT_ITERATIONS = 100_000
+
 
 def credential_fingerprint(api_key: str) -> str:
     """A stable, non-reversible identifier for a credential.
 
-    Keyed rather than a bare digest: the cache only needs two different
-    credentials to land on different keys, so this is a keyed MAC over the
-    secret, never a password hash and never a value anyone can test offline
-    against a guess without the key.
+    The cache only needs two different credentials to land on different keys,
+    so this derives an opaque token from the secret and never keeps the secret.
     """
-    return hashlib.blake2b(
-        api_key.encode(), key=_CREDENTIAL_FINGERPRINT_KEY, digest_size=8
-    ).hexdigest()
+    derived = hashlib.pbkdf2_hmac(
+        "sha256",
+        api_key.encode(),
+        _CREDENTIAL_FINGERPRINT_KEY,
+        _CREDENTIAL_FINGERPRINT_ITERATIONS,
+    )
+    return derived.hex()[:16]
 
 
 class ProbeResult(NamedTuple):
