@@ -419,6 +419,7 @@ isolation, and coverage rules stay in
 | `tests/test_dev_entrypoint.py` | One canonical way to run the stack locally, everywhere it is documented. |
 | `tests/test_docs_code_overview.py` | The README's Code Overview table must match the actual workspace. |
 | `tests/test_docs_method.py` | The eight-stage guide must survive being followed, not just being read. |
+| `tests/test_score_tolerance_parity.py` | The score-mismatch tolerance is one number, not two. |
 | `tests/test_timeout_ceiling.py` | — |
 | `tests/test_underserved_threshold_parity.py` | The boundary between "served" and "underserved" is one number, not two. |
 | `tests/test_worker_build_route.py` | `/api/build` tells a support thread which release the hosted Studio runs. |
