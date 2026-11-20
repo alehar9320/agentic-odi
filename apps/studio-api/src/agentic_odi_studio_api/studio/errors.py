@@ -16,7 +16,12 @@ import re
 from typing import Any
 from uuid import uuid4
 
-from agentic_odi_core.remote import StudioError, StudioErrorCode
+from agentic_odi_core.remote import (
+    StudioError,
+    StudioErrorCode,
+    suggestion_for_code,
+    retryable_for_code,
+)
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -41,16 +46,30 @@ STATUS_FOR_CODE: dict[StudioErrorCode, int] = {
     StudioErrorCode.LLM_UNREACHABLE: 502,
     StudioErrorCode.MCP_TOOL_FAILED: 500,
     StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED: 500,
+    StudioErrorCode.UNAUTHORIZED: 401,
+    StudioErrorCode.FORBIDDEN: 403,
+    StudioErrorCode.METHOD_NOT_ALLOWED: 405,
+    StudioErrorCode.PAYLOAD_TOO_LARGE: 413,
+    StudioErrorCode.UNSUPPORTED_MEDIA_TYPE: 415,
+    StudioErrorCode.RATE_LIMITED: 429,
+    StudioErrorCode.UNAVAILABLE: 503,
     StudioErrorCode.INTERNAL: 500,
 }
 
 CODE_FOR_STATUS: dict[int, StudioErrorCode] = {
     400: StudioErrorCode.VALIDATION,
+    401: StudioErrorCode.UNAUTHORIZED,
+    403: StudioErrorCode.FORBIDDEN,
     404: StudioErrorCode.NOT_FOUND,
+    405: StudioErrorCode.METHOD_NOT_ALLOWED,
     409: StudioErrorCode.CONFLICT,
+    413: StudioErrorCode.PAYLOAD_TOO_LARGE,
+    415: StudioErrorCode.UNSUPPORTED_MEDIA_TYPE,
     422: StudioErrorCode.VALIDATION,
+    429: StudioErrorCode.RATE_LIMITED,
     500: StudioErrorCode.INTERNAL,
     502: StudioErrorCode.MCP_UNREACHABLE,
+    503: StudioErrorCode.UNAVAILABLE,
 }
 
 
@@ -118,9 +137,12 @@ def _compact_validation_text(exc: RequestValidationError) -> str:
 
 def http_error_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """Render a Starlette/FastAPI ``HTTPException`` as the one error body."""
+    code = code_for_status(exc.status_code)
     error = StudioError(
-        code=code_for_status(exc.status_code),
+        code=code,
         message=str(exc.detail),
+        suggestion=suggestion_for_code(code),
+        retryable=retryable_for_code(code),
     )
     return _error_response(request, error, exc.status_code)
 

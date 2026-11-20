@@ -31,6 +31,12 @@ class StudioErrorCode(str, Enum):
     CONFLICT = "conflict"
     RATE_LIMITED = "rate_limited"
     CONSENT_REQUIRED = "consent_required"
+    UNAUTHORIZED = "unauthorized"
+    FORBIDDEN = "forbidden"
+    METHOD_NOT_ALLOWED = "method_not_allowed"
+    PAYLOAD_TOO_LARGE = "payload_too_large"
+    UNSUPPORTED_MEDIA_TYPE = "unsupported_media_type"
+    UNAVAILABLE = "unavailable"
     STORE_CORRUPT = "store_corrupt"
     INTERNAL = "internal"
 
@@ -55,6 +61,12 @@ STATUS_FOR_CODE: dict[StudioErrorCode, int] = {
     StudioErrorCode.CONFLICT: 409,
     StudioErrorCode.RATE_LIMITED: 429,
     StudioErrorCode.CONSENT_REQUIRED: 403,
+    StudioErrorCode.UNAUTHORIZED: 401,
+    StudioErrorCode.FORBIDDEN: 403,
+    StudioErrorCode.METHOD_NOT_ALLOWED: 405,
+    StudioErrorCode.PAYLOAD_TOO_LARGE: 413,
+    StudioErrorCode.UNSUPPORTED_MEDIA_TYPE: 415,
+    StudioErrorCode.UNAVAILABLE: 503,
     StudioErrorCode.STORE_CORRUPT: 500,
     StudioErrorCode.MCP_UNREACHABLE: 502,
     StudioErrorCode.LLM_UNREACHABLE: 502,
@@ -75,6 +87,12 @@ _MESSAGE_FOR_CODE: dict[StudioErrorCode, str] = {
     StudioErrorCode.CONFLICT: "That conflicts with the current state.",
     StudioErrorCode.RATE_LIMITED: "Too many requests.",
     StudioErrorCode.CONSENT_REQUIRED: "That action needs the PM's approval first.",
+    StudioErrorCode.UNAUTHORIZED: "The Studio token was refused.",
+    StudioErrorCode.FORBIDDEN: "That action is not allowed.",
+    StudioErrorCode.METHOD_NOT_ALLOWED: "That request is not allowed on this route.",
+    StudioErrorCode.PAYLOAD_TOO_LARGE: "The request body is too large.",
+    StudioErrorCode.UNSUPPORTED_MEDIA_TYPE: "That media type is not supported.",
+    StudioErrorCode.UNAVAILABLE: "The sidecar is temporarily unavailable.",
     StudioErrorCode.STORE_CORRUPT: "The database failed its integrity check.",
     StudioErrorCode.MCP_TOOL_FAILED: "The operation did not complete.",
     StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED: "The assistant reached its tool limit for this turn.",
@@ -93,6 +111,12 @@ _SUGGESTION_FOR_CODE: dict[StudioErrorCode, str | None] = {
     StudioErrorCode.CONFLICT: "Reload and try again.",
     StudioErrorCode.RATE_LIMITED: "Wait, then try again.",
     StudioErrorCode.CONSENT_REQUIRED: "Get the PM's approval for this workspace, then try again.",
+    StudioErrorCode.UNAUTHORIZED: "Check the Studio token (AGENTIC_ODI_STUDIO_TOKEN) and try again.",
+    StudioErrorCode.FORBIDDEN: "Check the Studio token (AGENTIC_ODI_STUDIO_TOKEN) and try again.",
+    StudioErrorCode.METHOD_NOT_ALLOWED: "Use a route that accepts this method.",
+    StudioErrorCode.PAYLOAD_TOO_LARGE: "Send a smaller request body.",
+    StudioErrorCode.UNSUPPORTED_MEDIA_TYPE: "Use a supported content type.",
+    StudioErrorCode.UNAVAILABLE: "Try again in a moment.",
     StudioErrorCode.STORE_CORRUPT: (
         "Restore a backup, then restart. The damaged file was left untouched."
     ),
@@ -112,6 +136,7 @@ _RETRYABLE_FOR_CODE: frozenset[StudioErrorCode] = frozenset(
         StudioErrorCode.LLM_UNREACHABLE,
         StudioErrorCode.LLM_TOOL_ROUNDS_EXHAUSTED,
         StudioErrorCode.RATE_LIMITED,
+        StudioErrorCode.UNAVAILABLE,
     }
 )
 
