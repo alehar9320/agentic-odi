@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
+import stat
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -247,14 +248,58 @@ def backup_database(db_path: str, *, directory=None) -> Path:
     return dest
 
 
-def restore_database(backup_path, db_path: str) -> Path:
-    """Verify ``backup_path``, keep current db as ``<name>.pre-restore``, swap."""
+def restore_database(backup_path: str | Path, db_path: str) -> Path:
+    """Verify ``backup_path``, keep current db as ``<name>.pre-restore``, swap.
+
+    Removes any WAL/SHM/journal sidecars from the live database before the swap,
+    copies them to the safety backup if present, verifies the restored file,
+    and restores the original file mode.
+    """
     bpath = Path(backup_path)
     if not _integrity_ok(bpath):
         raise ValueError(f"backup failed integrity check: {bpath}")
     db = Path(db_path)
     safety = db.with_suffix(db.suffix + ".pre-restore")
+    sidecar_suffixes = ("-wal", "-shm", "-journal")
+
+    # Preserve the destination file mode if the file exists.
+    mode = None
+    if db.exists():
+        mode = stat.S_IMODE(db.stat().st_mode)
+
+    # Copy the live database and its sidecars to the safety backup BEFORE removing sidecars.
     if db.exists():
         shutil.copy2(db, safety)
+        for suffix in sidecar_suffixes:
+            sidecar = Path(str(db) + suffix)
+            safety_sidecar = Path(str(safety) + suffix)
+            if sidecar.exists():
+                shutil.copy2(sidecar, safety_sidecar)
+
+    # Remove stale sidecars from the live database before the swap.
+    for suffix in sidecar_suffixes:
+        sidecar = Path(str(db) + suffix)
+        sidecar.unlink(missing_ok=True)
+
+    # Copy the verified backup over the live database.
     shutil.copy2(bpath, db)
+
+    # Restore the original file mode.
+    if mode is not None:
+        os.chmod(db, mode)
+
+    # Verify the restored database.
+    if not _integrity_ok(db):
+        # Restore the original file and sidecars on verification failure.
+        if safety.exists():
+            shutil.copy2(safety, db)
+            for suffix in sidecar_suffixes:
+                safety_sidecar = Path(str(safety) + suffix)
+                sidecar = Path(str(db) + suffix)
+                if safety_sidecar.exists():
+                    shutil.copy2(safety_sidecar, sidecar)
+            if mode is not None:
+                os.chmod(db, mode)
+        raise RuntimeError("restored copy failed its integrity check")
+
     return safety
