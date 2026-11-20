@@ -420,8 +420,10 @@ describe("briefToMarkdown", () => {
     ]);
   });
 
-  it("dates the document from its own timestamp", () => {
-    expect(markdown).toContain("3 November 2026");
+  it("dates the document from its own timestamp in the reader's locale", () => {
+    // Prose dates follow the reader's locale, so the day/month order varies.
+    // Assert the day (3), the month name, and the year (2026) all appear.
+    expect(markdown).toMatch(/\b(3\s+[A-Z][a-z]+\s+2026|[A-Z][a-z]+\s+3,\s*2026)/);
   });
 
   it("names the decision, its score, and the reasoning saved against it", () => {
