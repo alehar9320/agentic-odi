@@ -8,8 +8,10 @@ concurrent ingest or too large for a constrained deployment.
 
 from __future__ import annotations
 
+import asyncio
 import os
-from typing import Any
+import random
+from typing import Any, Awaitable, Callable
 
 import httpx
 
@@ -20,6 +22,15 @@ DEFAULT_RETRIES = 3
 POOL_SIZE_ENV = "AGENTIC_ODI_HTTP_POOL_SIZE"
 TIMEOUT_ENV = "AGENTIC_ODI_HTTP_TIMEOUT"
 RETRIES_ENV = "AGENTIC_ODI_HTTP_RETRIES"
+
+# HTTP statuses that a retry budget should spend. httpx's transport retries
+# only cover connection failures; these statuses are the ones the budget is
+# advertised for, so they are retried here too.
+RETRY_STATUSES: frozenset[int] = frozenset({429, 502, 503, 504})
+
+BACKOFF_BASE = 0.25
+BACKOFF_CAP = 4.0
+MAX_RETRY_AFTER = 10.0
 
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:
