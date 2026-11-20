@@ -13,6 +13,8 @@ const REGISTRY_IDS = [
   "sidecar-connectors",
   "sidecar-mcp",
   "sidecar-import",
+  "remedies",
+  "session-verbatims",
 ] as const;
 
 describe("blockedReason", () => {

@@ -60,6 +60,14 @@ const REASONS: Record<CapabilityId, BlockedReason> = {
     sentence: "Importing from another machine needs the local service, which is not running.",
     action: { label: "Start the local service", kind: "start-sidecar" },
   },
+  remedies: {
+    sentence: "Nothing computes suggested fixes yet, so the panel shows labelled examples.",
+    action: { label: "See what works here", kind: "keep-working" },
+  },
+  "session-verbatims": {
+    sentence: "Nothing reads customer quotes yet, so the panel shows labelled examples.",
+    action: { label: "See what works here", kind: "keep-working" },
+  },
 };
 
 /** Why an action is blocked, in one sentence, with one thing to do about it. */
