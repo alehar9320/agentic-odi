@@ -48,6 +48,4 @@ def test_post_returns_405_with_allow() -> None:
 def test_head_is_rejected_like_post() -> None:
     # A single method test rejects every non-GET verb, HEAD and POST alike.
     branch = _capabilities_branch()
-    assert branch.index('request.method !== "GET"') < branch.index(
-        "localCapabilitiesResponse(env)"
-    )
+    assert branch.index('request.method !== "GET"') < branch.index("localCapabilitiesResponse(env)")
