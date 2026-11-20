@@ -133,7 +133,7 @@
           "title": "Agent Assignment"
         },
         {
-          "blurb": "What has shipped, and what is queued.",
+          "blurb": "Where to see what shipped, what is in review, and what is queued.",
           "slug": "roadmap",
           "source": "docs/roadmap.md",
           "title": "Roadmap"
