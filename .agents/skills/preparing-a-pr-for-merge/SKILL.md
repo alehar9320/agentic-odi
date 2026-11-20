@@ -30,9 +30,9 @@ gh pr view <n> --comments
 gh api "repos/{owner}/{repo}/pulls/<n>/files?per_page=100" --paginate --jq '.[].filename'
 ```
 
-Find the spec: the issue linked in the body, a `docs/superpowers/plans/` or
-`specs/` entry, or the `docs/roadmap.md` *In flight* line. No spec anywhere is
-itself the first defect — state that in the body instead of inventing one.
+Find the spec: the issue linked in the body, or a `docs/superpowers/plans/` or
+`specs/` entry. No spec anywhere is itself the first defect — state that in the
+body instead of inventing one.
 
 Review comments are claims to verify, not gates to clear: turn each into a
 defect — file, line, expected, actual — fix the still-valid ones, and account
@@ -64,8 +64,8 @@ Then check the gates a spec in this repo usually implies:
 - **Contract sync** — a new or changed MCP tool needs `ToolName` / `TOOL_SPECS`
   in `packages/core/src/agentic_odi_core/contract.py` and the `get_capabilities`
   text, in the same PR.
-- **Docs** — `README.md` and `docs/` reflect the change, and `docs/roadmap.md`
-  gains a *Shipped* or *In flight* line for the capability.
+- **Docs** — `README.md` and `docs/` reflect the change; a shipped capability
+  lands in `CHANGELOG.md` and the release, not in a hand-maintained roadmap list.
 - **Tests** — `uv run pytest` in the owning workspace; `npm --prefix apps/studio test -- --run`
   for the frontend.
 - **Reuse** — a PR that adds a source file carries the `Reuses:` block from

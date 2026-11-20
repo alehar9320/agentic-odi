@@ -160,7 +160,7 @@ generated artefact that follows from it — never a list to hand-edit.
 | New workflow or agent instruction | `.agents/` | `docs/living-studio.md` (via `scripts/docs_index.py`) |
 | New message part or conversation capability | `apps/studio/src/assistant/convert.ts` | `docs/living-studio.md` (via `scripts/docs_index.py`) |
 | Deployment URL or cloud setup changes | `docs/deployment.md` | `docs/deployment.md` |
-| Roadmap item completed or added | `docs/roadmap.md` | `docs/roadmap.md` |
+| Shipped capability | the merged pull request | `CHANGELOG.md` / Releases (release-please) |
 | Test layout or coverage changes | `tests/` | `docs/reference/test-map.md` (via `scripts/docs_index.py`) |
 
 ### Rules
@@ -170,7 +170,7 @@ generated artefact that follows from it — never a list to hand-edit.
 - ✅ **Optimize the first five seconds**: the top of the README carries the one-line value proposition and two distinct calls to action — try the hosted Living Studio, or run the full stack locally. Keep the `curl … install.sh | sh` one-liner in the hero.
 - ✅ **Keep the Install section accurate**: always reflect `uv run python scripts/dev.py` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
-- ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
+- ✅ **Record a shipped capability where it is owned**: the merged pull request and `CHANGELOG.md`, not a hand-maintained roadmap list — `docs/roadmap.md` is a pointer page with no lists to tick.
 - ❌ **Never leave the README or `docs/` in a stale state** where documented commands or files no longer match the codebase.
 - ❌ **Never hand-edit a generated block.** If a register needs a new value, change the source — directory, front matter, or contract — and run the generator. A hand-edited register is a broken invariant.
 
@@ -211,12 +211,13 @@ our own store; it is not a hand-rolled message list. Do not replace it, wrap it 
 a second one, or re-implement streaming, the composer, attachments, branches, or
 approval prompts beside it.
 
-- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown` is
-  declared in `apps/studio/package.json` and imported nowhere, while
-  `apps/studio/src/lib/markdown.ts` hand-parses a subset for the transcript. That
-  is the shape the reuse ladder forbids: a paid-for dependency plus a second
-  implementation beside it. New rendering work goes through the library;
-  collapsing the existing parser is its own task, not a reason to add a third.
+- **Markdown is a dependency, not a file.** `@assistant-ui/react-markdown`
+  renders the transcript: `MarkdownTextPrimitive` for prose and reasoning, and
+  the shared `mdComponents` map in `apps/studio/src/components/chat/Markdown.tsx`
+  for the standalone `Markdown({ source })` callers and `ClaimText`. The
+  hand-written parser that used to sit beside it was deleted in #394. New
+  rendering work goes through the library and the shared map; do not add a
+  second parser or a second class vocabulary.
 - **One bridge.** `apps/studio/src/assistant/convert.ts` is the only mapping
   between `ChatMessage`/`ChatPart` and assistant-ui parts. It is pure and tested
   without a runtime. A new part type is added there, rendered in `parts.tsx`, and

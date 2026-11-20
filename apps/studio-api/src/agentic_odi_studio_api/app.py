@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from agentic_odi_core import ODIService
+from agentic_odi_core import ODIService, configure_logging
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.funnel import count_launch, start_session
 from agentic_odi_core.messages import CAPABILITIES
@@ -37,7 +37,7 @@ from agentic_odi_studio_api.studio.errors import (
 )
 from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
 from agentic_odi_studio_api.studio.memory import StudioMemory
-from agentic_odi_studio_api.studio.paths import issue_token
+from agentic_odi_studio_api.studio.paths import issue_token, load_token
 from agentic_odi_studio_api.studio.router import router as studio_router
 from agentic_odi_studio_api.studio.sharing import ShareService
 
@@ -222,6 +222,11 @@ def create_app(
     marketplace: StudioMarketplace | None = None,
     sharing: ShareService | None = None,
 ) -> FastAPI:
+    # The sidecar is started two ways: ``python -m agentic_odi_studio_api.main``
+    # and uvicorn's factory (``scripts/dev.py``). This call is what makes both
+    # paths log the same way; it is idempotent, so a process that took the first
+    # path does not log twice.
+    configure_logging()
     # A damaged file must not reach the person as a traceback. The store is
     # gated on open; when it fails, the app still starts and answers with the
     # failure page until the file is restored. The file itself is never touched.
@@ -298,7 +303,7 @@ def create_app(
     app.state.memory = resolved_memory
     app.state.sharing = sharing or ShareService(service, resolved_memory)
     app.state.approvals = approvals
-    app.state.studio_token = issue_token()
+    app.state.studio_token = load_token() or issue_token()
     app.add_middleware(_AuthMiddleware, token=app.state.studio_token)
     app.state.boot_error = _boot_failure_error(boot_error) if boot_error else None
     app.state.db_integrity = "corrupt" if boot_error else getattr(repo, "integrity", "unknown")

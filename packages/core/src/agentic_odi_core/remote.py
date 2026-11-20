@@ -173,30 +173,20 @@ def code_for_error(exc: BaseException) -> StudioErrorCode:
 
 
 def error_envelope(exc: BaseException) -> dict[str, Any]:
-    """Serialize a failure into the fields a client can branch on.
+    """Serialize a failure into the four fields a client can branch on.
 
     This is the only place a Python exception becomes a wire value, so a
     handler never has to choose a code and a caller never has to read English
     to get one back. ``message`` is the exception's own sentence — it is the
     human half of the pair and carries no meaning a client should depend on.
-
-    ``field`` is the optional name of the input that failed, when the
-    exception carries one. It lets a form put the message next to the field
-    instead of on top of it; when the exception does not name a field it is
-    left out rather than defaulted, so a client can tell "no field" from
-    "the field is the whole form".
     """
     code = code_for_error(exc)
-    envelope: dict[str, Any] = {
+    return {
         "code": code.value,
         "message": str(exc),
         "suggestion": suggestion_for_code(code),
         "retryable": retryable_for_code(code),
     }
-    field = getattr(exc, "field", None)
-    if isinstance(field, str) and field:
-        envelope["field"] = field
-    return envelope
 
 
 def _envelope_error(stripped: str) -> StudioError | None:
@@ -234,13 +224,11 @@ def _envelope_error(stripped: str) -> StudioError | None:
 
     suggestion = fields.get("suggestion")
     retryable = fields.get("retryable")
-    field = fields.get("field")
     return StudioError(
         code=code,
         message=message,
         suggestion=suggestion if isinstance(suggestion, str) else suggestion_for_code(code),
         retryable=retryable if isinstance(retryable, bool) else retryable_for_code(code),
-        field=field if isinstance(field, str) else None,
     )
 
 

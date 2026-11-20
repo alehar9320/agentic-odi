@@ -35,6 +35,11 @@
   --line-strong: rgba(255, 255, 255, 0.14);
   --surface: rgba(255, 255, 255, 0.03);
   --surface-hover: rgba(255, 255, 255, 0.06);
+  /* The modal frame: the scrim behind it and the shadow that lifts it. Both
+     are literals here because this file owns the palette; the shared Dialog
+     reads them by name. */
+  --scrim: rgba(11, 13, 19, 0.75);
+  --shadow-dialog: 0 24px 48px rgba(0, 0, 0, 0.6);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   /* The display voice: the self-hosted serif plus a system-serif fallback, so a
@@ -480,6 +485,133 @@ a {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.bar__history-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.bar__history-row .bar__history-item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bar__history-delete {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.bar__history-rename-open {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.bar__history-row:hover .bar__history-rename-open,
+.bar__history-rename-open:focus-visible {
+  opacity: 1;
+}
+
+.bar__history-rename-open:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.bar__history-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 2px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.bar__history-rename:focus-visible {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 1px;
+}
+
+.bar__history-row:hover .bar__history-delete,
+.bar__history-delete:focus-visible {
+  opacity: 1;
+}
+
+.bar__history-delete:hover {
+  background: var(--surface-hover);
+  color: var(--danger, #e5484d);
+}
+
+.bar__history-confirm {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.bar__history-confirm-text {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.bar__history-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bar__history-confirm-actions button {
+  padding: 3px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.bar__history-confirm-delete {
+  border-color: transparent !important;
+  background: var(--danger, #e5484d) !important;
+  color: #fff !important;
+}
+
+.bar__history-confirm-delete:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .bar__history-item[aria-current="true"] {
@@ -2013,6 +2145,50 @@ a {
   border-top: 1px solid var(--line);
 }
 
+/* GFM tables arrive as real tables (#394). The wrapper scrolls a wide table
+   instead of letting it push the message column out of the transcript. */
+.md-table-wrap {
+  margin: 0 0 10px;
+  overflow-x: auto;
+}
+
+.md-table {
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.md-table th,
+.md-table td {
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-table th {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* A task list reads as a list of statements, not as a row of empty bullets. */
+.md-list .task-list-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.md-list .task-list-item > input {
+  margin-top: 3px;
+}
+
 /* Panel content primitives */
 .stack {
   display: flex;
@@ -2048,6 +2224,20 @@ a {
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+/* The dashboard's trend is drawn by hand: one inline SVG, no charting
+   dependency. A short series still reads as a shape rather than a stub. */
+.dashboard-trend__svg {
+  display: block;
+  width: 100%;
+  height: 72px;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.dashboard .metrics {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .chips {
@@ -2936,6 +3126,17 @@ button.message__tag:hover {
 
 .failure__retry {
   margin-top: 8px;
+}
+
+/* The pair sits on one line: Retry is the primary way out, Delete the quiet one. */
+.failure__delete {
+  margin-top: 8px;
+  margin-left: 12px;
+  color: var(--muted);
+}
+
+.failure__delete:hover {
+  color: var(--text);
 }
 
 /* ------------------------------------------------------------------ */
@@ -5041,6 +5242,14 @@ details[open] summary {
   min-height: 0;
 }
 
+/* The split itself. `ResizablePanelGroup` carries Tailwind's `h-full w-full`,
+   which would pin it to its content, so the flex container's own sizing wins. */
+.stage__split-group {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 .stage__thread {
   display: flex;
   flex-direction: column;
@@ -5141,18 +5350,30 @@ details[open] summary {
 /* ------------------------------------------------------------------ */
 /* Lens: a view docks beside the conversation, never over it          */
 /* ------------------------------------------------------------------ */
+/* The column that fills whichever shell holds it. The docked panel owns the
+   width, so the lens no longer sizes itself; the sheet content does the same
+   on a narrow screen (#407). */
 .lens {
   display: flex;
   flex-direction: column;
-  flex: none;
-  width: min(520px, 44vw);
-  min-width: 360px;
+  min-width: 0;
   min-height: 0;
-  border-left: 1px solid var(--line);
+  height: 100%;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006)),
     var(--bg-raised);
   animation: lens-in var(--motion-base) var(--ease-out);
+}
+
+.lens--docked {
+  border-left: 1px solid var(--line);
+}
+
+/* The copied `sheet` renders the same lens inside a Radix dialog. Drop the
+   docked border and the slide-in, which the sheet already animates. */
+.lens--sheet {
+  border-left: 0;
+  animation: none;
 }
 
 .lens__head {
@@ -5168,8 +5389,50 @@ details[open] summary {
 .lens__heading {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 11px;
   min-width: 0;
+  flex: 1;
+}
+
+.lens__where {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.lens__siblings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 100%;
+  margin-top: 2px;
+}
+
+.lens__sibling {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.lens__sibling:hover,
+.lens__sibling:focus-visible {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--line) 60%, var(--text));
+}
+
+.lens__sibling[aria-current="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .lens__icon {
@@ -7110,20 +7373,6 @@ details[open] summary {
   border-top: 1px solid var(--line);
 }
 
-.update-settings__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.update-settings__version {
-  color: var(--faint);
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .update-settings__status {
   display: flex;
   align-items: center;
@@ -7132,12 +7381,6 @@ details[open] summary {
   color: var(--muted);
   font-size: 0.79rem;
   line-height: 1.4;
-}
-
-.update-settings__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
 }
 
 .update-settings__toggle {
@@ -7166,14 +7409,6 @@ details[open] summary {
 
 .update-settings__toggle input {
   accent-color: var(--accent);
-}
-
-.update-settings__notes-body {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
 }
 
 .status-dot.is-busy {
@@ -7626,4 +7861,19 @@ textarea,
 .pending-calls__prompt {
   color: var(--muted);
   font-size: 12.5px;
+}
+
+/* blocked actions */
+/* The reason sits under the control it explains, quieter than the control and
+   never a second alert: the person reads why at the moment they pressed. */
+.blocked-reason {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.blocked-reason__action {
+  color: var(--accent);
+  font-weight: 600;
 }

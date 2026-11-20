@@ -110,7 +110,7 @@ function DayDivider() {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, dismissFailedTurn } = useStudio();
   const id = useAuiState((state) => state.message.id);
   const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
@@ -144,13 +144,9 @@ function AssistantMessage() {
         {/* Named on the reply it describes, never on every reply on screen, and
             said once instead of warned about in a strip above the work. */}
         {offlineReplyFor === id ? (
-          <button
-            type="button"
-            className="message__tag"
-            onClick={() => openPanel("settings")}
-          >
-            Local draft, no model connected
-          </button>
+          <span className="message__tag" aria-label="This reply came from the built-in assistant">
+            Built-in assistant
+          </span>
         ) : null}
 
         {/* One row for the work a turn did, and the answer on its own. The
@@ -203,6 +199,7 @@ function AssistantMessage() {
             error={error}
             retryText={retryText}
             onRetry={(text) => void sendMessage(text)}
+            onDelete={() => dismissFailedTurn(id)}
           />
         ) : null}
 

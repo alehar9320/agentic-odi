@@ -54,7 +54,7 @@
     "id": "surfaces",
     "eyebrow": "The surfaces",
     "title": "The agent composes, it does not describe.",
-    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Nine shapes, each one a thing you can act on.",
+    "blurb": "The studio answers with a card from a closed catalog, rendered inline in the conversation. Ten shapes, each one a thing you can act on.",
     "cards": [
       {
         "type": "outcome-card",
@@ -203,6 +203,22 @@
               "why": "every outcome maps to a job already in the store, so there is no job that is entirely unaddressed"
             }
           ]
+        }
+      },
+      {
+        "type": "finding-card",
+        "title": "Finding",
+        "blurb": "The one sentence worth opening: the claim, the impact, the measured number, and the step it happens on.",
+        "data": {
+          "kind": "key_finding",
+          "headline": "Waiting on IT approval",
+          "impact": "high",
+          "metric": {
+            "label": "Drop-off at Step 2",
+            "value": "34%"
+          },
+          "step": "Match each line",
+          "detail": "The drop-off is not confusion with the product. It is internal waiting."
         }
       }
     ]

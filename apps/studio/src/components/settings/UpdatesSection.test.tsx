@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { createUpdateService, UpdateProvider } from "../../updater";
 import type { UpdateTransport } from "../../updater/types";
@@ -14,38 +14,28 @@ const transport: UpdateTransport = {
 
 const service = createUpdateService({ transport, storage: null, document: null });
 
-function renderSection(overrides: Partial<Parameters<typeof UpdatesSection>[0]> = {}) {
-  const props = {
-    tourEnabled: false,
-    restartTour: vi.fn(),
-    ...overrides,
-  };
-  return {
-    ...render(
-      <UpdateProvider service={service}>
-        <UpdatesSection {...props} />
-      </UpdateProvider>,
-    ),
-    props,
-  };
+function renderSection() {
+  return render(
+    <UpdateProvider service={service}>
+      <UpdatesSection />
+    </UpdateProvider>,
+  );
 }
 
 describe("UpdatesSection", () => {
-  it("renders the software update block", () => {
+  it("shows one state line and at most one action", () => {
     renderSection();
 
-    expect(screen.getByRole("region", { name: /software update/i })).toBeInTheDocument();
-    expect(screen.getByText(/how the studio works/i)).toBeInTheDocument();
+    const updates = screen.getByRole("region", { name: "Updates" });
+    expect(within(updates).getByText(service.statusLine())).toBeInTheDocument();
+    expect(within(updates).queryAllByRole("button").length).toBeLessThanOrEqual(1);
   });
 
-  it("hides the tour when it is not enabled", () => {
-    renderSection({ tourEnabled: false });
+  it("leaves the tour and the product essay to About", () => {
+    renderSection();
+
     expect(screen.queryByRole("button", { name: /replay the tour/i })).toBeNull();
-  });
-
-  it("replays the tour when it is enabled", () => {
-    const { props } = renderSection({ tourEnabled: true });
-    fireEvent.click(screen.getByRole("button", { name: /replay the tour/i }));
-    expect(props.restartTour).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /take the tour/i })).toBeNull();
+    expect(screen.queryByText(/how the studio works/i)).toBeNull();
   });
 });

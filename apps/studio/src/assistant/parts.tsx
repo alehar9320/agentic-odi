@@ -10,9 +10,11 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useAuiState, type ToolCallMessagePartProps } from "@assistant-ui/react";
 
+import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+
 import { formatFileSize, preparedAttachmentById } from "./attachments";
 import { CheckIcon, ChevronDownIcon, SparkIcon } from "../components/icons";
-import { Markdown } from "../components/chat/Markdown";
+import { mdComponents, mdRemarkPlugins } from "../components/chat/Markdown";
 import { useStudio } from "../state/StudioContext";
 import type { Claim } from "../types";
 import type { UiNode } from "../ui/protocol";
@@ -26,16 +28,19 @@ import {
 } from "./claims";
 import { CLAIMS_PART, SURFACE_PART, isArguments } from "./convert";
 import { describeConsequence } from "./consequence";
-import { ClaimCitation } from "../components/chat/ClaimCitation";
 
-/** Prose. The existing renderer, so the transcript reads exactly as before. */
+/** Prose. Rendered by the assistant-ui markdown primitive, so the transcript
+ * reads through the library's own engine with the shared class vocabulary. */
 export function TextPart() {
-  const text = useAuiState((state) => (state.part.type === "text" ? state.part.text : null));
-  if (text === null) {
-    return null;
-  }
-  // A marker is syntax, not prose: hide it even while the reply streams.
-  return <Markdown source={hideMarkers(text)} />;
+  return (
+    <MarkdownTextPrimitive
+      className="md"
+      smooth={false}
+      preprocess={hideMarkers}
+      remarkPlugins={mdRemarkPlugins}
+      components={mdComponents}
+    />
+  );
 }
 
 /**
@@ -95,7 +100,7 @@ export function ClaimText({ content, claims }: { content: string; claims: Claim[
       }
       return (
         <span key={index} className="claim claim--cited">
-          <ClaimCitation claim={claim} onOpenRecord={focusEvidence} />
+          {claim.text}
           {claim.evidence.map((citation) => {
             const label = citation.source_name
               ? `${citation.source_name} · ${citation.name}`
@@ -255,7 +260,13 @@ export function ReasoningPart() {
         />
       </button>
       <div className="reasoning__body" id={panelId} hidden={!open}>
-        <Markdown source={text} />
+        <MarkdownTextPrimitive
+          className="md"
+          smooth={false}
+          preprocess={hideMarkers}
+          remarkPlugins={mdRemarkPlugins}
+          components={mdComponents}
+        />
       </div>
     </div>
   );

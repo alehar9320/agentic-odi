@@ -6,20 +6,30 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  MIN_MEANINGFUL_N,
+  confidenceClass,
+  existingSolutionLabel,
+  formatBand,
+  formatBandProvenance,
   confidencePill,
   formatMemberMean,
   formatOpportunityScore,
+  formatSample,
   hasScore,
+  isOnlyWorkaround,
   isUnderserved,
   isUnderservedPoint,
+  nAdvisory,
   opportunityPill,
   opportunityScore,
   scoreConfidence,
+  scoreMismatch,
   scoredAverage,
   segmentBasisLine,
   summarizeMemberScores,
   underservedBoundaryImportance,
   UNDERSERVED_THRESHOLD,
+  UNSCORED_LABEL,
 } from "./odi";
 
 // The fixture is the contract between the Python service and the TypeScript
@@ -108,6 +118,34 @@ describe("opportunityScore", () => {
   });
 });
 
+describe("scoreMismatch", () => {
+  it("flags a stored score that no longer matches its inputs", () => {
+    // 8.6 / 4.9 produce 12.3, not the 14.0 the record holds.
+    expect(scoreMismatch(14, 8.6, 4.9)).toBe(true);
+  });
+
+  it("tolerates a rounding difference within a twentieth", () => {
+    // 8.6 / 4.9 produce 12.3; four hundredths away is a rounding difference.
+    expect(scoreMismatch(12.34, 8.6, 4.9)).toBe(false);
+    // A tenth away is a real disagreement.
+    expect(scoreMismatch(12.4, 8.6, 4.9)).toBe(true);
+  });
+
+  it("agrees at half a twentieth and disagrees just beyond it", () => {
+    // 5 / 5 produce 5 exactly, so there is no floating-point noise in the
+    // recomputed score. Half a twentieth (0.05) is still a rounding difference;
+    // anything past it is a real disagreement.
+    expect(scoreMismatch(5.05, 5, 5)).toBe(false);
+    expect(scoreMismatch(5.049, 5, 5)).toBe(false);
+    expect(scoreMismatch(5.051, 5, 5)).toBe(true);
+  });
+
+  it("never mismatches an unscored outcome", () => {
+    expect(scoreMismatch(null, 8.6, 4.9)).toBe(false);
+    expect(scoreMismatch(undefined, 8.6, 4.9)).toBe(false);
+  });
+});
+
 describe("isUnderserved", () => {
   it("is true only when the score is strictly greater than 10", () => {
     expect(isUnderserved(15.3)).toBe(true);
@@ -140,9 +178,9 @@ describe("hasScore", () => {
 });
 
 describe("formatOpportunityScore (regression: crash when opp is None)", () => {
-  it("renders N/A for nullish scores", () => {
-    expect(formatOpportunityScore(null)).toBe("N/A");
-    expect(formatOpportunityScore(undefined)).toBe("N/A");
+  it("renders the shared label for nullish scores", () => {
+    expect(formatOpportunityScore(null)).toBe(UNSCORED_LABEL);
+    expect(formatOpportunityScore(undefined)).toBe(UNSCORED_LABEL);
   });
 
   it("formats real scores to one decimal", () => {
@@ -169,8 +207,8 @@ describe("opportunityPill", () => {
   // A missing score is not a verdict. The pill must not read "Served", and it
   // must not print "N/A" inside a sentence that claims something about the outcome.
   it("returns a neutral Not scored descriptor for a missing score", () => {
-    expect(opportunityPill(null)).toEqual({ label: "Not scored", variant: "blue" });
-    expect(opportunityPill(undefined)).toEqual({ label: "Not scored", variant: "blue" });
+    expect(opportunityPill(null)).toEqual({ label: UNSCORED_LABEL, variant: "blue" });
+    expect(opportunityPill(undefined)).toEqual({ label: UNSCORED_LABEL, variant: "blue" });
     expect(opportunityPill(null).label).not.toContain("Served");
     expect(opportunityPill(null).label).not.toContain("N/A");
   });
@@ -197,6 +235,229 @@ describe("the underserved boundary", () => {
       expect(isUnderservedPoint(importance, satisfaction)).toBe(expected);
       expect(isUnderserved(opportunityScore(importance, satisfaction))).toBe(expected);
     }
+  });
+});
+
+describe("formatSample", () => {
+  it("reads as est. when the counts are unknown", () => {
+    expect(formatSample({})).toBe("est.");
+    expect(formatSample({ score_method: "estimate" })).toBe("est.");
+  });
+
+  it("never fabricates an n for an estimate with no counts", () => {
+    expect(formatSample({ score_method: "estimate", importance_n: null, satisfaction_n: null })).toBe(
+      "est.",
+    );
+  });
+
+  it("shows one shared n and the method when the counts agree", () => {
+    expect(formatSample({ score_method: "survey", importance_n: 40, satisfaction_n: 40 })).toBe(
+      "n=40 (survey)",
+    );
+  });
+
+  it("shows both counts when the dimensions differ", () => {
+    expect(formatSample({ score_method: "survey", importance_n: 40, satisfaction_n: 12 })).toBe(
+      "n=40/12 (survey)",
+    );
+  });
+
+  it("marks a missing dimension with ? rather than inventing a count", () => {
+    expect(formatSample({ score_method: "import", importance_n: 40, satisfaction_n: null })).toBe(
+      "n=40/? (import)",
+    );
+  });
+
+  it("falls back to est. when the method is absent but no counts exist", () => {
+    expect(formatSample({ importance_n: null, satisfaction_n: null })).toBe("est.");
+  });
+});
+
+describe("formatBand", () => {
+  it("reads an estimate as no band, never a tight one", () => {
+    expect(formatBand({ score_method: "estimate" })).toBe("no band");
+  });
+
+  it("renders a survey band as a range", () => {
+    expect(
+      formatBand({ score_method: "survey", opportunity_low: 8.5, opportunity_high: 10.5 }),
+    ).toBe("8.5–10.5");
+  });
+
+  it("marks a zero-width survey band so it is not read as certainty", () => {
+    expect(
+      formatBand({ score_method: "survey", opportunity_low: 10, opportunity_high: 10 }),
+    ).toBe("±0 (n=1)");
+  });
+
+  it("reads a missing band as no band", () => {
+    expect(formatBand({ score_method: "survey" })).toBe("no band");
+  });
+});
+
+describe("confidenceClass", () => {
+  it("calls a large survey measured", () => {
+    expect(confidenceClass({ score_method: "survey", importance_n: 40, satisfaction_n: 40 })).toBe(
+      "measured",
+    );
+  });
+
+  it("calls a small survey thin", () => {
+    expect(confidenceClass({ score_method: "survey", importance_n: 3, satisfaction_n: 3 })).toBe(
+      "thin",
+    );
+  });
+
+  it("never treats a method label alone as evidence", () => {
+    expect(confidenceClass({ score_method: "survey" })).toBe("none");
+  });
+
+  it("lets the weakest dimension bound the class", () => {
+    expect(confidenceClass({ score_method: "survey", importance_n: 40, satisfaction_n: 2 })).toBe(
+      "thin",
+    );
+  });
+});
+
+describe("formatBandProvenance", () => {
+  it("says plainly when a score carries no band", () => {
+    expect(formatBandProvenance(null)).toBe("no band");
+    expect(formatBandProvenance({ outcome_id: "O-1", band: null })).toBe("no band");
+  });
+
+  it("names the sample, confidence and seed behind a stored band", () => {
+    expect(
+      formatBandProvenance({
+        outcome_id: "O-1",
+        band: {
+          low: 14,
+          high: 18,
+          n: 40,
+          confidence_level: 0.95,
+          seed: 7,
+          method: "survey",
+          computed_at: "2026-01-01T00:00:00+00:00",
+          stale: false,
+        },
+      }),
+    ).toBe("n=40 · 95% · seed 7");
+  });
+
+  it("marks a stale band and an unrecorded seed rather than faking either", () => {
+    expect(
+      formatBandProvenance({
+        outcome_id: "O-1",
+        band: {
+          low: 14,
+          high: 18,
+          n: 40,
+          confidence_level: 0.95,
+          seed: null,
+          method: "survey",
+          computed_at: "2026-01-01T00:00:00+00:00",
+          stale: true,
+        },
+      }),
+    ).toBe("n=40 · 95% · seed unrecorded · stale");
+  });
+});
+
+describe("nAdvisory (M2-14)", () => {
+  it("uses the documented threshold of 20", () => {
+    expect(MIN_MEANINGFUL_N).toBe(20);
+  });
+
+  it("advises a four-response sample and names the number and threshold", () => {
+    const advisory = nAdvisory({
+      score_method: "survey",
+      importance_n: 4,
+      satisfaction_n: 4,
+      opportunity_score: 12,
+    });
+    expect(advisory).not.toBeNull();
+    expect(advisory?.n).toBe(4);
+    expect(advisory?.threshold).toBe(20);
+    expect(advisory?.dimension).toBe("both");
+    expect(advisory?.message).toContain("4");
+    expect(advisory?.message).toContain("20");
+    expect(advisory?.message).toContain("below the advisory threshold");
+  });
+
+  it("does not advise a sample at or above the threshold", () => {
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 25, satisfaction_n: 25, opportunity_score: 12 }),
+    ).toBeNull();
+  });
+
+  it("pins the boundary strictly below twenty", () => {
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 19, satisfaction_n: 19, opportunity_score: 12 }),
+    ).not.toBeNull();
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 20, satisfaction_n: 20, opportunity_score: 12 }),
+    ).toBeNull();
+  });
+
+  it("names the smaller dimension when the two differ", () => {
+    const advisory = nAdvisory({
+      score_method: "survey",
+      importance_n: 40,
+      satisfaction_n: 12,
+      opportunity_score: 12,
+    });
+    expect(advisory?.n).toBe(12);
+    expect(advisory?.dimension).toBe("satisfaction");
+  });
+
+  it("never advises an estimate or an unknown count at a fabricated zero", () => {
+    expect(
+      nAdvisory({ score_method: "estimate", opportunity_score: 12 }),
+    ).toBeNull();
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: null, satisfaction_n: null, opportunity_score: 12 }),
+    ).toBeNull();
+  });
+
+  it("never advises an unscored outcome", () => {
+    expect(
+      nAdvisory({ score_method: "survey", importance_n: 3, satisfaction_n: 3, opportunity_score: null }),
+    ).toBeNull();
+  });
+});
+
+describe("isOnlyWorkaround", () => {
+  const link = (kind: string) => ({
+    outcome_id: "O-1",
+    alternative: { id: "A-1", job_id: "JOB-1", name: "Thing", kind },
+    link: { outcome_id: "O-1", alternative_id: "A-1", adequacy: 5, usage_n: null, note: null },
+  });
+
+  it("is true when the only recorded solution is a workaround", () => {
+    expect(isOnlyWorkaround([link("workaround")] as never)).toBe(true);
+  });
+
+  it("is false when a non-workaround solution is also recorded", () => {
+    expect(isOnlyWorkaround([link("workaround"), link("product")] as never)).toBe(false);
+  });
+
+  it("is false for a nothing row", () => {
+    expect(isOnlyWorkaround([link("nothing")] as never)).toBe(false);
+  });
+
+  it("is false for an un-inventoried outcome", () => {
+    expect(isOnlyWorkaround([])).toBe(false);
+  });
+});
+
+describe("existingSolutionLabel", () => {
+  it("words the two no states differently and records a solution only for yes", () => {
+    const yes = existingSolutionLabel("yes");
+    const nothing = existingSolutionLabel("no_linked_nothing");
+    const unknown = existingSolutionLabel("no_link_at_all");
+
+    expect(new Set([yes, nothing, unknown]).size).toBe(3);
+    expect(unknown).toContain("not yet inventoried");
+
   });
 });
 
@@ -266,7 +527,7 @@ describe("formatMemberMean", () => {
   });
 
   it("renders Not scored instead of a fake zero, NaN, or dash", () => {
-    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe("Not scored");
+    expect(formatMemberMean(summarizeMemberScores([null, undefined]))).toBe(UNSCORED_LABEL);
   });
 });
 

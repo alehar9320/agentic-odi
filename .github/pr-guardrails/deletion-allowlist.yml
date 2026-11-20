@@ -13,6 +13,18 @@
 - path: "apps/studio/src/components/chat/OfflineNotice.tsx"
   issue: 264
   reason: "Replaced by the unified banner system in PR #264."
+- path: "apps/studio/src/lib/markdown.ts"
+  issue: 394
+  reason: >-
+    The hand-written markdown subset is superseded by the declared
+    `@assistant-ui/react-markdown` owner rendering through `react-markdown`
+    (#394). Its behaviours moved to `components/chat/Markdown.test.tsx`.
+- path: "apps/studio/src/lib/markdown.test.ts"
+  issue: 394
+  reason: >-
+    The seven parser behaviours moved to `components/chat/Markdown.test.tsx`
+    against the library renderer, so this parser test goes with its parser
+    (#394).
 - path: "apps/studio/src/components/notices/SidecarNotice.test.tsx"
   issue: 264
   reason: "Replaced by banner bridge tests in PR #264."
@@ -25,3 +37,10 @@
     Tests the roadmap gate that PR #497 removes, so the test goes with it. The
     gate required every new capability to add a line to docs/roadmap.md, which
     made every agent PR edit one shared file and conflict with every other.
+- path: ".qoder/worktrees/*"
+  issue: 1101
+  reason: >-
+    Accidentally committed Qoder IDE worktree gitlinks (mode 160000 submodule
+    pointers) with no URL in .gitmodules; they break `actions/checkout`
+    submodule auth cleanup during CI. PR #1101 removes them and gitignores
+    `.qoder/` to prevent recurrence.

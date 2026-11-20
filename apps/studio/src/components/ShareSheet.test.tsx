@@ -39,6 +39,14 @@ describe("ShareSheet", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("exposes an accessible name through the dialog role", () => {
+    render(<ShareSheet isOpen onClose={() => undefined} onCreate={vi.fn()} />);
+
+    expect(
+      screen.getByRole("dialog", { name: "Share a read-only link" }),
+    ).toBeInTheDocument();
+  });
+
   it("mints a link for the chosen duration and offers it to copy", async () => {
     stubClipboard();
     const onCreate = vi.fn(async () => link());
@@ -99,7 +107,9 @@ describe("ShareSheet", () => {
     const onClose = vi.fn();
     render(<ShareSheet isOpen onClose={onClose} onCreate={vi.fn()} />);
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    // The primitive dismisses on a keydown it receives from the document,
+    // which is where a real Escape lands before it bubbles to the window.
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalled();
   });
