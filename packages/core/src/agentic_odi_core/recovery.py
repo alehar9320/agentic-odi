@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from agentic_odi_core.errors import StoreCorrupt
@@ -25,8 +25,121 @@ DEFAULT_BACKUP_DIR = "~/.agentic-odi/backups"
 
 BACKUP_DIR_ENV = "AGENTIC_ODI_BACKUP_DIR"
 
-#: The prefix a database's backups share, keyed by the database file's stem.
-_BACKUP_PREFIXES = {"odi": "odi", "studio": "studio"}
+#: How many backups to keep at most. The newest ``keep`` always survive, and
+#: one backup per calendar day is retained for the last week on top of that.
+BACKUP_KEEP_ENV = "AGENTIC_ODI_BACKUP_KEEP"
+DEFAULT_BACKUP_KEEP = 14
+
+#: The number of recent calendar days that always keep one backup each,
+#: regardless of the ``keep`` count.
+_BACKUP_DAILY_RETENTION_DAYS = 7
+
+
+def _env_int(name: str, default: int, *, minimum: int) -> int:
+    """Parse an integer environment variable, raising on an invalid value.
+
+    An absent or empty variable means "use the default". A present but
+    non-integer or out-of-range value raises with the variable name in the
+    message so the operator sees which setting they chose.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {raw!r}") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {value}")
+    return value
+
+
+def _backup_keep() -> int:
+    """Resolve the retention count from the environment, refusing bad values.
+
+    A non-positive keep would delete the backup just written, so it falls back
+    to the default rather than honouring it.
+    """
+    try:
+        return _env_int(BACKUP_KEEP_ENV, DEFAULT_BACKUP_KEEP, minimum=1)
+    except ValueError:
+        return DEFAULT_BACKUP_KEEP
+
+
+def _backup_sort_key(path: Path) -> tuple[int, str]:
+    """Sort backups newest-first by mtime, filename as a tiebreaker.
+
+    Shares the ordering with :func:`latest_backup` so the two views of the
+    directory cannot disagree.
+    """
+    return (path.stat().st_mtime_ns, path.name)
+
+
+def _calendar_day(path: Path) -> str:
+    """Return the UTC calendar day a backup was written, as ``YYYY-MM-DD``.
+
+    The filename carries a fixed-width UTC stamp, so the day is read from the
+    name rather than the file's mtime. A collision suffix (``-N``) is stripped
+    before parsing, matching :func:`format_backup_time`.
+    """
+    stem = path.stem
+    _, _, stamp = stem.partition("-")
+    head, sep, tail = stamp.rpartition("-")
+    if sep and tail.isdigit():
+        stamp = head
+    try:
+        parsed = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return ""
+    return parsed.date().isoformat()
+
+
+def prune_backups(
+    db_path: str,
+    *,
+    keep: int | None = None,
+    directory: Path | None = None,
+) -> list[Path]:
+    """Delete old backups, keeping the newest ``keep`` plus one per recent day.
+
+    The newest ``keep`` backups always survive. In addition, the newest backup
+    from each of the last ``_BACKUP_DAILY_RETENTION_DAYS`` calendar days is
+    kept, so a day with many backups still contributes one. Oldest files are
+    removed first. A failed unlink is skipped rather than raised.
+
+    ``keep`` defaults to the configured retention count. A non-positive value
+    is refused and falls back to the default rather than deleting everything.
+    """
+    if keep is None or keep <= 0:
+        keep = _backup_keep()
+    folder = directory if directory is not None else backups_dir()
+    if not folder.is_dir():
+        return []
+    prefix = backup_prefix(db_path)
+    candidates = [path for path in folder.glob(f"{prefix}-*.db") if path.is_file()]
+    if not candidates:
+        return []
+    candidates.sort(key=_backup_sort_key, reverse=True)
+
+    today = datetime.now(timezone.utc).date()
+    recent_days = {today - timedelta(days=i) for i in range(_BACKUP_DAILY_RETENTION_DAYS)}
+    recent_days_iso = {day.isoformat() for day in recent_days}
+
+    kept: set[Path] = set()
+    removed: list[Path] = []
+    for path in candidates[:keep]:
+        kept.add(path)
+    for path in candidates[keep:]:
+        day = _calendar_day(path)
+        if day in recent_days_iso and path not in kept:
+            kept.add(path)
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        removed.append(path)
+    return removed
 
 
 def backups_dir() -> Path:
@@ -161,6 +274,7 @@ def backup_database(db_path: str, *, directory=None) -> Path:
         except OSError:
             pass
         raise RuntimeError("backup failed integrity check")
+    prune_backups(str(source), directory=folder)
     return dest
 
 

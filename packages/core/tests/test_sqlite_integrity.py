@@ -30,6 +30,7 @@ from agentic_odi_core.recovery import (
     corrupt_store_message,
     format_backup_time,
     latest_backup,
+    prune_backups,
     restore_database,
 )
 from agentic_odi_core.repository import InMemoryRepository
