@@ -1,3 +1,4 @@
+// Session verbatims interface: provenance decides what the quotes claim (#741).
 import { describe, expect, it } from "vitest";
 
 import type { CanvasProvenance } from "../types";

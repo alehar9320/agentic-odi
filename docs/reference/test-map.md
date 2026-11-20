@@ -198,6 +198,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | Mock StudioContext |
 | `apps/studio/src/components/canvas/OpportunityLandscapeFacet.test.tsx` | — |
 | `apps/studio/src/components/canvas/OutcomeCard.test.tsx` | The card lists the records captured against its outcome, so the canvas |
+| `apps/studio/src/components/canvas/OutcomeCard.visual.test.tsx` | Visual: the finding card's labelled remedies and customer-words controls (#741). |
 | `apps/studio/src/components/canvas/OutcomeCardAlternatives.test.tsx` | — |
 | `apps/studio/src/components/canvas/OutcomeCardBand.test.tsx` | — |
 | `apps/studio/src/components/canvas/OutcomeCardNote.test.tsx` | The note is a value, so it must never be parsed as markup. |
@@ -257,6 +258,8 @@ isolation, and coverage rules stay in
 | `apps/studio/src/diagnostics/DiagnosticsModal.test.tsx` | The primitive hides the page behind from assistive technology (and marks |
 | `apps/studio/src/diagnostics/bundle.test.ts` | #800: About and diagnostics must report the same runtime facts, and those |
 | `apps/studio/src/diagnostics/redact.test.ts` | — |
+| `apps/studio/src/domain/Remedies.test.ts` | Remedies interface: the effort vocabulary and the labelled examples (#741). |
+| `apps/studio/src/domain/Verbatims.test.ts` | Session verbatims interface: provenance decides what the quotes claim (#741). |
 | `apps/studio/src/features/flags.test.ts` | — |
 | `apps/studio/src/install.test.ts` | `isInstalled()` answers one question — is the page running as its own |
 | `apps/studio/src/lib/blockedReason.test.ts` | Every id the capability registry models, spelled out so a new one fails here. */ |

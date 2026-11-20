@@ -1,3 +1,4 @@
+// Visual: the finding card's labelled remedies and customer-words controls (#741).
 import { configure } from "@chromatic-com/vitest";
 import { afterEach, expect, it } from "vitest";
 import { render } from "vitest-browser-react";

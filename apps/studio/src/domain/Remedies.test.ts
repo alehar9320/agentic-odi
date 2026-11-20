@@ -1,3 +1,4 @@
+// Remedies interface: the effort vocabulary and the labelled examples (#741).
 import { describe, expect, it } from "vitest";
 
 import { getRemedies, isRemedyEffort } from "./Remedies";
