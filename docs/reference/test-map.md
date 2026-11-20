@@ -425,6 +425,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_artifact_inventory.py` | The renderer inventory and the gate that keeps it true. |
 | `tests/scripts/test_assistant_ui_ledger.py` | Tests for the assistant-ui ledger check in scripts/doc_check.py (issue #429). |
 | `tests/scripts/test_audit_ignore.py` | The accepted-advisory ledger is the gate's memory (#1090). |
+| `tests/scripts/test_blind_excepts.py` | Every broad ``except`` must say what it swallowed (issue #1091). |
 | `tests/scripts/test_bundle_budget.py` | The cold-start bundle budget gate (#529). |
 | `tests/scripts/test_ci_release.py` | — |
 | `tests/scripts/test_cli_docs.py` | Assert that docs/cli.md stays synchronized with registered Typer CLI commands. |
