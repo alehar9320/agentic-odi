@@ -718,8 +718,8 @@ uv run pytest \
   `scripts/`).
 - Every async test is decorated with `@pytest.mark.asyncio`.
 - Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
-- The MCP server's `reset_db` autouse fixture clears in-memory state before
-  each test.
+- The MCP server's `configured_server` autouse fixture names a fresh
+  `InMemoryRepository` before each test.
 
 ### Test Coverage Map
 
