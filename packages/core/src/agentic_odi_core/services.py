@@ -52,7 +52,6 @@ from agentic_odi_core.models import (
     Outcome,
     OutcomeAlignment,
     OutcomeCandidate,
-    RelationshipType,
     ScheduledWork,
     ScheduledWorkStatus,
     ScheduledWorkTriggerType,

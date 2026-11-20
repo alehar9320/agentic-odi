@@ -50,6 +50,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_interviews_cli.py` | Tests for the interviews CLI group (A1). |
 | `apps/cli/tests/test_jobs_cli.py` | Tests for the Jobs CLI command group. |
 | `apps/cli/tests/test_link_outcome_errors.py` | Linking an outcome to an objective that does not exist is a backend error. |
+| `apps/cli/tests/test_links_cli.py` | Tests for the links CLI group. |
 | `apps/cli/tests/test_mascot.py` | The Odi banner: shape, colour, and when it is allowed to appear. |
 | `apps/cli/tests/test_onboard.py` | Tests for first-run onboarding signal extraction and gating. |
 | `apps/cli/tests/test_paths.py` | — |

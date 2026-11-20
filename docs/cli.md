@@ -742,6 +742,23 @@ agentic-odi schedule trigger <work-id>
 agentic-odi schedule cancel <work-id>
 ```
 
+## Typed links between entities
+
+`links` records typed relationships between ODI entities (jobs, outcomes, evidence, and more). Links are stored in the local SQLite store and can be filtered by source, target, or relationship type.
+
+```bash
+# Create a typed link between two entities
+agentic-odi links add --source-type job --source-id <id> --target-type job --target-id <id> --relationship-type references
+
+# List links (optionally filtered by source, target, or relationship type)
+agentic-odi links list
+agentic-odi links list --source-id <id> --json
+agentic-odi links list --relationship-type references --limit 10 --offset 0
+
+# Remove a link by ID
+agentic-odi links remove <link-id>
+```
+
 ## Connectors
 
 The `connectors` group manages external MCP integrations. See
