@@ -19,8 +19,8 @@ from uuid import uuid4
 from agentic_odi_core.remote import (
     StudioError,
     StudioErrorCode,
-    suggestion_for_code,
     retryable_for_code,
+    suggestion_for_code,
 )
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError

@@ -115,6 +115,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_conversations.py` | Conversations keep a branch tree, and old rows still open. |
 | `apps/studio-api/tests/test_studio_csp.py` | Content-Security-Policy headers on sidecar responses. |
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Tests for the Studio's metadata-only diagnostics endpoint. |
+| `apps/studio-api/tests/test_studio_error_status_map.py` | Status-to-error-code mapping and retryability for sidecar HTTP errors. |
 | `apps/studio-api/tests/test_studio_errors.py` | HTTP error shape, status mapping, and request-id correlation. |
 | `apps/studio-api/tests/test_studio_evidence.py` | The evidence routes: capture with a link, promote it, delete it. |
 | `apps/studio-api/tests/test_studio_focus.py` | The record a PM is looking at must reach the model — in the store's own words. |
