@@ -478,6 +478,7 @@ isolation, and coverage rules stay in
 | `tests/test_worker_deploy_route.py` | `/api/deploy` tells a probe which commit and which bundle this artifact is. |
 | `tests/test_worker_error_origin.py` | Every Worker-generated failure says so with `origin: "proxy"`. |
 | `tests/test_worker_error_shape.py` | The Worker returns the one-error-body shape, even when the sidecar is down. |
+| `tests/test_worker_header_forwarding.py` | The Worker forwards an explicit allowlist of headers to the sidecar. |
 | `tests/test_worker_security_headers.py` | The Cloudflare Worker puts security headers on every Response. |
 | `website/tests/conftest.py` | Make the website's build tools importable during collection. |
 | `website/tests/site_support.py` | Shared fixtures and helpers for the website contract tests. |
