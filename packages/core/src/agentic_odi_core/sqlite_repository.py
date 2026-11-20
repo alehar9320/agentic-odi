@@ -70,19 +70,6 @@ _DERIVED_EVENT_TYPES = frozenset(
     }
 )
 
-DEFAULT_DB_PATH = os.path.expanduser("~/.agentic-odi/odi.db")
-
-
-def resolve_db_path(db_path: str | None = None) -> str:
-    """The store path a command will actually open.
-
-    One place resolves the default so every surface — a write, a read, and the
-    ``store`` report — names the same file rather than each guessing.
-    """
-    if db_path:
-        return db_path
-    return os.environ.get("AGENTIC_ODI_DB") or DEFAULT_DB_PATH
-
 
 class SQLiteRepository(Repository):
     def __init__(
