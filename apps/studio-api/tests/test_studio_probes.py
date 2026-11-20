@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
+import pytest
 from agentic_odi_studio_api.studio import probes
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+)
 
 
 def test_is_endpoint_reachable_is_false_for_an_unresolvable_endpoint() -> None:
@@ -44,6 +55,53 @@ def test_classify_llm_error_detects_connection_failures() -> None:
 
 def test_classify_llm_error_keeps_other_errors_generic() -> None:
     assert probes.classify_llm_error(RuntimeError("bad request")) == ("error", "bad request")
+
+
+def _status_error(exc_type: type[APIStatusError], status: int) -> Exception:
+    """Build an SDK status error without importing httpx, which the SDK owns.
+
+    The SDK only reads ``status_code``, ``headers``, ``request`` and ``text`` off
+    the response, so a namespace is enough and keeps the test off an undeclared
+    dependency.
+    """
+
+    response = SimpleNamespace(
+        status_code=status,
+        headers={},
+        request=SimpleNamespace(method="POST", url="http://llm/v1/models", headers={}),
+        text='{"error": {"message": "provider text"}}',
+    )
+    return exc_type("provider text", response=cast(Any, response), body=None)
+
+
+def _connection_error(exc_type: type[APIConnectionError]) -> Exception:
+    request = SimpleNamespace(method="POST", url="http://llm/v1/models")
+    return exc_type(request=cast(Any, request))
+
+
+@pytest.mark.parametrize(
+    ("exc", "reason"),
+    [
+        (_status_error(AuthenticationError, 401), "auth"),
+        (_status_error(PermissionDeniedError, 403), "forbidden"),
+        (_status_error(NotFoundError, 404), "model_not_found"),
+        (_status_error(RateLimitError, 429), "rate_limited"),
+        (_connection_error(APIConnectionError), "connection_error"),
+        (_connection_error(APITimeoutError), "connection_error"),
+    ],
+)
+def test_classify_llm_error_reads_the_sdk_exception_type(exc: Exception, reason: str) -> None:
+    classified, message = probes.classify_llm_error(exc)
+
+    assert classified == reason
+    assert "{" not in message
+    assert "provider text" not in message
+
+
+def test_classify_llm_error_does_not_leak_provider_json() -> None:
+    _, message = probes.classify_llm_error(RuntimeError("boom"))
+
+    assert "{" not in message
 
 
 def test_check_llm_health_reports_offline_without_connecting(monkeypatch) -> None:
@@ -88,7 +146,7 @@ def test_check_llm_health_reports_connection_errors(monkeypatch) -> None:
     healthy, message = asyncio.run(probes.check_llm_health("http://llm", "key", "model"))
 
     assert healthy is False
-    assert message == "connection_error: connection refused"
+    assert message == f"connection_error: {probes.OFFLINE_MESSAGE}"
 
 
 def test_list_models_reports_offline_without_connecting(monkeypatch) -> None:
@@ -137,7 +195,7 @@ def test_list_models_explains_why_a_provider_cannot_answer(monkeypatch) -> None:
     models, message = asyncio.run(probes.list_models("http://llm", "key"))
 
     assert models == []
-    assert message == "connection_error: connection refused"
+    assert message == f"connection_error: {probes.OFFLINE_MESSAGE}"
 
 
 def test_defaults_read_environment(monkeypatch) -> None:
