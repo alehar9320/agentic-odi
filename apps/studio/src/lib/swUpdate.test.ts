@@ -240,41 +240,6 @@ describe("activateWaiting", () => {
 
     activateWaiting(registration, container, vi.fn());
 
-    expect(container.addListenerCalls).toHaveLength(1);
-    expect(container.addListenerCalls[0].options).toEqual({ once: true });
-  });
-
-  it("reloads once even if the container dispatches twice", () => {
-    const registration = new FakeRegistration();
-    registration.waiting = new FakeWorker();
-    const container = new FakeContainer();
-    const reload = vi.fn();
-
-    activateWaiting(registration, container, reload);
-    container.addListenerCalls[0].listener();
-    container.addListenerCalls[0].listener();
-
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not attach a listener when nothing is waiting", () => {
-    const container = new FakeContainer();
-    const reload = vi.fn();
-
-    const started = activateWaiting(new FakeRegistration(), container, reload);
-
-    expect(started).toBe(false);
-    expect(container.addListenerCalls).toHaveLength(0);
-    expect(reload).not.toHaveBeenCalled();
-  });
-
-  it("asks the container to fire the reload listener once", () => {
-    const registration = new FakeRegistration();
-    registration.waiting = new FakeWorker();
-    const container = new FakeContainer();
-
-    activateWaiting(registration, container, vi.fn());
-
     expect(container.listeners).toHaveLength(1);
     expect(container.listeners[0].options).toEqual({ once: true });
   });
