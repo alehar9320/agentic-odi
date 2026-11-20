@@ -475,6 +475,7 @@ isolation, and coverage rules stay in
 | `tests/test_underserved_threshold_parity.py` | The boundary between "served" and "underserved" is one number, not two. |
 | `tests/test_worker_build_route.py` | `/api/build` tells a support thread which release the hosted Studio runs. |
 | `tests/test_worker_capabilities_route.py` | `/api/capabilities` states its method, like the two routes beside it. |
+| `tests/test_worker_csp_rationale.py` | The one relaxed CSP directive carries a recorded reason, and stays the only one. |
 | `tests/test_worker_deploy_route.py` | `/api/deploy` tells a probe which commit and which bundle this artifact is. |
 | `tests/test_worker_error_origin.py` | Every Worker-generated failure says so with `origin: "proxy"`. |
 | `tests/test_worker_error_shape.py` | The Worker returns the one-error-body shape, even when the sidecar is down. |

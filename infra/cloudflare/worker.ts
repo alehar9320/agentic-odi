@@ -137,6 +137,10 @@ function buildConnectSrc(env: Env): string {
 }
 
 function securityHeaders(env: Env): Record<string, string> {
+  // `style-src 'unsafe-inline'` is required by React's `style` prop, which the
+  // Studio uses for a handful of one-off layout values (see EvidenceStream,
+  // SkeletonCard). Removing it means moving every one of those into a class in
+  // theme.css first. Scripts are NOT relaxed: `script-src 'self'` stays.
   return {
     "Content-Security-Policy": [
       "default-src 'self'",
