@@ -292,6 +292,7 @@ the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `lo
 | `AGENTIC_ODI_MCP_KEEPALIVE` | MCP session keepalive interval | `15` seconds (`0` disables) |
 | `AGENTIC_ODI_STUDIO_DB` | Studio API memory | `~/.agentic-odi/studio.db` |
 | `AGENTIC_ODI_BACKUP_DIR` | core recovery, boot failure message | `~/.agentic-odi/backups` |
+| `AGENTIC_ODI_BACKUP_KEEP` | core recovery retention, applied after a verified backup | `14` |
 | `AGENTIC_ODI_CHECKPOINT_SECONDS` | Studio API idle checkpoint interval | `60` seconds (`0` disables) |
 | `AGENTIC_ODI_CONNECTORS_CONFIG` | connectors registry (CLI, Studio, MCP) | `~/.config/agentic-odi/connectors.json` |
 | `AGENTIC_ODI_CONNECTOR_TIMEOUT` | connector health/ingest calls | `30` seconds |
