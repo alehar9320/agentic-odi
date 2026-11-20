@@ -18,6 +18,27 @@ BASELINE_FILE_NAME = "baseline.json"
 BASELINE_BACKUP_KEEP = 5
 
 
+class ProfileFileError(ValueError):
+    """A profile file could not be read or parsed, with the reason named.
+
+    Subclasses ValueError so existing `except ValueError` handlers keep working.
+    """
+
+
+def _read_json_object(path: Path) -> dict:
+    """Read a JSON object from `path`, naming whether reading or parsing failed."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except OSError as exc:
+        reason = exc.strerror or str(exc)
+        raise ProfileFileError(f"Could not read {path}: {reason}") from exc
+    except json.JSONDecodeError as exc:
+        raise ProfileFileError(
+            f"{path} is not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
+        ) from exc
+
+
 @dataclass
 class Baseline:
     schema_version: int = 1
@@ -95,16 +116,11 @@ def baseline_exists() -> bool:
 def load_baseline() -> Baseline | None:
     """Load the baseline file, returning None if it does not exist.
 
-    Raises ValueError on unparseable JSON.
+    Raises ProfileFileError naming the path and whether reading or parsing failed.
     """
     if not baseline_exists():
         return None
-    try:
-        with open(baseline_file(), encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to parse baseline file: {e}") from e
-    return Baseline.from_dict(data)
+    return Baseline.from_dict(_read_json_object(baseline_file()))
 
 
 def save_baseline(b: Baseline) -> Path:
@@ -221,16 +237,11 @@ def llm_profile_exists() -> bool:
 def load_llm_profile() -> LLMProfile | None:
     """Load the LLM profile file, returning None if it does not exist.
 
-    Raises ValueError on unparseable JSON.
+    Raises ProfileFileError naming the path and whether reading or parsing failed.
     """
     if not llm_profile_exists():
         return None
-    try:
-        with open(llm_profile_file(), encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to parse LLM profile file: {e}") from e
-    return LLMProfile.from_dict(data)
+    return LLMProfile.from_dict(_read_json_object(llm_profile_file()))
 
 
 def load_llm_config_dict() -> dict[str, str]:
@@ -242,6 +253,7 @@ def load_llm_config_dict() -> dict[str, str]:
     try:
         p = load_llm_profile()
     except (ValueError, OSError):
+        # Deliberately silent: this path feeds defaults, not a diagnosis.
         return {}
     if p is None:
         return {}
@@ -287,12 +299,21 @@ def _profile_display_value(value: str | None) -> str:
     return value
 
 
+def _load_baseline_for_command() -> Baseline | None:
+    """Load the baseline, reporting a profile-file problem as a sentence and exit 1."""
+    try:
+        return load_baseline()
+    except ProfileFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
 @app.command("show")
 def show_profile(
     as_json: bool = typer.Option(False, "--json", help="Format output as JSON"),
 ) -> None:
     """Show current product baseline profile."""
-    b = load_baseline()
+    b = _load_baseline_for_command()
     if b is None:
         if as_json:
             typer.echo(json.dumps({}))
@@ -348,7 +369,7 @@ def set_profile(
             )
             raise typer.Exit(code=2)
 
-    b = load_baseline() or Baseline(schema_version=1, source="cli")
+    b = _load_baseline_for_command() or Baseline(schema_version=1, source="cli")
     if product_name is not None:
         b.product_name = product_name
     if domain is not None:
@@ -372,7 +393,7 @@ def setup_wizard() -> None:
     """Run interactive baseline setup wizard."""
     typer.echo("Agentic ODI — Product Baseline Setup Wizard")
     typer.echo("==========================================")
-    existing = load_baseline() or Baseline()
+    existing = _load_baseline_for_command() or Baseline()
 
     p_name = typer.prompt("Product Name", default=existing.product_name or "")
     domain = typer.prompt("Domain", default=existing.domain or "")
