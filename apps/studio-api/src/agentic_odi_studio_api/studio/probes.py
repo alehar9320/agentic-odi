@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import hashlib
 import json
 import os
@@ -17,7 +18,15 @@ from typing import Any, NamedTuple
 from urllib.parse import urlparse
 
 from agentic_odi_core import settings
-from openai import AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    NotFoundError,
+    PermissionDeniedError,
+    RateLimitError,
+)
 
 DEFAULT_BASE_URL = "http://localhost:8001/v1"
 DEFAULT_API_KEY = "local"
@@ -176,8 +185,27 @@ def is_endpoint_reachable(url: str, timeout: float = 0.3) -> bool:
         return False
 
 
+_LOGGER = logging.getLogger(__name__)
+
+
 def classify_llm_error(exc: Exception) -> tuple[str, str]:
     message = str(exc)
+    if isinstance(exc, AuthenticationError):
+        _LOGGER.debug("model auth rejected: %s", message)
+        return "auth", "The model server rejected the key. Check it in Settings."
+    if isinstance(exc, PermissionDeniedError):
+        _LOGGER.debug("model permission denied: %s", message)
+        return "forbidden", "The key is valid but not allowed to use this model."
+    if isinstance(exc, NotFoundError):
+        _LOGGER.debug("model not found: %s", message)
+        return "model_not_found", "The model server does not have that model. Pick another."
+    if isinstance(exc, RateLimitError):
+        _LOGGER.debug("model rate limited: %s", message)
+        return "rate_limited", "The model server is rate limiting. Try again shortly."
+    if isinstance(exc, (APITimeoutError, APIConnectionError)):
+        _LOGGER.debug("model connection failure: %s", message)
+        return "connection_error", OFFLINE_MESSAGE
+
     lower = message.lower()
     connection_indicators = [
         "connection error",
@@ -188,7 +216,9 @@ def classify_llm_error(exc: Exception) -> tuple[str, str]:
         "connection refused",
     ]
     if any(indicator in lower for indicator in connection_indicators):
-        return "connection_error", message
+        _LOGGER.debug("model connection failure (text): %s", message)
+        return "connection_error", OFFLINE_MESSAGE
+    _LOGGER.debug("model error: %s", message)
     return "error", message
 
 
