@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from agentic_odi_core.paths import default_odi_db_path
 
 

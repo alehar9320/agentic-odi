@@ -425,7 +425,7 @@ def store_cmd(
     from agentic_odi_core.paths import default_odi_db_path
     from agentic_odi_core.sqlite_repository import SQLiteRepository
 
-    db_path = str(default_odi_db_path())
+    db_path = context.config().db_path or str(default_odi_db_path())
     try:
         repo = SQLiteRepository(db_path=db_path)
     except Exception as exc:  # noqa: BLE001 - surfaced verbatim, it is the point

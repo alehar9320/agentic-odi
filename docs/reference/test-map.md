@@ -348,6 +348,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
 | `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
+| `packages/core/tests/test_default_db_path.py` | Tests for the canonical ODI database path resolution. |
 | `packages/core/tests/test_demo.py` | The demo workspace loads on purpose, and never masquerades as real data. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
