@@ -121,7 +121,9 @@ def test_restore_refuses_a_corrupt_backup(tmp_path: Path) -> None:
     assert not (tmp_path / "odi.db.pre-restore").exists()
 
 
-def test_restore_is_verified_after_the_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_restore_is_verified_after_the_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A failed post-copy verification leaves the original in place and raises."""
     db = tmp_path / "odi.db"
     _make_database(db)
@@ -130,8 +132,12 @@ def test_restore_is_verified_after_the_copy(tmp_path: Path, monkeypatch: pytest.
     # Create stale WAL/SHM files.
     _create_stale_wal_files(db)
     original_rows = _rows(db)
-    original_wal = (tmp_path / "odi.db-wal").read_bytes() if (tmp_path / "odi.db-wal").exists() else None
-    original_shm = (tmp_path / "odi.db-shm").read_bytes() if (tmp_path / "odi.db-shm").exists() else None
+    original_wal = (
+        (tmp_path / "odi.db-wal").read_bytes() if (tmp_path / "odi.db-wal").exists() else None
+    )
+    original_shm = (
+        (tmp_path / "odi.db-shm").read_bytes() if (tmp_path / "odi.db-shm").exists() else None
+    )
 
     # Make the integrity check fail on the second call (the post-copy verification).
     call_count = 0
