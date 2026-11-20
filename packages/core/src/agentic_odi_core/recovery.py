@@ -25,6 +25,12 @@ DEFAULT_BACKUP_DIR = "~/.agentic-odi/backups"
 
 BACKUP_DIR_ENV = "AGENTIC_ODI_BACKUP_DIR"
 
+#: How many of the newest backups to keep by default, before the per-day rule.
+DEFAULT_BACKUP_KEEP = 14
+#: Environment override for the retention count. A non-positive value falls back
+#: to the default; a keep of zero would delete the backup just written.
+BACKUP_KEEP_ENV = "AGENTIC_ODI_BACKUP_KEEP"
+
 #: The prefix a database's backups share, keyed by the database file's stem.
 _BACKUP_PREFIXES = {"odi": "odi", "studio": "studio"}
 
@@ -35,6 +41,22 @@ def backups_dir() -> Path:
     if configured:
         return Path(configured).expanduser()
     return Path(DEFAULT_BACKUP_DIR).expanduser()
+
+
+def _backup_keep() -> int:
+    """The retention count read from the environment, defaulting defensively.
+
+    An unset or unparseable value falls back to the default, and a non-positive
+    count is refused because zero would delete the backup just written.
+    """
+    raw = os.environ.get(BACKUP_KEEP_ENV)
+    if raw is None:
+        return DEFAULT_BACKUP_KEEP
+    try:
+        value = int(raw.strip())
+    except (ValueError, AttributeError):
+        return DEFAULT_BACKUP_KEEP
+    return value if value > 0 else DEFAULT_BACKUP_KEEP
 
 
 def backup_prefix(db_path: str) -> str:
@@ -83,6 +105,66 @@ def format_backup_time(backup: Path) -> str:
     except ValueError:
         return backup.name
     return parsed.astimezone().strftime("%H:%M")
+
+
+def _backup_day(backup: Path):
+    """The calendar date a backup belongs to, read from its filename stamp.
+
+    Falls back to the file's modification date when the stamp is not a parseable
+    UTC timestamp. Used to keep one survivor per calendar day.
+    """
+    stem = backup.stem
+    _, _, stamp = stem.partition("-")
+    head, sep, tail = stamp.rpartition("-")
+    if sep and tail.isdigit():
+        stamp = head
+    try:
+        return datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).date()
+    except ValueError:
+        return datetime.fromtimestamp(backup.stat().st_mtime, tz=timezone.utc).date()
+
+
+def prune_backups(
+    db_path: str, *, keep: int | None = None, directory: Path | None = None
+) -> list[Path]:
+    """Return the backup paths removed by bounded retention.
+
+    Keeps the newest ``keep`` backups, plus the newest backup from each of the
+    last 7 distinct calendar days. Everything older is unlinked. A failed unlink
+    is skipped and never raised.
+    """
+    if keep is None:
+        keep = _backup_keep()
+    folder = directory if directory is not None else backups_dir()
+    if not folder.is_dir():
+        return []
+    prefix = backup_prefix(db_path)
+    candidates = [path for path in folder.glob(f"{prefix}-*.db") if path.is_file()]
+    # Newest first: mtime, then filename as tiebreaker (same order as latest_backup).
+    candidates.sort(key=lambda path: (path.stat().st_mtime_ns, path.name), reverse=True)
+    # One survivor per calendar day for the last 7 distinct days, newest first.
+    protected: set[Path] = set()
+    seen_days: set = set()
+    for path in candidates:
+        day = _backup_day(path)
+        if day in seen_days:
+            continue
+        seen_days.add(day)
+        protected.add(path)
+        if len(protected) >= 7:
+            break
+    removed: list[Path] = []
+    for index, path in enumerate(candidates):
+        if index < keep:
+            continue
+        if path in protected:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        removed.append(path)
+    return removed
 
 
 def corrupt_store_message(error: StoreCorrupt, *, backup: Path | None = None) -> str:
@@ -161,6 +243,9 @@ def backup_database(db_path: str, *, directory=None) -> Path:
         except OSError:
             pass
         raise RuntimeError("backup failed integrity check")
+    # Bound the backup directory after a successful write; never prune on a
+    # failed backup, since that path raises above.
+    prune_backups(db_path, directory=folder)
     return dest
 
 

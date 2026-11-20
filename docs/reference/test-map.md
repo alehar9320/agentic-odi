@@ -376,6 +376,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_persistence_parity.py` | A field added on one persistence link must exist on all of them. |
 | `packages/core/tests/test_promotion_identity.py` | One customer quote must not become three opportunities. |
 | `packages/core/tests/test_proposals.py` | Tests for proposal lifecycle (issue #80). |
+| `packages/core/tests/test_recovery.py` | Bounded retention for backups (issue #1163). |
 | `packages/core/tests/test_remote.py` | Tests for the shared MCP tool-result error parser. |
 | `packages/core/tests/test_repository.py` | Tests for the in-memory Repository implementation. |
 | `packages/core/tests/test_repository_factory.py` | — |
