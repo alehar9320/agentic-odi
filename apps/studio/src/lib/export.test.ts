@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec, type UiNode } from "../ui/protocol";
-import { conversationToMarkdown, exportFilename } from "./export";
+import {
+  conversationToMarkdown,
+  exportFilename,
+  briefToMarkdown,
+  briefFilename,
+} from "./export";
+import type { DecisionBrief } from "./brief";
 
 const exportedAt = new Date("2026-10-24T12:00:00Z");
 
@@ -455,6 +461,44 @@ describe("conversationToMarkdown", () => {
   it("dates the export in the filename", () => {
     expect(exportFilename(exportedAt)).toBe(
       "agentic-odi-conversation-2026-10-24.md",
+    );
+  });
+});
+
+describe("briefToMarkdown", () => {
+  const minimalBrief: DecisionBrief = {
+    schema_version: 1,
+    generated_at: "2026-10-24T12:00:00Z",
+    product_name: "Test Product",
+    vision: null,
+    decision: null,
+    opportunities: [],
+    evidence: [],
+    unlinked_evidence_count: 0,
+    dissent: [],
+    next_evidence: null,
+    provenance: {
+      kind: "empty",
+      source: null,
+      cached: false,
+      sample: false,
+      excluded_sample_rows: { outcomes: 0, evidence: 0 },
+      counted_rows: { outcomes: 0, evidence: 0 },
+      record_counts: null,
+      canvas_generated_at: null,
+    },
+  };
+
+  it("dates the brief in the reader's locale", () => {
+    const markdown = briefToMarkdown(minimalBrief);
+    // The date line should contain the day number (24) and the year (2026)
+    // Month name varies by locale, so we don't assert the exact format
+    expect(markdown).toMatch(/_Decision brief — .*24.*2026.*_/);
+  });
+
+  it("keeps ISO dates in filenames", () => {
+    expect(briefFilename(exportedAt)).toBe(
+      "agentic-odi-decision-brief-2026-10-24.md",
     );
   });
 });

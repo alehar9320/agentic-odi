@@ -208,7 +208,8 @@ export function exportFilename(exportedAt: Date = new Date()): string {
 
 const NOT_RECORDED = "Not recorded.";
 
-const LOCAL_DATE = new Intl.DateTimeFormat("en-GB", {
+// Prose dates follow the reader's locale; filenames stay ISO because a filename is a sort key.
+const DOCUMENT_DATE = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
   month: "long",
   year: "numeric",
@@ -365,7 +366,7 @@ export function briefToMarkdown(brief: DecisionBrief): string {
   const lines: string[] = [
     `# ${brief.product_name}`,
     "",
-    `_Decision brief — ${LOCAL_DATE.format(
+    `_Decision brief — ${DOCUMENT_DATE.format(
       Number.isNaN(generatedAt.getTime()) ? new Date() : generatedAt,
     )}_`,
     "",
