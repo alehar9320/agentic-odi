@@ -220,7 +220,7 @@ For the full Kiro tool reference including subagent dispatch patterns and git wo
   `docs/tour/README.md`. `tests/test_tour.py` fails on drift, a command that
   cannot run, or a walkthrough over the 90s budget. Never edit the cast or the
   generated README by hand.
-- **One place resolves the store path.** `agentic_odi_core.sqlite_repository.resolve_db_path`
+- **One place resolves the store path.** `agentic_odi_core.paths.default_odi_db_path`
   is the single default-resolution point (`--db` → `AGENTIC_ODI_DB` →
   `~/.agentic-odi/odi.db`); the `store` command reports it, so the report can
   never disagree with the file a write opens.
