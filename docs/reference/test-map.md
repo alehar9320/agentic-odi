@@ -72,13 +72,14 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_update_edges.py` | Edge-case tests for the self-update engine and background updater. |
 | `apps/cli/tests/test_version_flag.py` | — |
 | `apps/cli/tests/test_wizard_cli.py` | Tests for the interactive ODI entity creation wizard command. |
-| `apps/mcp-server/tests/conftest.py` | — |
+| `apps/mcp-server/tests/conftest.py` | Shared fixtures for the MCP server tests. |
 | `apps/mcp-server/tests/mcp_failures.py` | How these tests read a failing tool's answer. |
 | `apps/mcp-server/tests/test_candidates.py` | MCP coverage for the candidate extraction tools (A4). |
 | `apps/mcp-server/tests/test_context_tools.py` | — |
 | `apps/mcp-server/tests/test_customer_outcomes.py` | Tests for Customer Outcome entities. |
 | `apps/mcp-server/tests/test_graceful_shutdown.py` | Tests for the MCP server's graceful shutdown path. |
 | `apps/mcp-server/tests/test_health.py` | The store health tool reports readiness without touching ODI data. |
+| `apps/mcp-server/tests/test_import_side_effects.py` | Importing the MCP server must not build a store or touch the filesystem. |
 | `apps/mcp-server/tests/test_interviews.py` | MCP coverage for transcript import and the interview quote tools (A2). |
 | `apps/mcp-server/tests/test_odi.py` | — |
 | `apps/mcp-server/tests/test_parity.py` | — |

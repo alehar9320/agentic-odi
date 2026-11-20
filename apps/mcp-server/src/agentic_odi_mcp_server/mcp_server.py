@@ -1333,7 +1333,7 @@ def list_candidates(
     except ValueError:
         return _fail(ValueError(f"unknown candidate status: {status}"))
     if quote_id is not None or job_id is not None:
-        spine_items = _repo.list_extracted_candidates(
+        spine_items = get_repository().list_extracted_candidates(
             quote_id=quote_id, job_id=job_id, status=resolved, limit=limit, offset=offset
         )
         return json.dumps([item.model_dump(mode="json") for item in spine_items])
@@ -1348,7 +1348,7 @@ def get_candidate(candidate_id: str) -> str:
     """Get a single proposed or extracted candidate by ID."""
     candidate = get_service().get_candidate(candidate_id)
     if candidate is None:
-        extracted = _repo.get_extracted_candidate(candidate_id)
+        extracted = get_repository().get_extracted_candidate(candidate_id)
         if extracted is None:
             return _fail(
                 CandidateNotFoundError(candidate_id),
