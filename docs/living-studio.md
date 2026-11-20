@@ -381,6 +381,11 @@ left untouched, and offers **Recheck the database** for after the person has
 restored a copy. It never offers to delete or overwrite anything — that decision
 belongs to the person.
 
+The backups themselves stay bounded: after each verified snapshot the oldest
+copies are pruned, keeping the newest `AGENTIC_ODI_BACKUP_KEEP` (default 14) plus
+the newest copy from each of the last seven days, so a daily habit cannot fill
+the disk the backups exist to protect.
+
 ### What the canvas is made of
 
 Every canvas response carries its provenance: `live` when the sidecar read your

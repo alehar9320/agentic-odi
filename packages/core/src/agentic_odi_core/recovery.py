@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from agentic_odi_core.errors import StoreCorrupt
@@ -24,6 +24,15 @@ from agentic_odi_core.errors import StoreCorrupt
 DEFAULT_BACKUP_DIR = "~/.agentic-odi/backups"
 
 BACKUP_DIR_ENV = "AGENTIC_ODI_BACKUP_DIR"
+
+#: How many snapshots a database keeps unless told otherwise.
+DEFAULT_BACKUP_KEEP = 14
+
+#: Overrides the number of snapshots kept after a successful backup.
+BACKUP_KEEP_ENV = "AGENTIC_ODI_BACKUP_KEEP"
+
+#: How many distinct calendar days keep their newest snapshot regardless of count.
+BACKUP_DAILY_DAYS = 7
 
 #: The prefix a database's backups share, keyed by the database file's stem.
 _BACKUP_PREFIXES = {"odi": "odi", "studio": "studio"}
@@ -47,22 +56,93 @@ def backup_prefix(db_path: str) -> str:
     return _BACKUP_PREFIXES.get(stem, stem)
 
 
-def latest_backup(db_path: str, *, directory: Path | None = None) -> Path | None:
-    """Return the newest existing backup for a database, or ``None``.
+def _backups_newest_first(db_path: str, folder: Path) -> list[Path]:
+    """Every backup of ``db_path`` under ``folder``, newest first.
 
     Newest is by modification time, with the filename as a tiebreaker. The
     filename stamp has one-second resolution, so a pair written in the same
     second differ only by their collision suffix and the clock cannot order
     them; the file's own mtime can.
     """
-    folder = directory if directory is not None else backups_dir()
     if not folder.is_dir():
-        return None
+        return []
     prefix = backup_prefix(db_path)
     candidates = [path for path in folder.glob(f"{prefix}-*.db") if path.is_file()]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))
+    return sorted(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name), reverse=True)
+
+
+def latest_backup(db_path: str, *, directory: Path | None = None) -> Path | None:
+    """Return the newest existing backup for a database, or ``None``."""
+    folder = directory if directory is not None else backups_dir()
+    ordered = _backups_newest_first(db_path, folder)
+    return ordered[0] if ordered else None
+
+
+def _keep_count() -> int:
+    """The configured snapshot count, falling back to the default.
+
+    A keep count of zero would delete the snapshot the backup just wrote, so a
+    non-numeric or non-positive value is refused rather than obeyed.
+    """
+    raw = os.environ.get(BACKUP_KEEP_ENV)
+    if raw is None or not raw.strip():
+        return DEFAULT_BACKUP_KEEP
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_BACKUP_KEEP
+    return value if value > 0 else DEFAULT_BACKUP_KEEP
+
+
+def prune_backups(
+    db_path: str,
+    *,
+    keep: int | None = None,
+    directory: Path | None = None,
+    now: datetime | None = None,
+) -> list[Path]:
+    """Delete old backups for ``db_path``, returning the paths removed.
+
+    The newest ``keep`` snapshots survive, plus the newest snapshot of each of
+    the last :data:`BACKUP_DAILY_DAYS` distinct calendar days — so a burst of
+    backups in one afternoon cannot erase the one from last Tuesday. A failed
+    unlink is skipped, never raised: a backup directory that cannot be pruned is
+    still a backup directory that works.
+    """
+    folder = directory if directory is not None else backups_dir()
+    limit = _keep_count() if keep is None else keep
+    if limit <= 0:
+        limit = DEFAULT_BACKUP_KEEP
+    ordered = _backups_newest_first(db_path, folder)
+    if not ordered:
+        return []
+
+    today = (now or datetime.now(timezone.utc)).astimezone().date()
+    kept = set(ordered[:limit])
+    days_seen: set[date] = set()
+    for path in ordered:
+        if len(days_seen) >= BACKUP_DAILY_DAYS:
+            break
+        # A snapshot older than the newest ``keep`` is still worth a day slot
+        # only while it belongs to one of the last seven days.
+        day = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).astimezone().date()
+        if (today - day).days >= BACKUP_DAILY_DAYS:
+            break
+        if day in days_seen:
+            continue
+        days_seen.add(day)
+        kept.add(path)
+
+    removed: list[Path] = []
+    for path in ordered:
+        if path in kept:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        removed.append(path)
+    return removed
 
 
 def format_backup_time(backup: Path) -> str:
@@ -161,6 +241,9 @@ def backup_database(db_path: str, *, directory=None) -> Path:
         except OSError:
             pass
         raise RuntimeError("backup failed integrity check")
+    # Only after the snapshot is verified: a failed backup leaves the existing
+    # history untouched.
+    prune_backups(db_path, directory=folder)
     return dest
 
 
