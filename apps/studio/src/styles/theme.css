@@ -1330,6 +1330,8 @@ a {
   place-items: center;
   width: 20px;
   height: 20px;
+  min-width: 24px;
+  min-height: 24px;
   flex: none;
   border: 0;
   border-radius: 50%;
@@ -1614,6 +1616,7 @@ a {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  min-height: 24px;
 }
 
 .composer__model-select:hover {
@@ -1803,6 +1806,7 @@ a {
   color: var(--faint);
   font-size: 0.74rem;
   cursor: pointer;
+  min-height: 24px;
 }
 
 .quiet-action:hover {
@@ -3619,12 +3623,6 @@ button.message__tag:hover {
 
   .before-after {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (hover: none) {
-  .message__actions {
-    opacity: 1;
   }
 }
 
@@ -6152,6 +6150,8 @@ details[open] summary {
 .branch-picker__step {
   width: 22px;
   height: 22px;
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 6px;
   border: 1px solid var(--line);
   background: transparent;
@@ -6237,6 +6237,17 @@ details[open] summary {
 .message--user:hover .message__actions--user,
 .message__actions--user:focus-within {
   opacity: 1;
+}
+
+/* A finger has no hover. Declared after the rules that hide these rows, so
+   source order agrees with intent and the override cannot be beaten by a
+   later `opacity: 0`. */
+@media (hover: none) {
+  .message__actions,
+  .message__actions--user,
+  .message__time {
+    opacity: 1;
+  }
 }
 
 /* ------------------------------------------------------------------ */
