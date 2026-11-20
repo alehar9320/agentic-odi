@@ -118,6 +118,12 @@ function ShareSheetBody({
 
       {shareUrl ? (
         <div className="share-sheet__result">
+          {link && !link.shareable && (
+            <p className="share-sheet__note">
+              This link only opens on this machine. Set a public URL to share
+              it.
+            </p>
+          )}
           <label className="sr-only" htmlFor="share-url">
             Shareable link
           </label>

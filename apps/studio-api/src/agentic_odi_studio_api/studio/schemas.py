@@ -589,6 +589,7 @@ class ShareMintResponse(BaseModel):
     token: str
     url: str
     expires_at: str
+    shareable: bool
 
 
 class SharedArtifactResponse(BaseModel):

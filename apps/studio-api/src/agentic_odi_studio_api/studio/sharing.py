@@ -27,6 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 from agentic_odi_core import ODIService
 from agentic_odi_core.models import Evidence
@@ -85,14 +86,23 @@ class MintedShare:
     token: str
     url: str
     expires_at: str
+    shareable: bool
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, str | bool]:
         return {
             "id": self.id,
             "token": self.token,
             "url": self.url,
             "expires_at": self.expires_at,
+            "shareable": self.shareable,
         }
+
+
+def is_loopback_base(url: str) -> bool:
+    """True when the public base names this machine only, so a minted link
+    opened anywhere else reaches nothing (or the recipient's own loopback)."""
+    host = (urlparse(url).hostname or "").lower()
+    return host in {"127.0.0.1", "localhost", "::1"}
 
 
 def public_base_url() -> str:
@@ -183,6 +193,7 @@ class ShareService:
             token=token,
             url=f"{self._base()}/api/share/{token}",
             expires_at=expires_at,
+            shareable=not is_loopback_base(self._base()),
         )
 
     def revoke(self, share_id: str) -> None:
