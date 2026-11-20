@@ -81,6 +81,8 @@ export function OpportunityLandscape() {
   const provenance = canvasStatus(canvas);
   const hasRecords = canvasHasRecords(canvas);
   const isFailed = canvasState.kind === "error";
+  // Nothing to head, plot, filter or export: the lens collapses to its one action.
+  const showEmpty = isEmpty;
   const hasWarnings = Boolean(canvas?.warnings?.length);
   // The board is drawn whenever real data is on screen and nothing else owns the
   // space: not a failure, not the seed warning strip, not a genuinely empty
@@ -237,6 +239,26 @@ export function OpportunityLandscape() {
     return hoveredOutcome || sortedOutcomes[0] || null;
   }, [selectedOutcomeId, outcomes, hoveredOutcome, sortedOutcomes]);
 
+  if (showEmpty) {
+    return (
+      <section className="fade-in">
+        <div className="studio-empty" role="status">
+          <p className="studio-empty__title">Nothing captured yet</p>
+          <p className="studio-empty__body">
+            Capture an outcome and this lens will show what is underserved.
+          </p>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => openPanel("capture")}
+          >
+            Capture an outcome
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="fade-in">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
@@ -328,20 +350,6 @@ export function OpportunityLandscape() {
             <li key={warning}>{warning}</li>
           ))}
         </ul>
-      ) : isEmpty ? (
-        <div className="studio-empty" role="status">
-          <p className="studio-empty__title">No saved copy on this device</p>
-          <p className="studio-empty__body">
-            Capture an outcome and the landscape will show what is underserved.
-          </p>
-          <button
-            type="button"
-            className="button button--ghost"
-            onClick={() => openPanel("capture")}
-          >
-            Capture an outcome
-          </button>
-        </div>
       ) : isLoading && !hasRecords ? (
         <GhostMetrics />
       ) : (
@@ -446,11 +454,7 @@ export function OpportunityLandscape() {
 
       {isLoading && !hasRecords ? (
         <GhostOpportunityCards />
-      ) : canvasState.kind === "error" ? null : isEmpty ? (
-        <p className="caption" style={{ padding: 24, textAlign: "center", background: "var(--studio-surface)", borderRadius: 8 }}>
-          Capture an outcome to see it here.
-        </p>
-      ) : viewMode === "matrix" ? (
+      ) : canvasState.kind === "error" ? null : viewMode === "matrix" ? (
         <OpportunityPlot
           outcomes={filteredOutcomes}
           selectedOutcomeId={selectedOutcomeId}

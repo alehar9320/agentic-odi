@@ -389,6 +389,8 @@ showing the built-in demonstration because the MCP server could not be reached.
 The sidecar says this in the payload (`provenance.kind`, `provenance.reason`,
 and record counts); it never dresses the prototype up as your data.
 
+An empty canvas is one card, one sentence, and one Capture action: the lens shows no view switcher, export, share or filters until there is a record to act on.
+
 The studio repeats that label where a person can see it: the rail shows a
 **DEMO** or **OFFLINE** chip, the Opportunity Landscape shows a sample-data
 notice, and an impact simulation must carry `provenance: live | simulated` before
