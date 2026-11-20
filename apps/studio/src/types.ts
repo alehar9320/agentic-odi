@@ -347,6 +347,7 @@ export interface ShareLink {
   token: string;
   url: string;
   expires_at: string;
+  shareable: boolean;
 }
 
 export type StudioTheme = "light" | "dark";

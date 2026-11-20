@@ -51,6 +51,7 @@ describe("ShareAction", () => {
       token: "odi_sh_abc",
       url: "http://127.0.0.1:8100/s/odi_sh_abc",
       expires_at: new Date(Date.now() + 7 * 86400_000).toISOString(),
+      shareable: true,
     });
 
     render(<ShareAction />);

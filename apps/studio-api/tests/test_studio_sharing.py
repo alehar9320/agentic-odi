@@ -413,3 +413,24 @@ def test_the_read_still_works_after_a_write_is_refused() -> None:
     client.post(f"/api/share/{minted['token']}")
 
     assert client.get(f"/api/share/{minted['token']}").status_code == 200
+
+
+# -- shareable flag ---------------------------------------------------------
+
+
+def test_a_loopback_base_is_marked_unshareable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_PUBLIC_BASE_URL", raising=False)
+    client, ids = _seeded()
+    minted = _mint(client, "outcome", ids["outcome"])
+    assert minted["shareable"] is False
+
+
+def test_a_configured_base_is_shareable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_PUBLIC_BASE_URL", "https://odi.example.com")
+    client, ids = _seeded()
+    minted = _mint(client, "outcome", ids["outcome"])
+    assert minted["shareable"] is True
