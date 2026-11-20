@@ -289,6 +289,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/swRouting.test.ts` | A request that never settles: the timeout is the only way out. |
 | `apps/studio/src/lib/swUpdate.test.ts` | A worker whose state a test drives. */ |
 | `apps/studio/src/lib/theme.test.ts` | — |
+| `apps/studio/src/lib/themeBootstrap.test.ts` | — |
 | `apps/studio/src/lib/useReducedMotion.test.tsx` | The preference is live, not read once at mount: toggling the OS setting has |
 | `apps/studio/src/lib/version.test.ts` | The build version is the single source of truth: it is baked in from |
 | `apps/studio/src/lib/windowState.test.ts` | #962: the desktop app opens focused, not sprawling, and remembers the size |
