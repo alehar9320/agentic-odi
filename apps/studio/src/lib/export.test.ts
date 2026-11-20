@@ -486,6 +486,7 @@ describe("conversationToMarkdown", () => {
 
     const markdown = conversationToMarkdown(messages, exportedAt);
 
+    // Both the full sentence and the prefix claim should appear
     expect(markdown).toContain(
       "Rotation costs two engineer-days and a review. (per Gong · Call with Acme, record e1)",
     );

@@ -1174,6 +1174,22 @@ export async function getStorageFacts(): Promise<StorageFacts> {
   };
 }
 
+export interface DataStoreStatus {
+  id: "odi" | "studio";
+  path: string;
+  bytes: number | null;
+  lastModified: string | null;
+}
+
+export interface DataStatus {
+  stores: DataStoreStatus[];
+}
+
+/** Resolved paths and sizes for the sidecar's ODI and Studio SQLite stores. */
+export async function getDataStatus(): Promise<DataStatus> {
+  return getJson<DataStatus>("/api/data/status");
+}
+
 export async function exportWorkspace(): Promise<string> {
   const bff = await getStudioBff();
   return bff.exportWorkspace();

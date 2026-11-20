@@ -639,6 +639,11 @@ baseline wizard. Before `setup` overwrites an existing baseline it writes a
 dated `baseline.json.bak-<UTC>` copy beside it and keeps only the newest five,
 so the config directory does not grow without bound.
 
+When a profile file cannot be read or parsed, `profile show`, `profile set` and
+`setup` print one sentence naming the file and the reason, then exit 1. A
+permissions problem says `Could not read <path>: permission denied`; malformed
+JSON says `<path> is not valid JSON: <reason> (line N, column M)`.
+
 ## Manage Customer Outcomes
 
 Customer Outcomes link customer value to business value. The `local` backend

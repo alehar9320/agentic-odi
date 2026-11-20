@@ -57,6 +57,14 @@ themselves by `scripts/docs_index.py`, so a new test file appears there after
 `--write` and a file with no description still appears, named, with `—`. The
 rules below are what stays prose here.
 
+### Broad `except` handlers
+
+`tests/scripts/test_blind_excepts.py` walks `apps/` and `packages/` with `ast`
+and fails on any handler that catches `Exception` (or `BaseException`, or
+nothing) without a log call. A suppression that genuinely needs no log is named
+in the test's `ALLOWED` baseline with a reason; that list is capped, and an
+entry whose handler is gone fails, so it can only shrink.
+
 ### `website/tests/` contracts
 
 `test_ci_required.py` is the contract that keeps the site from shipping on faith. It asserts the `website` job in `ci.yml` runs `uv run --directory website pytest tests/`, carries no `continue-on-error`, and is both a `needs:` entry and an enforced result in the `CI green` aggregate — the status check the `main-requires-ci-green` ruleset requires. It also asserts the Pages `deploy` job waits on the tested `build`. The wiring has regressed before: the site's checks once lived in a `feature/gh-pages`-only workflow that never ran for a pull request into `main` (402f0a5).
@@ -64,7 +72,7 @@ rules below are what stays prose here.
 ## Isolation Rules
 
 - Use `InMemoryRepository` in tests. `create_app(InMemoryRepository())` keeps the Studio API off the real `~/.agentic-odi/odi.db`.
-- The MCP server uses `build_repository()`; tests set `AGENTIC_ODI_DB=:memory:` before import and call tools through `Client(mcp)` without HTTP.
+- The MCP server builds no store at import. `main()` calls `configure()`; a test calls `configure(InMemoryRepository())` in an autouse fixture and reaches tools through `Client(mcp)` without HTTP.
 - Async tests use `@pytest.mark.asyncio` (strict mode).
 
 ## Coverage

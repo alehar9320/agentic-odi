@@ -14,6 +14,7 @@ import sqlite3
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from agentic_odi_core import recovery
@@ -516,3 +517,139 @@ def test_restore_refuses_a_corrupt_snapshot_and_changes_nothing(tmp_path) -> Non
     # The live file is untouched and no safety copy was written.
     assert _rows(db) == [(1,)]
     assert not (tmp_path / "odi.db.pre-restore").exists()
+
+
+# -- backup retention (issue #1163) ----------------------------------------
+
+DAY = 24 * 60 * 60
+
+
+def _aged_backup(folder, name: str, age_seconds: int, *, now: float) -> None:
+    """Write a backup file and stamp its mtime ``age_seconds`` before ``now``."""
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / name
+    path.write_bytes(b"snapshot")
+    stamp = now - age_seconds
+    os.utime(path, (stamp, stamp))
+
+
+def test_prune_keeps_the_newest_n(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_BACKUP_KEEP", raising=False)
+    backups = tmp_path / "backups"
+    now = time.time()
+    names = [f"odi-2026010{i}T000000Z.db" for i in range(10)]
+    names += [f"odi-2026011{i}T000000Z.db" for i in range(10)]
+    for index, name in enumerate(names):
+        _aged_backup(backups, name, age_seconds=(len(names) - index) * 60, now=now)
+    newest_five = {path.name for path in sorted(backups.glob("odi-*.db"))[-5:]}
+
+    removed = recovery.prune_backups(
+        "/home/me/.agentic-odi/odi.db", keep=5, directory=backups, now=datetime.now(timezone.utc)
+    )
+
+    remaining = {path.name for path in backups.glob("odi-*.db")}
+    assert remaining == newest_five
+    assert len(removed) == 15
+
+
+def test_prune_never_deletes_one_per_day_for_a_week(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_BACKUP_KEEP", raising=False)
+    backups = tmp_path / "backups"
+    now = time.time()
+    for day in range(10):
+        for slot in range(3):
+            _aged_backup(
+                backups,
+                f"odi-2026010{day}-{slot}.db",
+                age_seconds=day * DAY + slot * 60,
+                now=now,
+            )
+
+    recovery.prune_backups(
+        "/home/me/.agentic-odi/odi.db", keep=2, directory=backups, now=datetime.now(timezone.utc)
+    )
+
+    remaining = {path.name for path in backups.glob("odi-*.db")}
+    # The newest two survive outright, the newest of each of the last seven days
+    # is protected, and days 7-9 are gone.
+    expected = {"odi-20260100-0.db", "odi-20260100-1.db"}
+    expected |= {f"odi-2026010{day}-0.db" for day in range(1, 7)}
+    assert remaining == expected
+
+
+def test_prune_does_not_delete_the_backup_it_just_wrote(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backups = tmp_path / "backups"
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "1")
+    monkeypatch.setattr(recovery, "_timestamp", lambda: "20260101T000000Z")
+    backup_database(str(db), directory=backups)
+
+    written = backup_database(str(db), directory=backups)
+
+    assert written.exists()
+    assert [path.name for path in backups.glob("odi-*.db")] == [written.name]
+
+
+def test_a_zero_keep_falls_back_to_the_default(tmp_path, monkeypatch) -> None:
+    backups = tmp_path / "backups"
+    now = time.time()
+    for index in range(recovery.DEFAULT_BACKUP_KEEP + 2):
+        _aged_backup(backups, f"odi-20260101T00{index:04d}Z.db", age_seconds=index * 60, now=now)
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "0")
+
+    recovery.prune_backups("/home/me/.agentic-odi/odi.db", directory=backups)
+
+    assert len(list(backups.glob("odi-*.db"))) == recovery.DEFAULT_BACKUP_KEEP
+
+
+def test_a_non_numeric_keep_falls_back_to_the_default(tmp_path, monkeypatch) -> None:
+    backups = tmp_path / "backups"
+    now = time.time()
+    _aged_backup(backups, "odi-20260101T000000Z.db", age_seconds=60, now=now)
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "lots")
+
+    assert recovery.prune_backups("/home/me/.agentic-odi/odi.db", directory=backups) == []
+
+
+def test_a_failed_unlink_does_not_raise(tmp_path, monkeypatch) -> None:
+    backups = tmp_path / "backups"
+    now = time.time()
+    for index in range(4):
+        _aged_backup(backups, f"odi-20260101T000{index:02d}Z.db", age_seconds=index * 60, now=now)
+    # The oldest snapshot is the one a keep=1 prune would remove first.
+    stuck = min(backups.glob("odi-*.db"), key=lambda path: path.stat().st_mtime_ns)
+    original = Path.unlink
+
+    def refuse(self, *args, **kwargs):
+        if self == stuck:
+            raise PermissionError("read-only directory")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", refuse)
+
+    removed = recovery.prune_backups("/home/me/.agentic-odi/odi.db", keep=1, directory=backups)
+
+    assert stuck.exists()
+    assert stuck not in removed
+    assert len(removed) == 2
+
+
+def test_a_failed_backup_does_not_prune(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backups = tmp_path / "backups"
+    now = time.time()
+    _aged_backup(backups, "odi-20200101T000000Z.db", age_seconds=100 * DAY, now=now)
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "1")
+    monkeypatch.setattr(recovery, "_integrity_ok", lambda path: False)
+
+    with pytest.raises(RuntimeError, match="integrity check"):
+        backup_database(str(db), directory=backups)
+
+    # The unverified snapshot was removed; the pre-existing history was not pruned.
+    assert (backups / "odi-20200101T000000Z.db").exists()
+
+
+def test_prune_is_a_no_op_when_no_backup_exists(tmp_path) -> None:
+    assert recovery.prune_backups("/home/me/.agentic-odi/odi.db", directory=tmp_path / "none") == []

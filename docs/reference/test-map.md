@@ -72,13 +72,14 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_update_edges.py` | Edge-case tests for the self-update engine and background updater. |
 | `apps/cli/tests/test_version_flag.py` | — |
 | `apps/cli/tests/test_wizard_cli.py` | Tests for the interactive ODI entity creation wizard command. |
-| `apps/mcp-server/tests/conftest.py` | — |
+| `apps/mcp-server/tests/conftest.py` | Shared fixtures for the MCP server tests. |
 | `apps/mcp-server/tests/mcp_failures.py` | How these tests read a failing tool's answer. |
 | `apps/mcp-server/tests/test_candidates.py` | MCP coverage for the candidate extraction tools (A4). |
 | `apps/mcp-server/tests/test_context_tools.py` | — |
 | `apps/mcp-server/tests/test_customer_outcomes.py` | Tests for Customer Outcome entities. |
 | `apps/mcp-server/tests/test_graceful_shutdown.py` | Tests for the MCP server's graceful shutdown path. |
 | `apps/mcp-server/tests/test_health.py` | The store health tool reports readiness without touching ODI data. |
+| `apps/mcp-server/tests/test_import_side_effects.py` | Importing the MCP server must not build a store or touch the filesystem. |
 | `apps/mcp-server/tests/test_interviews.py` | MCP coverage for transcript import and the interview quote tools (A2). |
 | `apps/mcp-server/tests/test_odi.py` | — |
 | `apps/mcp-server/tests/test_parity.py` | — |
@@ -114,7 +115,9 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_connectors_router.py` | — |
 | `apps/studio-api/tests/test_studio_conversations.py` | Conversations keep a branch tree, and old rows still open. |
 | `apps/studio-api/tests/test_studio_csp.py` | Content-Security-Policy headers on sidecar responses. |
+| `apps/studio-api/tests/test_studio_data_status.py` | Metadata-only status for the sidecar's two SQLite stores. |
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Tests for the Studio's metadata-only diagnostics endpoint. |
+| `apps/studio-api/tests/test_studio_error_status_map.py` | Status-to-error-code mapping and retryability for sidecar HTTP errors. |
 | `apps/studio-api/tests/test_studio_errors.py` | HTTP error shape, status mapping, and request-id correlation. |
 | `apps/studio-api/tests/test_studio_evidence.py` | The evidence routes: capture with a link, promote it, delete it. |
 | `apps/studio-api/tests/test_studio_focus.py` | The record a PM is looking at must reach the model — in the store's own words. |
@@ -287,6 +290,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/swRouting.test.ts` | A request that never settles: the timeout is the only way out. |
 | `apps/studio/src/lib/swUpdate.test.ts` | A worker whose state a test drives. */ |
 | `apps/studio/src/lib/theme.test.ts` | — |
+| `apps/studio/src/lib/themeBootstrap.test.ts` | — |
 | `apps/studio/src/lib/useReducedMotion.test.tsx` | The preference is live, not read once at mount: toggling the OS setting has |
 | `apps/studio/src/lib/version.test.ts` | The build version is the single source of truth: it is baked in from |
 | `apps/studio/src/lib/windowState.test.ts` | #962: the desktop app opens focused, not sprawling, and remembers the size |
@@ -347,6 +351,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
 | `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
+| `packages/core/tests/test_default_db_path.py` | Tests for the canonical ODI database path resolution. |
 | `packages/core/tests/test_demo.py` | The demo workspace loads on purpose, and never masquerades as real data. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
@@ -424,6 +429,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_artifact_inventory.py` | The renderer inventory and the gate that keeps it true. |
 | `tests/scripts/test_assistant_ui_ledger.py` | Tests for the assistant-ui ledger check in scripts/doc_check.py (issue #429). |
 | `tests/scripts/test_audit_ignore.py` | The accepted-advisory ledger is the gate's memory (#1090). |
+| `tests/scripts/test_blind_excepts.py` | Every broad ``except`` must say what it swallowed (issue #1091). |
 | `tests/scripts/test_bundle_budget.py` | The cold-start bundle budget gate (#529). |
 | `tests/scripts/test_ci_release.py` | — |
 | `tests/scripts/test_cli_docs.py` | Assert that docs/cli.md stays synchronized with registered Typer CLI commands. |
@@ -474,9 +480,11 @@ isolation, and coverage rules stay in
 | `tests/test_underserved_threshold_parity.py` | The boundary between "served" and "underserved" is one number, not two. |
 | `tests/test_worker_build_route.py` | `/api/build` tells a support thread which release the hosted Studio runs. |
 | `tests/test_worker_capabilities_route.py` | `/api/capabilities` states its method, like the two routes beside it. |
+| `tests/test_worker_csp_rationale.py` | The one relaxed CSP directive carries a recorded reason, and stays the only one. |
 | `tests/test_worker_deploy_route.py` | `/api/deploy` tells a probe which commit and which bundle this artifact is. |
 | `tests/test_worker_error_origin.py` | Every Worker-generated failure says so with `origin: "proxy"`. |
 | `tests/test_worker_error_shape.py` | The Worker returns the one-error-body shape, even when the sidecar is down. |
+| `tests/test_worker_header_forwarding.py` | The Worker forwards an explicit allowlist of headers to the sidecar. |
 | `tests/test_worker_security_headers.py` | The Cloudflare Worker puts security headers on every Response. |
 | `website/tests/conftest.py` | Make the website's build tools importable during collection. |
 | `website/tests/site_support.py` | Shared fixtures and helpers for the website contract tests. |

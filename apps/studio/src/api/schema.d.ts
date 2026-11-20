@@ -48,7 +48,15 @@ export interface paths {
         /** Get Config */
         get: operations["get_config_api_config_get"];
         put?: never;
-        post?: never;
+        /**
+         * Save Config
+         * @description Persist LLM connection settings and invalidate the probe cache.
+         *
+         *     The probe cache is keyed on (endpoint, model, key_hash), so a credential
+         *     rotation naturally misses the cache. This endpoint additionally clears the
+         *     cache for base_url or model_name changes, which do not include the key.
+         */
+        post: operations["save_config_api_config_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -67,6 +75,30 @@ export interface paths {
          * @description Return diagnostic metadata only; never return database paths or records.
          */
         get: operations["get_diagnostics_api_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Data Status
+         * @description Report the resolved paths and sizes of the sidecar's two SQLite stores.
+         *
+         *     Metadata only: no entity rows, no credentials, no record counts. A store
+         *     whose file does not yet exist reports its resolved configuration path with
+         *     unavailable size and modification time rather than inventing values.
+         */
+        get: operations["get_data_status_api_data_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1005,7 +1037,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Conversation
+         * @description Remove one thread and its turns; an unknown id is a 404, not a no-op.
+         */
+        delete: operations["delete_conversation_api_conversations__conversation_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -2137,6 +2173,10 @@ export interface components {
              * @default false
              */
             confirmed: boolean;
+            /** Subject Type */
+            subject_type?: ("job" | "step" | "outcome" | "evidence") | null;
+            /** Subject Id */
+            subject_id?: string | null;
         };
         /** ObservationListResponse */
         ObservationListResponse: {
@@ -2161,6 +2201,10 @@ export interface components {
             confidence: number;
             /** Source Turn */
             source_turn?: number | null;
+            /** Subject Type */
+            subject_type?: string | null;
+            /** Subject Id */
+            subject_id?: string | null;
             /** Created At */
             created_at: string;
             /** Updated At */
@@ -2204,6 +2248,11 @@ export interface components {
             /** Satisfaction */
             satisfaction?: number | null;
             /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /**
              * Mcp Url
              * @default
              */
@@ -2243,6 +2292,28 @@ export interface components {
          * @description Reject a proposal.
          */
         RejectProposalRequest: {
+            /**
+             * Mcp Url
+             * @default
+             */
+            mcp_url: string;
+        };
+        /**
+         * SaveConfigRequest
+         * @description Persist LLM connection settings so the sidecar reads them on restart.
+         *
+         *     The same fields the GET /config endpoint returns as ``defaults``.
+         */
+        SaveConfigRequest: {
+            /** Base Url */
+            base_url: string;
+            /**
+             * Api Key
+             * @default
+             */
+            api_key: string;
+            /** Model Name */
+            model_name: string;
             /**
              * Mcp Url
              * @default
@@ -2616,7 +2687,64 @@ export interface operations {
             };
         };
     };
+    save_config_api_config_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_diagnostics_api_diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_data_status_api_data_status_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4557,7 +4685,10 @@ export interface operations {
     };
     list_observations_api_memory_observations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                subject_type?: string | null;
+                subject_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4571,6 +4702,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ObservationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4776,6 +4916,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationTreeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

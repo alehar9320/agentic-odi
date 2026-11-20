@@ -63,6 +63,45 @@
             }
           }
         }
+      },
+      "post": {
+        "summary": "Save Config",
+        "description": "Persist LLM connection settings and invalidate the probe cache.\n\nThe probe cache is keyed on (endpoint, model, key_hash), so a credential\nrotation naturally misses the cache. This endpoint additionally clears the\ncache for base_url or model_name changes, which do not include the key.",
+        "operationId": "save_config_api_config_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Save Config Api Config Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/diagnostics": {
@@ -79,6 +118,27 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Get Diagnostics Api Diagnostics Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/status": {
+      "get": {
+        "summary": "Get Data Status",
+        "description": "Report the resolved paths and sizes of the sidecar's two SQLite stores.\n\nMetadata only: no entity rows, no credentials, no record counts. A store\nwhose file does not yet exist reports its resolved configuration path with\nunavailable size and modification time rather than inventing values.",
+        "operationId": "get_data_status_api_data_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Data Status Api Data Status Get"
                 }
               }
             }
@@ -3004,6 +3064,40 @@
       "get": {
         "summary": "List Observations",
         "operationId": "list_observations_api_memory_observations_get",
+        "parameters": [
+          {
+            "name": "subject_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Type"
+            }
+          },
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3014,6 +3108,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       },
@@ -3021,14 +3125,14 @@
         "summary": "Create Observation",
         "operationId": "create_observation_api_memory_observations_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ObservationCreateRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -3256,6 +3360,46 @@
       }
     },
     "/api/conversations/{conversation_id}": {
+      "delete": {
+        "summary": "Delete Conversation",
+        "description": "Remove one thread and its turns; an unknown id is a 404, not a no-op.",
+        "operationId": "delete_conversation_api_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Conversation Api Conversations  Conversation Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "summary": "Patch Conversation",
         "description": "Record the visible branch, or rename the thread.",
@@ -6075,6 +6219,36 @@
             "type": "boolean",
             "title": "Confirmed",
             "default": false
+          },
+          "subject_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "job",
+                  "step",
+                  "outcome",
+                  "evidence"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Type"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
           }
         },
         "type": "object",
@@ -6137,6 +6311,28 @@
               }
             ],
             "title": "Source Turn"
+          },
+          "subject_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Type"
+          },
+          "subject_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Id"
           },
           "created_at": {
             "type": "string",
@@ -6296,6 +6492,11 @@
             ],
             "title": "Satisfaction"
           },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
+          },
           "mcp_url": {
             "type": "string",
             "title": "Mcp Url",
@@ -6362,6 +6563,35 @@
         "type": "object",
         "title": "RejectProposalRequest",
         "description": "Reject a proposal."
+      },
+      "SaveConfigRequest": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "default": ""
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "mcp_url": {
+            "type": "string",
+            "title": "Mcp Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_url",
+          "model_name"
+        ],
+        "title": "SaveConfigRequest",
+        "description": "Persist LLM connection settings so the sidecar reads them on restart.\n\nThe same fields the GET /config endpoint returns as ``defaults``."
       },
       "ScheduleWorkRequest": {
         "properties": {

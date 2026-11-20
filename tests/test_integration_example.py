@@ -38,12 +38,11 @@ import client as agent_client  # noqa: E402
 
 @pytest.fixture
 def server(tmp_path, monkeypatch):
-    """A server on its own SQLite file, built as an isolated module instance.
+    """A server on its own SQLite file, configured explicitly.
 
-    ``mcp_server`` builds its repository at import time, so exercising a
-    throwaway store means loading a fresh copy under a private name. Reloading
-    the shared module would rebind the globals that the rest of the suite
-    imports (``jobs_db``, ``mcp``, ...) and close the store out from under them.
+    Importing ``mcp_server`` builds no store, so the fixture loads a private
+    copy of the module and calls ``configure()``: the shared module the rest of
+    the suite imports keeps its own binding.
     """
     db = str(tmp_path / "integration.db")
     monkeypatch.setenv("AGENTIC_ODI_DB", db)
@@ -54,6 +53,7 @@ def server(tmp_path, monkeypatch):
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.configure()
     yield module
     module.shutdown_store()
 

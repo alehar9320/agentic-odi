@@ -1,5 +1,7 @@
+import sys
 from pathlib import Path
 
+import pytest
 from agentic_odi_cli import profile
 
 
@@ -66,8 +68,88 @@ def test_load_baseline_rejects_corrupt_json(monkeypatch, tmp_path):
     try:
         profile.load_baseline()
     except ValueError as exc:
-        assert "Failed to parse baseline file" in str(exc)
+        assert str(target) in str(exc)
+        assert "not valid JSON" in str(exc)
     else:  # pragma: no cover - corrupt JSON must raise
+        raise AssertionError("expected ValueError")
+
+
+def test_an_unreadable_file_names_permissions_not_parsing(monkeypatch, tmp_path):
+    if sys.platform == "win32":  # pragma: no cover - chmod does not deny reads on Windows
+        pytest.skip("chmod cannot deny reads on Windows")
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"product_name": "Acme"}')
+    target.chmod(0o000)
+
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        message = str(exc)
+        assert "Could not read" in message
+        assert str(target) in message
+        assert "parse" not in message.lower()
+    else:  # pragma: no cover - unreadable file must raise
+        raise AssertionError("expected ProfileFileError")
+    finally:
+        target.chmod(0o600)
+
+
+def test_malformed_json_names_the_line_and_column(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"a": 1,}')
+
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        message = str(exc)
+        assert "line" in message
+        assert "column" in message
+    else:  # pragma: no cover - malformed JSON must raise
+        raise AssertionError("expected ProfileFileError")
+
+
+def test_the_path_appears_in_both_messages(monkeypatch, tmp_path):
+    if sys.platform == "win32":  # pragma: no cover - chmod does not deny reads on Windows
+        pytest.skip("chmod cannot deny reads on Windows")
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text("{not json")
+
+    messages = []
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        messages.append(str(exc))
+
+    target.chmod(0o000)
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        messages.append(str(exc))
+    finally:
+        target.chmod(0o600)
+
+    assert len(messages) == 2
+    for message in messages:
+        assert str(target) in message
+
+
+def test_profile_file_error_is_a_value_error(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text("{not json")
+
+    try:
+        profile.load_baseline()
+    except ValueError as exc:
+        assert isinstance(exc, profile.ProfileFileError)
+    else:  # pragma: no cover - malformed JSON must raise
         raise AssertionError("expected ValueError")
 
 
@@ -263,7 +345,8 @@ def test_llm_profile_handles_corrupt_file(monkeypatch, tmp_path):
     try:
         profile.load_llm_profile()
     except ValueError as exc:
-        assert "Failed to parse LLM profile file" in str(exc)
+        assert str(target) in str(exc)
+        assert "not valid JSON" in str(exc)
     else:  # pragma: no cover - corrupt JSON must raise
         raise AssertionError("expected ValueError")
 

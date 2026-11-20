@@ -137,6 +137,10 @@ function buildConnectSrc(env: Env): string {
 }
 
 function securityHeaders(env: Env): Record<string, string> {
+  // `style-src 'unsafe-inline'` is required by React's `style` prop, which the
+  // Studio uses for a handful of one-off layout values (see EvidenceStream,
+  // SkeletonCard). Removing it means moving every one of those into a class in
+  // theme.css first. Scripts are NOT relaxed: `script-src 'self'` stays.
   return {
     "Content-Security-Policy": [
       "default-src 'self'",
@@ -347,9 +351,25 @@ export default {
     }
 
     // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.
-    const headers = new Headers(request.headers);
-    headers.delete("host");
-    headers.delete("cf-connecting-ip");
+    // The allowlist is the point: the sidecar asks for Authorization, Content-Type,
+    // Accept, Accept-Language and the request id, and nothing else crosses the
+    // tunnel. Copying the client's headers wholesale would forward cookies,
+    // origin, referer, and any browser-extension header to a machine the person
+    // owns, where they are useless and logged by anything that logs headers.
+    // `accept-encoding` is deliberately excluded: the Worker's own fetch
+    // negotiates encoding, and copying it can produce a double-encoded stream.
+    const FORWARDED_HEADERS = [
+      "authorization",
+      "content-type",
+      "accept",
+      "accept-language",
+      "x-request-id",
+    ] as const;
+    const headers = new Headers();
+    for (const name of FORWARDED_HEADERS) {
+      const value = request.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
 
     const target = new URL(`${url.pathname}${url.search}`, `${sidecar}/`);
 

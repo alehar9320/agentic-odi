@@ -327,6 +327,110 @@ def test_deleting_the_artifact_empties_the_link_without_a_hint() -> None:
     assert response.json()["error"]["code"] == "not_found"
 
 
+def _canvas_with_share_service(clock) -> tuple[TestClient, ShareService, StudioMemory, str]:
+    """Seed a job + outcome and wire a ShareService with the given clock."""
+    repo = InMemoryRepository()
+    memory = StudioMemory(":memory:")
+    app = create_app(repo, backend="local", memory=memory)
+    service = app.state.service
+    job = service.add_job("Rotate a leaked secret")
+    outcome = service.add_outcome(
+        job.id,
+        statement=STATEMENT,
+        importance=9,
+        satisfaction=2,
+        claim_check=manual_claim_check(),
+    )
+    sharing = ShareService(service, memory, clock=clock)
+    app.state.sharing = sharing
+    return TestClient(app), sharing, memory, outcome.id
+
+
+# -- expiry, malformed stamps, and the one 404 ---------------------------------
+
+
+def test_a_naive_expiry_reads_as_expired() -> None:
+    """A stored stamp with no offset is read as UTC and compared fairly."""
+    fixed = datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)
+    client, sharing, memory, outcome_id = _canvas_with_share_service(clock=lambda: fixed)
+    memory.create_share(
+        token_hash=hash_token("odi_sh_naive"),
+        artifact_kind="outcome",
+        artifact_id=outcome_id,
+        expires_at="2026-11-20T12:00:00",  # naive; equal to the clock is expired
+    )
+    assert client.get("/api/share/odi_sh_naive").status_code == 404
+
+
+def test_an_unparseable_expiry_reads_as_expired() -> None:
+    """A stamp that is not ISO-8601 is a dead share, not a 500."""
+    fixed = datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)
+    client, sharing, memory, outcome_id = _canvas_with_share_service(clock=lambda: fixed)
+    memory.create_share(
+        token_hash=hash_token("odi_sh_soon"),
+        artifact_kind="outcome",
+        artifact_id=outcome_id,
+        expires_at="soon",
+    )
+    assert client.get("/api/share/odi_sh_soon").status_code == 404
+
+
+def test_a_future_naive_expiry_is_accepted_as_utc() -> None:
+    """A naive future stamp is treated as UTC and the artifact is returned."""
+    fixed = datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)
+    client, sharing, memory, outcome_id = _canvas_with_share_service(clock=lambda: fixed)
+    memory.create_share(
+        token_hash=hash_token("odi_sh_future"),
+        artifact_kind="outcome",
+        artifact_id=outcome_id,
+        expires_at="2026-11-21T12:00:00",  # naive future, read as UTC
+    )
+    response = client.get("/api/share/odi_sh_future")
+    assert response.status_code == 200, response.text
+    assert response.json()["artifact"]["id"] == outcome_id
+
+
+def test_every_read_failure_is_the_same_404() -> None:
+    """Unknown, expired, revoked, and malformed-expiry shares are one 404."""
+    now = datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)
+    client, sharing, memory, outcome_id = _canvas_with_share_service(clock=lambda: now)
+
+    live = sharing.mint("outcome", outcome_id, ttl_days=1)
+    revoked = sharing.mint("outcome", outcome_id, ttl_days=1)
+    memory.revoke_share(revoked.id)
+
+    memory.create_share(
+        token_hash=hash_token("odi_sh_expired"),
+        artifact_kind="outcome",
+        artifact_id=outcome_id,
+        expires_at=(now - timedelta(days=1)).isoformat(),  # aware, in the past
+    )
+    memory.create_share(
+        token_hash=hash_token("odi_sh_soon"),
+        artifact_kind="outcome",
+        artifact_id=outcome_id,
+        expires_at="soon",  # unparseable
+    )
+
+    header = {"X-Request-ID": "probe"}
+    unknown = client.get("/api/share/odi_sh_does-not-exist", headers=header)
+    expired = client.get("/api/share/odi_sh_expired", headers=header)
+    after_revoke = client.get(f"/api/share/{revoked.token}", headers=header)
+    malformed_expiry = client.get("/api/share/odi_sh_soon", headers=header)
+
+    assert (
+        unknown.status_code
+        == expired.status_code
+        == after_revoke.status_code
+        == malformed_expiry.status_code
+        == 404
+    )
+    assert unknown.text == expired.text == after_revoke.text == malformed_expiry.text
+
+    # The live token is unaffected.
+    assert client.get(f"/api/share/{live.token}").status_code == 200
+
+
 # -- hash and compare safely ---------------------------------------------------
 
 
@@ -413,3 +517,24 @@ def test_the_read_still_works_after_a_write_is_refused() -> None:
     client.post(f"/api/share/{minted['token']}")
 
     assert client.get(f"/api/share/{minted['token']}").status_code == 200
+
+
+# -- shareable flag ---------------------------------------------------------
+
+
+def test_a_loopback_base_is_marked_unshareable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_PUBLIC_BASE_URL", raising=False)
+    client, ids = _seeded()
+    minted = _mint(client, "outcome", ids["outcome"])
+    assert minted["shareable"] is False
+
+
+def test_a_configured_base_is_shareable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_PUBLIC_BASE_URL", "https://odi.example.com")
+    client, ids = _seeded()
+    minted = _mint(client, "outcome", ids["outcome"])
+    assert minted["shareable"] is True

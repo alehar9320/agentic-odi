@@ -121,6 +121,11 @@ export function watchForUpdates({
  * waits for `controllerchange` so the new worker — and its new cache — serves the
  * next document, rather than reloading into the old one. It reloads at most once,
  * so the update can never loop.
+ *
+ * The listener is registered `once`, so it cannot outlive the reload it was
+ * attached for: a later `controllerchange` from a second update that day must not
+ * fire a stale reload. The `reloaded` flag covers a duplicate dispatch that
+ * arrives before the browser deregisters the listener.
  */
 export function activateWaiting(
   registration: RegistrationLike,
