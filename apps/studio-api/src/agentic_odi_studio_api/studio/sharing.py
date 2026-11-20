@@ -72,6 +72,22 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _parsed_expiry(raw: str) -> datetime | None:
+    """Parse a stored expiry stamp, treating a naive value as UTC.
+
+    Stamps written by this module are aware; older rows, restored backups, or
+    hand-edited rows may be naive or unreadable. Return None for anything that
+    cannot be parsed — the caller treats that as a dead share.
+    """
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)  # stored stamps are UTC
+    return parsed
+
+
 def hash_token(token: str) -> str:
     """The only representation of a token that is ever stored."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
@@ -146,6 +162,13 @@ class ShareService:
 
     def _base(self) -> str:
         return (self._base_url or public_base_url()).rstrip("/")
+
+    def _instant(self) -> datetime:
+        """The current instant, always aware; a naive test clock reads as UTC."""
+        instant = self._clock()
+        if instant.tzinfo is None:
+            instant = instant.replace(tzinfo=timezone.utc)
+        return instant
 
     # -- mint / revoke -----------------------------------------------------
 
@@ -226,7 +249,8 @@ class ShareService:
             raise ShareNotFoundError(token)
         if share.revoked_at is not None:
             raise ShareNotFoundError(token)
-        if datetime.fromisoformat(share.expires_at) <= self._clock():
+        expires = _parsed_expiry(share.expires_at)
+        if expires is None or expires <= self._instant():
             raise ShareNotFoundError(token)
         return share
 
