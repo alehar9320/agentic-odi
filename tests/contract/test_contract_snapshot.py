@@ -1649,7 +1649,7 @@ def test_declared_tool_surface_snapshot() -> None:
                     "target_id",
                     "target_type",
                 ],
-                "effect": "write",
+                "effect": "read",
                 "required": [],
                 "returns": "A list of Link records.",
                 "stage": None,

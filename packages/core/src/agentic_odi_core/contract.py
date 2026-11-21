@@ -1010,7 +1010,9 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ToolName.LINKS_LIST.value: ToolSpec(
         name="links_list",
         summary="List links, optionally filtered by source/target entity and relationship type.",
-        effect=_derive_effect("links_list"),
+        # A ``links_*`` name is not self-describing: the prefix rule would derive
+        # WRITE, but listing links is a pure read and must pass the consent gate.
+        effect=ToolEffect.READ,
         arguments=(
             "source_type",
             "source_id",
