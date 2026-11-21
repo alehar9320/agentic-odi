@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -12,10 +13,15 @@ from typing import Annotated
 
 import typer
 
+log = logging.getLogger(__name__)
+
 app = typer.Typer(name="profile", help="Profile management commands")
 
 BASELINE_FILE_NAME = "baseline.json"
 BASELINE_BACKUP_KEEP = 5
+
+#: Directory older CLI builds wrote into before config resolution was shared.
+LEGACY_CONFIG_DIR_NAME = "agentic-odi"
 
 
 class ProfileFileError(ValueError):
@@ -103,6 +109,41 @@ def config_dir() -> Path:
     return resolve_config_dir()
 
 
+def _legacy_config_dir() -> Path:
+    """The ``$HOME/agentic-odi`` directory older builds wrote into."""
+    return Path.home() / LEGACY_CONFIG_DIR_NAME
+
+
+def migrate_legacy_config_files() -> list[Path]:
+    """Move profile files from the legacy directory into the resolved one.
+
+    Older builds wrote ``$HOME/agentic-odi`` while every reader looks under
+    :func:`config_dir`. Moving each file once — and never overwriting a file
+    that is already there — keeps a person's answers from being abandoned.
+    Returns the paths that were moved; a no-op when there is nothing to move.
+
+    An explicit ``XDG_CONFIG_HOME`` is a configuration the person chose, so it
+    is left alone rather than guessed at.
+    """
+    if os.environ.get("XDG_CONFIG_HOME"):
+        return []
+    legacy = _legacy_config_dir()
+    current = config_dir()
+    if legacy == current:
+        return []
+    moved: list[Path] = []
+    for name in (BASELINE_FILE_NAME, LLM_PROFILE_FILE_NAME):
+        source = legacy / name
+        target = current / name
+        if not source.is_file() or target.exists():
+            continue
+        current.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(target))
+        log.info("moved %s to %s", source, target)
+        moved.append(target)
+    return moved
+
+
 def baseline_file() -> Path:
     """Return the path to the baseline JSON file."""
     return config_dir() / BASELINE_FILE_NAME
@@ -110,6 +151,7 @@ def baseline_file() -> Path:
 
 def baseline_exists() -> bool:
     """Return True if the baseline file exists and is parseable."""
+    migrate_legacy_config_files()
     return baseline_file().exists()
 
 
@@ -231,6 +273,7 @@ def llm_profile_file() -> Path:
 
 def llm_profile_exists() -> bool:
     """Return True if the LLM profile file exists."""
+    migrate_legacy_config_files()
     return llm_profile_file().exists()
 
 
