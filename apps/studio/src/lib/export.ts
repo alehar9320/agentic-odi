@@ -93,16 +93,27 @@ function claimsLines(content: string, claims: Claim[]): string[] {
   // answer is the failure this export exists to fix, so it travels as its own
   // line rather than vanishing with the sentence it could not be matched to —
   // but a sentence already on the page is not printed twice over a label that
-  // would not attach.
-  const normalise = (value: string) =>
-    value.replace(/\s+/g, " ").replace(/[.!?]+$/, "").trim();
+  // would not attach. The match is exact after collapsing whitespace and
+  // dropping terminal punctuation, so a claim that is only a *prefix* of a
+  // printed sentence (a company name that ran on into the next clause) is still
+  // printed; a substring test would swallow it.
+  const normalise = (value: string) => value.replace(/\s+/g, " ").trim();
+  const stripTrailingPunctuation = (value: string) => value.replace(/[.!?]+$/, "");
   const printedSentences = new Set<string>();
   for (const block of blocks) {
     for (const item of block.items) {
       for (const segment of item) {
-        printedSentences.add(normalise(segment.text));
+        const text = normalise(segment.text);
+        if (text) {
+          printedSentences.add(text);
+          printedSentences.add(stripTrailingPunctuation(text));
+        }
       }
-      printedSentences.add(normalise(item.map((s) => s.text).join("")));
+      const itemText = normalise(item.map((segment) => segment.text).join(""));
+      if (itemText) {
+        printedSentences.add(itemText);
+        printedSentences.add(stripTrailingPunctuation(itemText));
+      }
     }
   }
   for (const claim of claims) {
@@ -110,7 +121,11 @@ function claimsLines(content: string, claims: Claim[]): string[] {
       continue;
     }
     const sentence = normalise(claim.text);
-    if (sentence && printedSentences.has(sentence)) {
+    if (
+      sentence &&
+      (printedSentences.has(sentence) ||
+        printedSentences.has(stripTrailingPunctuation(sentence)))
+    ) {
       continue;
     }
     lines.push(`${claim.text}${claimSuffix(claim)}`, "");

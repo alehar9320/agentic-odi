@@ -497,6 +497,7 @@ describe("conversationToMarkdown", () => {
       "Rotation costs two engineer-days and a review. (per Gong · Call with Acme, record e1)",
     );
     expect(markdown).toContain("Rotation costs (Uncited)");
+    expect(markdown.match(/Rotation costs/g)).toHaveLength(2);
   });
 
   it("dates the export in the filename", () => {
