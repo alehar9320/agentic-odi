@@ -62,6 +62,7 @@ CI_JOB_COVERAGE: dict[str, tuple[str, ...]] = {
     "tauri-build": (),
     "e2e": (),
     "e2e-smoke": (),
+    "e2e-no-sidecar": (),
 }
 
 CI_ONLY_REASONS: dict[str, str] = {
@@ -86,6 +87,10 @@ CI_ONLY_REASONS: dict[str, str] = {
         "drives Chromium against a built Studio and both services; a real boot, and the "
         "one browser lane that blocks a merge, so CI owns it"
     ),
+    "e2e-no-sidecar": (
+        "drives Chromium against a built Studio with the sidecar and API down; a real boot "
+        "of the degraded mode, so CI owns the lane"
+    ),
 }
 
 TIER_NOTES = {
@@ -94,8 +99,8 @@ TIER_NOTES = {
     ),
     "default": "Not run: e2e (owned by the e2e lane), tauri, dependency audit.",
     "full": (
-        "Not run: e2e and e2e-smoke (owned by the e2e lane), tauri-check, tauri-build, "
-        "dependency audit."
+        "Not run: e2e, e2e-smoke and e2e-no-sidecar (owned by the e2e lanes), tauri-check, "
+        "tauri-build, dependency audit."
     ),
 }
 

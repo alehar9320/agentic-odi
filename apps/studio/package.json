@@ -13,6 +13,7 @@
     "test:e2e": "playwright test --project=chromium --project=mcp-backend",
     "test:e2e:smoke": "playwright test --project=chromium --project=mcp-backend --grep @smoke --retries=0",
     "test:e2e:visual": "playwright test --project=visual",
+    "test:e2e:no-sidecar": "playwright test --config playwright.no-sidecar.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",

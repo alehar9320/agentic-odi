@@ -88,7 +88,16 @@ export default defineConfig({
       // The product suite: everything that drives the shipped app in a browser.
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/, /visual\.spec\.ts/],
+      // The no-sidecar harness is a separate configuration (`vite preview`,
+      // every `/api/**` request dead), so its spec never belongs in this
+      // sidecar-backed project. `e2e/no-sidecar/offline.spec.ts` is a different
+      // suite that does need the sidecar, so only this one file is ignored.
+      testIgnore: [
+        /mcp-backend\.spec\.ts/,
+        /pr-screenshots\.spec\.ts/,
+        /visual\.spec\.ts/,
+        /no-sidecar\.spec\.ts$/,
+      ],
     },
     {
       // The same Studio against its MCP passthrough backend, which talks to

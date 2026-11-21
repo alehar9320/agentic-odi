@@ -214,12 +214,14 @@ gate is proven to fail rather than assumed to.
 
 ## End-to-end
 
-The browser-level suite lives in `apps/studio/e2e/` and runs with
-[Playwright](https://playwright.dev). It drives the real Studio against the
-real sidecar and MCP server — no mocked network calls — so it covers the
-seams that neither pytest nor vitest can: the SPA's assumptions about the
-sidecar's response shapes, the sidecar's hydration of the canvas, and the
-first-run wizard's ordering relative to the rest of the app.
+The browser-level suites live in `apps/studio/e2e/` and run with
+[Playwright](https://playwright.dev). The sidecar-backed suite drives the real
+Studio against the real sidecar and MCP server — no mocked network calls — so
+it covers the seams that neither pytest nor vitest can: the SPA's assumptions
+about the sidecar's response shapes, the sidecar's hydration of the canvas, and
+the first-run wizard's ordering relative to the rest of the app. The
+no-sidecar suite uses one 503 stub for `/api/**`, deliberately, so the fallback
+path is deterministic rather than dependent on a static server's SPA answer.
 
 ```bash
 npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
@@ -237,6 +239,17 @@ backend, the product default) and `mcp-backend` (the passthrough) make up
 `mcp-backend.spec.ts`, `visual.spec.ts` and `pr-screenshots.spec.ts`. Before
 #1118 it did not ignore the visual spec, so twelve comparisons ran twice, under
 two snapshot names, and one contract produced two independent verdicts.
+
+`playwright.no-sidecar.config.ts` is the second, required configuration. It
+serves the built SPA from `vite preview` with no sidecar or MCP process; each
+test answers `/api/**` with a 503 HTML page, a 502 (the hosted Worker's
+`sidecar_unavailable` shape), or a socket error, so all three transport
+failures take the browser path. It proves the four things the product promises
+without one: the stage loads, the assistant answers, a capture lands in
+IndexedDB, and a reload still shows it. Run it with
+`npm --prefix apps/studio run test:e2e:no-sidecar`. Its spec sits beside
+`e2e/no-sidecar/offline.spec.ts`, which is a different suite (#545) that does
+need the sidecar, so `chromium` ignores only the one file.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
 never to a `data-testid`, of which the application has none, and never to a CSS
@@ -288,9 +301,9 @@ of `test:e2e` until its Linux baselines are committed and reviewed;
 `npm run test:e2e:visual` writes and compares them with `animations:
 "disabled"`, `caret: "hide"` and `scale: "css"` from `playwright.config.ts`.
 
-### The smoke lane blocks a merge; the full suite is signal
+### The required lanes block a merge; the full suite is signal
 
-CI runs two browser jobs:
+CI runs three browser jobs:
 
 - **`e2e-smoke` is required.** It runs the `@smoke`-tagged handful — the settled
   shell, the first run, canvas hydration, one conversation turn, and one boot on
@@ -303,6 +316,12 @@ CI runs two browser jobs:
   repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
   `AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. It is too broad and too
   slow to be a merge gate on its own, which is why the narrow lane exists.
+- **`e2e-no-sidecar` is required.** It runs the product's most common first
+  run — a built SPA, no sidecar process, every `/api/**` request answered 503
+  (and, in one scenario, 502 or a socket error) — under its own configuration,
+  and proves the load, answer, capture and reload promises. It has no
+  `continue-on-error` and no kill switch either: a refactor that deletes the
+  browser fallback turns CI red.
 
 A retry is recorded, never concealed: `retries: 1` keeps the first attempt's
 trace, and the summary names every test that needed the second one.
