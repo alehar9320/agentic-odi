@@ -65,6 +65,22 @@ nothing) without a log call. A suppression that genuinely needs no log is named
 in the test's `ALLOWED` baseline with a reason; that list is capped, and an
 entry whose handler is gone fails, so it can only shrink.
 
+### The generated API contract
+
+`apps/studio-api/tests/test_openapi_contract.py` is the reason a green build
+means the contract is real. `uv run python -m agentic_odi_studio_api.openapi
+--check` regenerates the document from the running app and fails, naming the
+drifted paths, when `apps/studio/openapi.json` is stale; `--write` refreshes it.
+CI runs `--check` in the `docs` job, which is a required input to `CI green`.
+The SPA's `src/api/schema.d.ts` is generated from that file by
+`npm run gen:api-types`, and `src/api/contract.ts` asserts the hand-written
+interfaces in `src/types.ts` satisfy the generated models, so `npm run
+typecheck` (the `studio` job) fails on a renamed server field. The same test
+also caps the number of operations that still answer with an open object, so
+that count can only shrink. A route change is one `--write`, one
+`gen:api-types`, and whatever `contract.ts` then complains about — never a hand
+edit of the artifacts.
+
 ### `website/tests/` contracts
 
 `test_ci_required.py` is the contract that keeps the site from shipping on faith. It asserts the `website` job in `ci.yml` runs `uv run --directory website pytest tests/`, carries no `continue-on-error`, and is both a `needs:` entry and an enforced result in the `CI green` aggregate — the status check the `main-requires-ci-green` ruleset requires. It also asserts the Pages `deploy` job waits on the tested `build`. The wiring has regressed before: the site's checks once lived in a `feature/gh-pages`-only workflow that never ran for a pull request into `main` (402f0a5).

@@ -100,6 +100,13 @@ jobs:
       - name: Check the generated documentation blocks are current
         run: uv run python scripts/docs_index.py --check
 
+      # The SPA's TypeScript types come from apps/studio/openapi.json, which is
+      # generated from the running FastAPI app. A stale copy is a contract the
+      # client compiles against and the server does not honour, so the drift
+      # fails here, naming the routes that moved.
+      - name: Check the Studio OpenAPI contract matches the app
+        run: uv run python -m agentic_odi_studio_api.openapi --check
+
   security:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -901,13 +908,14 @@ jobs:
   ci-green:
     name: CI green
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, security, dependencies, test, smoke, website, studio, contrast, tauri-check, tauri-build, e2e, e2e-smoke]
+    needs: [lint, typecheck, docs, security, dependencies, test, smoke, website, studio, contrast, tauri-check, tauri-build, e2e, e2e-smoke]
     if: always()
     steps:
       - name: Verify the required jobs and report what was verified
         env:
           LINT: ${{ needs.lint.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
+          DOCS: ${{ needs.docs.result }}
           SECURITY: ${{ needs.security.result }}
           DEPENDENCIES: ${{ needs.dependencies.result }}
           TEST: ${{ needs.test.result }}
@@ -929,7 +937,7 @@ jobs:
           E2E_BLOCKING: ${{ vars.AGENTIC_ODI_E2E_BLOCKING }}
         run: |
           failed=0
-          for job in LINT TYPECHECK SECURITY DEPENDENCIES TEST SMOKE WEBSITE STUDIO CONTRAST TAURI_CHECK TAURI_BUILD E2E_SMOKE; do
+          for job in LINT TYPECHECK DOCS SECURITY DEPENDENCIES TEST SMOKE WEBSITE STUDIO CONTRAST TAURI_CHECK TAURI_BUILD E2E_SMOKE; do
             result="${!job}"
             if [ "$result" != "success" ]; then
               echo "::error::$job did not succeed ($result)"
@@ -967,6 +975,7 @@ jobs:
             echo "| --- | --- | --- |"
             printf '| %s | %s | %s |\n' lint "$LINT" required
             printf '| %s | %s | %s |\n' typecheck "$TYPECHECK" required
+            printf '| %s | %s | %s |\n' docs "$DOCS" required
             printf '| %s | %s | %s |\n' security "$SECURITY" required
             printf '| %s | %s | %s |\n' "test (3.10-3.12)" "$TEST" required
             printf '| %s | %s | %s |\n' smoke "$SMOKE" required

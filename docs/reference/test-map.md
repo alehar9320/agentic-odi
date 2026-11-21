@@ -99,6 +99,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_app_spa.py` | Tests for the static SPA fallback and the local server entrypoint. |
 | `apps/studio-api/tests/test_boot_integrity.py` | Boot integrity and clean-shutdown tests for the Studio sidecar (issue #598). |
 | `apps/studio-api/tests/test_capability_routes.py` | The MCP health route and the capability probe must agree on one method. |
+| `apps/studio-api/tests/test_openapi_contract.py` | The committed Studio contract is generated, and its holes only close. |
 | `apps/studio-api/tests/test_probe_cache.py` | Tests for the LLM probe TTL cache and the ``/api/health/llm`` response. |
 | `apps/studio-api/tests/test_studio_alternatives.py` | Alternatives CRUD and the three-state solution query through the Studio API (M2-07). |
 | `apps/studio-api/tests/test_studio_api.py` | Tests for the Living Studio sidecar API (``/api/*``). |
@@ -447,6 +448,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_hosted_first_run_workflow.py` | The hosted probe has a schedule, a commit to compare against, and no vote. |
 | `tests/scripts/test_label_merge_conflicts.py` | The merge-conflict labeler, pinned against the failures that silenced it. |
 | `tests/scripts/test_migrations_registry.py` | The migration registries are contracts, and these are their guards. |
+| `tests/scripts/test_openapi_contract_ci.py` | The Studio OpenAPI drift check runs in CI and can fail the merge. |
 | `tests/scripts/test_pr_ai_authorize.py` | Test the AI merge authorization and the check-suite gate it reads. |
 | `tests/scripts/test_pr_ai_merge.py` | The AI merge trust labeler, pinned so a silent gate failure cannot ship. |
 | `tests/scripts/test_pr_ai_merge_act.py` | Test the AI merge act workflow (``.github/workflows/pr-ai-merge-act.yml``). |

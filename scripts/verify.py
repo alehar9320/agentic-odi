@@ -51,6 +51,7 @@ TIERS = ("changed", "default", "full")
 CI_JOB_COVERAGE: dict[str, tuple[str, ...]] = {
     "lint": ("changed", "default", "full"),
     "typecheck": ("default", "full"),
+    "docs": ("changed", "default", "full"),
     "security": ("changed", "default", "full"),
     "dependencies": (),
     "test": ("changed", "default", "full"),
@@ -292,6 +293,12 @@ def plan_changed(files: list[str]) -> list[Step]:
             ("uv", "run", "python", "scripts/doc_check.py"),
         )
     )
+    steps.append(
+        Step(
+            "the Studio OpenAPI contract matches the app",
+            ("uv", "run", "python", "-m", "agentic_odi_studio_api.openapi", "--check"),
+        )
+    )
 
     # `security`: bandit only understands Python, so it is selected by path.
     if _paths_under(python_files, "apps/") or _paths_under(python_files, "packages/"):
@@ -407,6 +414,10 @@ def plan_full() -> list[Step]:
         Step(
             "generated documentation blocks are current",
             ("uv", "run", "python", "scripts/docs_index.py", "--check"),
+        ),
+        Step(
+            "the Studio OpenAPI contract matches the app",
+            ("uv", "run", "python", "-m", "agentic_odi_studio_api.openapi", "--check"),
         ),
         Step(
             "bandit (apps + packages)",

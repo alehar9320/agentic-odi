@@ -281,6 +281,26 @@ Desired outcomes come back ranked by opportunity score (highest first, unscored
 last) unless a caller asks for insertion order. The Studio canvas falls back to
 the demo seed only in `mcp` mode when MCP is unreachable or returns no jobs. `local` mode returns exactly what is in the local database, including an empty canvas.
 
+The sidecar's HTTP surface is described by one generated contract.
+`apps/studio/openapi.json` is produced from the running FastAPI app by
+`uv run python -m agentic_odi_studio_api.openapi --write`, and the SPA's
+`src/api/schema.d.ts` is generated from it by `npm run gen:api-types`. Neither is
+edited by hand: CI runs the `--check` form in the `docs` job (a required input to
+`CI green`), so a route the app serves and the contract does not describe fails
+the build. The SPA fallback (`/{full_path:path}`) is registered only when a built
+Studio is on disk and is therefore left out of the generated file, so the same
+checkout produces the same contract with or without `npm run build`.
+
+The generated types are load-bearing, not decorative.
+`apps/studio/src/api/contract.ts` asserts that the hand-written interfaces in
+`apps/studio/src/types.ts` satisfy the server's declared models
+(`Observation`, `Conversation`, `ConversationSummary`). A required field the
+server renames or removes fails `npm run typecheck`, which the `studio` CI job
+runs; `contract.ts` emits no JavaScript. The remaining gap is the 77 of 97 operations
+that still answer with an open object (no `response_model`); the ceiling for
+that count lives in `apps/studio-api/tests/test_openapi_contract.py` and may only
+go down.
+
 ## Configuration
 
 | Variable | Used by | Default |
