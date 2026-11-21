@@ -1,18 +1,25 @@
 name: CI Label
 
-# Keeps ci-pending and ready-for-merge in sync on every push and every
-# check-run completion. No repository secrets: it only needs the checked-out
-# repository and the GITHUB_TOKEN the workflow receives automatically.
+# Keeps one label honest: `ci-pending`, which a reviewer filters on to find pull
+# requests that are unblocked but still waiting on CI.
+#
+# This workflow owns exactly one label. `ready-for-merge` already has a single
+# owner — label-merge-conflicts.yml, which derives it from `mergeStateStatus`
+# when `CI` completes — and the AI-merge path reads that label (ADR 0009), so a
+# second writer computing it from different facts would flap a gate a merge
+# depends on.
+#
+# It runs no pull-request code: the tree it checks out is `main`, the script is
+# this repository's own, and every event value reaches the shell through `env:`
+# rather than through `${{ }}` interpolation inside a `run:` block, so a branch
+# name can never become a command.
+
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed, edited]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   check_run:
     types: [completed]
-
-concurrency:
-  group: ci-label-${{ github.event.pull_request.number || github.event.check_run.pull_requests[0].number || github.run_id }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -25,91 +32,103 @@ defaults:
 jobs:
   ci-label:
     name: Label pull request
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
-      issues: write # gh label create lives under the issues API
+      issues: write # `gh label create` and label edits live under the issues API
     steps:
-      # Detect the pull request number and whether it is a fork from either
-      # event shape. A check_run on a non-PR commit yields no number, so the
-      # job skips labeling in that case.
-      - name: Detect pull request and fork status
+      # Both event shapes name a pull request, but with different keys, and a
+      # check_run on a commit with no pull request names none at all. Normalise
+      # that here so every later step has one answer.
+      - name: Detect the pull request behind the event
         id: detect
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER_FROM_PULL_REQUEST: ${{ github.event.pull_request.number }}
+          PR_NUMBER_FROM_CHECK_RUN: ${{ github.event.check_run.pull_requests[0].number }}
+          IS_FORK_FROM_PULL_REQUEST: ${{ github.event.pull_request.head.repo.fork }}
+          IS_FORK_FROM_CHECK_RUN: ${{ github.event.check_run.pull_requests[0].head.repository.fork }}
+          CHECK_RUN_NAME: ${{ github.event.check_run.name }}
         run: |
           if [ "${EVENT_NAME}" = "pull_request" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            HEAD_REF="${{ github.event.pull_request.head.ref }}"
-            IS_FORK="${{ github.event.pull_request.head.repo.fork }}"
+            pr_number="${PR_NUMBER_FROM_PULL_REQUEST}"
+            is_fork="${IS_FORK_FROM_PULL_REQUEST}"
           else
-            # check_run: the check belongs to the PR(s) listed under pull_requests.
-            PR_NUMBER="${{ github.event.check_run.pull_requests[0].number }}"
-            HEAD_REF="${{ github.event.check_run.pull_requests[0].head.ref }}"
-            IS_FORK="${{ github.event.check_run.pull_requests[0].head.repository.fork }}"
+            pr_number="${PR_NUMBER_FROM_CHECK_RUN}"
+            is_fork="${IS_FORK_FROM_CHECK_RUN}"
           fi
 
-          if [ -z "${PR_NUMBER}" ] || [ "${PR_NUMBER}" = "null" ]; then
+          # This job's own completion emits a check_run. Ignore it, so the
+          # workflow cannot trigger itself.
+          if [ "${CHECK_RUN_NAME}" = "Label pull request" ]; then
+            echo "::notice::Ignoring this workflow's own check run."
             echo "pr_number=" >> "$GITHUB_OUTPUT"
             echo "is_fork=" >> "$GITHUB_OUTPUT"
-            echo "head_ref=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Normalise booleans that arrive as the strings "true"/"false".
-          case "${IS_FORK}" in
-            true) IS_FORK=true ;;
-            *) IS_FORK=false ;;
+          case "${is_fork}" in
+            true) is_fork=true ;;
+            *) is_fork=false ;;
           esac
 
-          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "is_fork=${IS_FORK}" >> "$GITHUB_OUTPUT"
-          echo "head_ref=${HEAD_REF}" >> "$GITHUB_OUTPUT"
+          case "${pr_number}" in
+            null) pr_number="" ;;
+          esac
+
+          echo "pr_number=${pr_number}" >> "$GITHUB_OUTPUT"
+          echo "is_fork=${is_fork}" >> "$GITHUB_OUTPUT"
 
       # A fork pull request gets a read-only token, so labeling it cannot
-      # succeed. Say so instead of failing red on a PR we may not touch.
+      # succeed. Say so instead of failing red on a pull request we may not touch.
       - name: Note fork pull requests
         if: ${{ steps.detect.outputs.is_fork == 'true' }}
         run: echo "::notice::Skipping labels for a fork pull request (read-only token)."
 
-      - name: Ensure labels exist
+      # The write-token job runs this repository's script, not the branch's:
+      # a pull request that edits scripts/ci_label.py must not have that edit
+      # executed with permission to write labels.
+      - name: Check out the trusted tree
+        if: ${{ steps.detect.outputs.is_fork != 'true' && steps.detect.outputs.pr_number != '' }}
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Ensure the label exists
         if: ${{ steps.detect.outputs.is_fork != 'true' && steps.detect.outputs.pr_number != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
           gh label create "ci-pending" --color fbca04 \
-            --description "CI checks still running; unblocked and ready for human review once green" \
-            --repo "$REPO" --force
-          gh label create "ready-for-merge" --color 00aa00 \
-            --description "CI is green and no merge conflicts; ready to merge" \
+            --description "A check is still running; review can start once CI is green" \
             --repo "$REPO" --force
 
-      - name: Checkout PR branch
-        if: ${{ steps.detect.outputs.is_fork != 'true' && steps.detect.outputs.pr_number != '' }}
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.detect.outputs.head_ref || github.ref }}
-          fetch-depth: 0
-
-      - name: Assemble PR facts
+      - name: Assemble pull request facts
+        id: facts
         if: ${{ steps.detect.outputs.is_fork != 'true' && steps.detect.outputs.pr_number != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.detect.outputs.pr_number }}
           REPO: ${{ github.repository }}
         run: |
-          # gh pr view returns one object with every field this job needs:
-          # isDraft, mergeable, reviewDecision, reviews, statusCheckRollup.
+          # Until this branch merges, `main` does not carry the script yet.
+          # Nothing to compute, and nothing to fail: a later push runs it.
+          if [ ! -f scripts/ci_label.py ]; then
+            echo "::notice::scripts/ci_label.py is not on main yet; skipping labels."
+            exit 0
+          fi
+          echo "script_present=true" >> "$GITHUB_OUTPUT"
+
+          # gh pr view returns one object with every field this job needs.
           gh pr view "$PR_NUMBER" --repo "$REPO" \
-            --json isDraft,mergeable,reviewDecision,reviews,statusCheckRollup,headRefName,baseRefName,title \
+            --json isDraft,mergeable,reviewDecision,reviews,statusCheckRollup,baseRefName \
             > "$RUNNER_TEMP/pr-view.json"
 
-          # gh camelCase keys -> snake_case keys the Python script expects.
+          # gh camelCase keys -> the snake_case keys the Python script expects.
           jq -n \
             --slurpfile view "$RUNNER_TEMP/pr-view.json" \
             '{
@@ -118,40 +137,48 @@ jobs:
               review_decision: $view[0].reviewDecision,
               reviews: $view[0].reviews,
               check_runs: $view[0].statusCheckRollup,
-              head_ref_name: $view[0].headRefName,
-              base_ref_name: $view[0].baseRefName,
-              title: $view[0].title
+              base_ref_name: $view[0].baseRefName
             }' > "$RUNNER_TEMP/facts.json"
 
-      - name: Compute desired labels
-        if: ${{ steps.detect.outputs.is_fork != 'true' && steps.detect.outputs.pr_number != '' }}
-        id: compute
+      - name: Compute the labels
+        if: ${{ steps.facts.outputs.script_present == 'true' }}
         run: |
-          computed="$(uv run python scripts/ci_label.py --facts "$RUNNER_TEMP/facts.json")"
-          echo "computed=$computed" >> "$GITHUB_OUTPUT"
+          # The script is stdlib-only, so the runner's python runs it as-is;
+          # this job never needs the workspace synced.
+          python3 scripts/ci_label.py --managed > "$RUNNER_TEMP/managed.txt"
+          python3 scripts/ci_label.py --facts "$RUNNER_TEMP/facts.json" \
+            > "$RUNNER_TEMP/computed.txt"
 
-      - name: Remove stale labels then apply desired ones
-        if: ${{ steps.detect.outputs.is_fork != 'true' && steps.detect.outputs.pr_number != '' }}
+      - name: Replace the managed labels with the computed ones
+        if: ${{ steps.facts.outputs.script_present == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.detect.outputs.pr_number }}
           REPO: ${{ github.repository }}
         run: |
-          # Remove labels this run no longer wants, then add what it does.
-          # Removing an absent label is a harmless no-op.
-          for label in ci-pending ready-for-merge; do
-            gh pr edit "${PR_NUMBER}" --repo "${REPO}" --remove-label "${label}" >/dev/null 2>&1 || true
-          done
+          # Remove every label this system owns (removing an absent label is a
+          # no-op), then add what the current state implies. The list comes from
+          # the script, so ci_label.py is the single definition of what is managed.
+          while IFS= read -r label; do
+            [ -z "${label}" ] && continue
+            gh pr edit "${PR_NUMBER}" --repo "${REPO}" --remove-label "${label}" \
+              >/dev/null 2>&1 || true
+          done < "$RUNNER_TEMP/managed.txt"
 
           while IFS= read -r label; do
             [ -z "${label}" ] && continue
             gh pr edit "${PR_NUMBER}" --repo "${REPO}" --add-label "${label}"
-          done <<< "${{ steps.compute.outputs.computed }}"
+          done < "$RUNNER_TEMP/computed.txt"
 
           {
-            echo "### CI labels applied"
+            echo "### CI labels"
             echo
+            echo "managed:"
             echo '```'
-            printf '%s\n' "${{ steps.compute.outputs.computed }}"
+            cat "$RUNNER_TEMP/managed.txt"
+            echo '```'
+            echo "applied:"
+            echo '```'
+            cat "$RUNNER_TEMP/computed.txt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -305,43 +305,52 @@ python3 scripts/pr_labels.py --managed          # list every managed label
 echo '{"author":{"login":"x","type":"User"},"files":[]}' | python3 scripts/pr_labels.py
 ```
 
-The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) are owned
-by the PR Risk Classification workflow and are deliberately left alone. The
-merge-state labels (`ci-pending`, `ready-for-merge`) are owned by the CI Label
-workflow below. The workflow is silent: it updates labels only and never posts
-PR comments.
+The risk tier labels (`safe to merge`, `needs a look`, `danger zone`) and the
+merge-state labels (`ready-for-merge`, `merge-conflict`) are owned by other
+workflows and are deliberately left alone. The workflow is silent: it updates
+labels only and never posts PR comments.
 
 ### CI Label
 
-The [CI Label](../.github/workflows/ci-label.yml) workflow keeps the two
-merge-state labels in sync on every pull-request event and every check-run
-completion:
+The [CI Label](../.github/workflows/ci-label.yml) workflow owns one label, and
+only one:
 
 | Label | Meaning |
 |---|---|
-| `ci-pending` | CI checks are still running, but nothing is blocking — the PR is unblocked and ready for a human to review once CI turns green. |
-| `ready-for-merge` | CI is green, there are no merge conflicts, the PR is not a draft, and no review has requested changes — ready to merge. |
+| `ci-pending` | A check is still running and nothing else blocks the pull request, so CI is the only thing between it and a human review. |
 
-A pull request moves between the labels as CI progresses:
+It is the complement of the merge-state pair below, not a second writer of it.
+`ready-for-merge` has exactly one owner — the
+[merge-conflict workflow](.github/workflows/label-merge-conflicts.yml), which
+derives it from `mergeStateStatus` when `CI` completes — because the AI-merge
+path reads that label (ADR 0009). Two workflows computing it from different
+facts would flap a gate a merge depends on.
 
-1. A new or revised PR starts with neither label while CI spins up.
-2. Once CI has at least one check run and nothing blocks it, `ci-pending` is applied.
-3. When every completed check is green and none is pending, `ci-pending` is replaced with `ready-for-merge`.
-4. If the PR is a draft, has merge conflicts, a failing/cancelled check, or a
-   `CHANGES_REQUESTED` review, both labels are removed until the blocker clears.
+The label therefore moves one way:
 
-The logic is deterministic and pure: `scripts/ci_label.py` computes the labels
-from the PR's facts, and the workflow only adds/removes them — it never posts
-comments. The set of labels it owns is defined once, in `scripts/ci_label.py`:
+1. A pull request gets no label while it has no checks yet, is a draft, has
+   merge conflicts, has a failing, cancelled, or timed-out check, or has a
+   `CHANGES_REQUESTED` review.
+2. Once a check is unfinished and none of those block it, `ci-pending` is
+   applied.
+3. When no check is unfinished any more, `ci-pending` is removed. It is never
+   replaced by `ready-for-merge` here; the merge-conflict workflow owns that.
+
+The workflow checks out `main`, not the pull request's head, and runs only this
+repository's `scripts/ci_label.py`: a job holding a write token never executes
+the code it is labelling. Event values reach the shell through `env:`, never
+through `${{ }}` interpolation inside a `run:` block, so a branch name cannot
+become a command. The logic is deterministic and pure:
 
 ```bash
 python3 scripts/ci_label.py --managed          # list every managed label
-echo '{"is_draft":false,"mergeable":"MERGEABLE","review_decision":"","reviews":[],"check_runs":[{"name":"lint","status":"COMPLETED","conclusion":"SUCCESS"}]}' | python3 scripts/ci_label.py
+echo '{"is_draft":false,"mergeable":"MERGEABLE","base_ref_name":"main","reviews":[],"check_runs":[{"name":"lint","status":"IN_PROGRESS","conclusion":null}]}' | python3 scripts/ci_label.py
 ```
 
-Labels are managed idempotently: each run removes both merge-state labels, then
-adds the ones the current state implies, so re-pushing a branch corrects the
-label instead of stacking a second one.
+Both `CheckRun` entries (`status`/`conclusion`) and legacy `StatusContext`
+entries (`state`) are understood, so an old commit status cannot pin the label
+forever. Labels are managed idempotently: each run removes every managed label,
+then adds the ones the current state implies.
 
 ### Merge-state labels
 
