@@ -66,6 +66,12 @@ test.describe("the workspace", () => {
 
     const settings = lens(page, "Settings");
     await expect(settings).toBeVisible();
+    // Settings opens on Model; the studio bridge URL lives in Connections, one
+    // click away through the index.
+    await settings
+      .getByRole("navigation", { name: "Settings sections" })
+      .getByRole("button", { name: "Connections", exact: true })
+      .click();
     await expect(settings.getByLabel("MCP server URL")).toBeVisible();
   });
 
