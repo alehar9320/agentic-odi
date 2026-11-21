@@ -164,12 +164,16 @@ describe("FirstRunWizard", () => {
     );
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(studio.openSetup).not.toHaveBeenCalled();
-    expect(stored()).toMatchObject({
-      status: "done",
-      step: 3,
-      goal: "find-opportunity",
-      version: 1,
-    });
+    // The provider persists on an effect after the dialog closes, so read the
+    // stored record once it has flushed instead of racing it.
+    await waitFor(() =>
+      expect(stored()).toMatchObject({
+        status: "done",
+        step: 3,
+        goal: "find-opportunity",
+        version: 1,
+      }),
+    );
   });
 
   it("lands on the outcome, then starts the conversation from the chosen door", async () => {

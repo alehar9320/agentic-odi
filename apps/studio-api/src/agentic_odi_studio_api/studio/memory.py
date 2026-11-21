@@ -12,7 +12,6 @@ The store is deliberately small and boring: stdlib ``sqlite3``, one file under
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
 import uuid
@@ -23,6 +22,8 @@ from typing import Any
 
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.integrity import ensure_intact
+from agentic_odi_core.migrations import Migration, migrate
+from agentic_odi_core.paths import default_studio_db_path
 
 from agentic_odi_studio_api.studio.claims import (
     Claim,
@@ -87,10 +88,12 @@ def _json_values(raw: Any) -> list[str]:
 
 
 def default_db_path() -> Path:
-    configured = os.environ.get("AGENTIC_ODI_STUDIO_DB")
-    if configured:
-        return Path(configured)
-    return Path.home() / ".agentic-odi" / "studio.db"
+    """Resolve the default path for the Studio memory database.
+
+    Honors ``AGENTIC_ODI_STUDIO_DB`` and falls back to the canonical
+    ``~/.agentic-odi/studio.db`` from :mod:`agentic_odi_core.paths`.
+    """
+    return default_studio_db_path()
 
 
 @dataclass
@@ -298,9 +301,11 @@ CREATE INDEX IF NOT EXISTS shares_by_hash ON shares(token_hash);
 """
 
 
-#: Columns added after the first release. A database created by an older build
-#: is upgraded in place: nothing is dropped and no data is rewritten.
-_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+#: Columns added after the first release, as migration 1. A database created by
+#: an older build is upgraded in place: nothing is dropped and no data is
+#: rewritten. The index on the message id is migration 2, kept separate so a
+#: step that only adds an index is its own entry rather than a re-run on open.
+_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("conversations", "head_id", "TEXT"),
     ("turns", "message_id", "TEXT"),
     ("turns", "parent_id", "TEXT"),
@@ -309,16 +314,29 @@ _MIGRATIONS: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def _migrate(connection: sqlite3.Connection) -> None:
-    for table, column, kind in _MIGRATIONS:
-        columns = {
-            row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
-        }
+def _studio_migration_1(connection: sqlite3.Connection) -> None:
+    """Add the columns the first release shipped without."""
+    for table, column, kind in _ADDED_COLUMNS:
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
         if column not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+
+
+def _studio_migration_2(connection: sqlite3.Connection) -> None:
+    """Index a turn by the message id a branch is rebuilt from."""
     connection.execute(
         "CREATE INDEX IF NOT EXISTS turns_by_message ON turns(conversation_id, message_id)"
     )
+
+
+#: Every step for ``studio.db``, keyed by the version it produces. The runner in
+#: ``agentic_odi_core.migrations`` applies the steps newer than the file records.
+STUDIO_MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        1, "Add head_id, message_id, parent_id, and observation subjects.", _studio_migration_1
+    ),
+    Migration(2, "Index turns by conversation and message id.", _studio_migration_2),
+)
 
 
 def _validate_text(text: str) -> str:
@@ -403,7 +421,7 @@ class StudioMemory:
                 self._connection.execute("PRAGMA busy_timeout = 5000")
             with self._connection:
                 self._connection.executescript(_SCHEMA)
-                _migrate(self._connection)
+                migrate(self._connection, STUDIO_MIGRATIONS, label="Your Studio memory")
         except sqlite3.DatabaseError as exc:
             self._connection.close()
             raise StoreCorrupt(str(self.db_path), [str(exc)], label="Your Studio memory") from exc
@@ -650,6 +668,22 @@ class StudioMemory:
                 (title.strip()[:200], now, conversation_id),
             )
         return self._updated_conversation(conversation_id)
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Remove a conversation and everything hanging off it, in one transaction.
+
+        ``turns`` and ``turn_citations`` reference their parents with
+        ``ON DELETE CASCADE`` and ``PRAGMA foreign_keys`` is on, so the single
+        delete takes the turns and their citations with it. An unknown id is a
+        not-found, not a silent success: the caller asked to destroy something
+        that was not there.
+        """
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM conversations WHERE id = ?", (conversation_id,)
+            )
+            if cursor.rowcount == 0:
+                raise ConversationNotFoundError(conversation_id)
 
     def _updated_conversation(self, conversation_id: str) -> Conversation:
         """Read back a row this instance just wrote.

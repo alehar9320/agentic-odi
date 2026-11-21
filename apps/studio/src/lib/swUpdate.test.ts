@@ -62,9 +62,15 @@ class FakeRegistration implements RegistrationLike {
 
 class FakeContainer implements ContainerLike {
   controller: unknown = null;
+  readonly addListenerCalls: Array<{ listener: () => void; options?: { once?: boolean } }> = [];
   private readonly listeners = new Set<() => void>();
 
-  addEventListener(_type: "controllerchange", listener: () => void): void {
+  addEventListener(
+    _type: "controllerchange",
+    listener: () => void,
+    options?: { once?: boolean },
+  ): void {
+    this.addListenerCalls.push({ listener, options });
     this.listeners.add(listener);
   }
 
@@ -206,11 +212,38 @@ describe("activateWaiting", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it("does nothing when there is no waiting worker", () => {
+  it("asks the container to fire the reload listener once", () => {
+    const registration = new FakeRegistration();
+    registration.waiting = new FakeWorker();
+    const container = new FakeContainer();
+
+    activateWaiting(registration, container, vi.fn());
+
+    expect(container.addListenerCalls).toHaveLength(1);
+    expect(container.addListenerCalls[0].options).toEqual({ once: true });
+  });
+
+  it("reloads once even if the container dispatches twice", () => {
+    const registration = new FakeRegistration();
+    registration.waiting = new FakeWorker();
+    const container = new FakeContainer();
     const reload = vi.fn();
-    const started = activateWaiting(new FakeRegistration(), new FakeContainer(), reload);
+
+    activateWaiting(registration, container, reload);
+    container.addListenerCalls[0].listener();
+    container.addListenerCalls[0].listener();
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attach a listener when nothing is waiting", () => {
+    const container = new FakeContainer();
+    const reload = vi.fn();
+
+    const started = activateWaiting(new FakeRegistration(), container, reload);
 
     expect(started).toBe(false);
+    expect(container.addListenerCalls).toHaveLength(0);
     expect(reload).not.toHaveBeenCalled();
   });
 });

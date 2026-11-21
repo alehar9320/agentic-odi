@@ -15,9 +15,11 @@ Three shapes, in order:
 2. **`IngestBatch`** — the connector name, its records, and any per-record
    errors.
 3. **`EvidenceDraft`** — the mapped record: `source_name`, `source_kind`,
-   `item_type`, `name`, `content`, `url`, `raw`, and optional
-   `job_id`/`step_id`/`outcome_id` (`mapping.py:17-29`). A draft deliberately has
-   no `id`; identity is the store's job.
+   `item_type`, `name`, `content`, `url`, `raw`, optional
+   `job_id`/`step_id`/`outcome_id`, plus the optional ratings `impact`
+   (`high`/`medium`/`low`, default `medium`) and `confidence`
+   (`verified`/`claimed`, default `claimed`) (`mapping.py:21-49`). A draft
+   deliberately has no `id`; identity is the store's job.
 
 `drafts_from_batch(batch, job_id=…, step_id=…, outcome_id=…)` walks the batch and
 maps each record field-for-field (`mapping.py:53-78`):
@@ -82,13 +84,36 @@ The quote-to-outcome chain is therefore: evidence record (source, name, content,
 url) → `outcome_id` → the Outcome on the Job. The `evidence_promoted` signal
 names the new outcome.
 
-## Confidence
+## Confidence and impact
 
-There is **no confidence field on evidence**, and the mapping does not infer one.
-A vendor's confidence survives only inside `raw`. `BusinessValue.confidence`
-(0.0–1.0, optional) is a different concept on a different model. Studio memory
-observations do carry confidence (default 0.5–0.6, out-of-range values rejected
-rather than clamped), but that is the PM memory store, not evidence.
+Evidence carries two optional ratings: `impact` (`high`/`medium`/`low`,
+default `medium`) and `confidence` (`verified`/`claimed`, default `claimed`).
+They default so existing records keep working, and the connector draft mirrors
+them (`mapping.py`). A vendor's own confidence still survives only inside
+`raw`. `BusinessValue.confidence` (0.0–1.0, optional) is a different concept on
+a different model. Studio memory observations do carry confidence (default
+0.5–0.6, out-of-range values rejected rather than clamped), but that is the PM
+memory store, not evidence.
+
+### Confidence weights the inputs, not the score
+
+An outcome derived from a single evidence record is discounted by that record's
+`confidence` before the shared scorer runs. `confidence_weighted_inputs`
+(`models.py`) scales the evidence-derived importance and satisfaction by
+`CONFIDENCE_WEIGHTS` — `verified` weighs 1.0 and `claimed` weighs 0.5 — and
+clamps each to the model's 1.0 floor. The weighted values are what the outcome
+stores, and `compute_opportunity_score` then runs over them unchanged, so the
+stored `opportunity_score` still equals
+`compute_opportunity_score(stored importance, stored satisfaction)` and the
+evaluation harness stays green.
+
+The rule applies only where an outcome is derived from one evidence record that
+carries a confidence: `promote_evidence(target="outcome")` and
+`approve_proposal` (whose proposal resolves to its source record). A
+directly-scored outcome with no backing evidence is unaffected — there is no
+confidence to weigh. The effect is that on otherwise identical raw inputs a
+`verified` outcome outranks a `claimed` one, and only `verified` inputs can
+cross a score of 10.
 
 ## What the alternatives were
 

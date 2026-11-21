@@ -327,7 +327,10 @@ describe("ThreadComposer mixed clipboard paste", () => {
     paste(input, { text: "inserted" });
 
     expect(input.value).toBe("first lineinserted\nsecond line");
-    expect(screen.queryByRole("listitem")).toBeNull();
+    // More than one list can live in the composer now (the starter cards
+    // above the input are list items too), so name the list this test is
+    // about: an empty Attachments list is what "attaches nothing" means.
+    expect(screen.queryByRole("list", { name: "Attachments" })).toBeNull();
   });
 
   it("attaches an image-only paste and inserts no text", async () => {

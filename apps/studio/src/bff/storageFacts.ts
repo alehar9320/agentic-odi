@@ -37,6 +37,7 @@ export const APP_STORAGE_KEYS: readonly string[] = [
   "studio.displayName",
   "studio.guidance",
   "studio.intro",
+  "studio.lensWidth",
   "studio.onboarding",
   "studio.session",
   "studio.settings",

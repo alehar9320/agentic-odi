@@ -32,8 +32,15 @@ jobs:
       pull-requests: write
       issues: write # gh label create lives under the issues API
     steps:
+      # Base ref, not the pull request head: this job only runs
+      # scripts/pr_labels.py. The default ref for a pull_request event is the
+      # merge commit, and actions/checkout runs `git submodule foreach` while it
+      # strips its auth header -- that exits 128 on a branch carrying a stray
+      # gitlink, failing the step before any command here runs.
       - name: Checkout base branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
 
       # A fork pull request gets a read-only token, so labeling it cannot
       # succeed. Say so instead of failing red on a PR we may not touch.
@@ -198,9 +205,16 @@ jobs:
         if: ${{ github.event.pull_request.head.repo.fork }}
         run: echo "::notice::Skipping triage labels for a fork pull request (read-only token)."
 
+      # Base ref, not the pull request head: this job only runs
+      # scripts/pr_triage.py. The default ref for a pull_request event is the
+      # merge commit, and actions/checkout runs `git submodule foreach` while it
+      # strips its auth header -- that exits 128 on a branch carrying a stray
+      # gitlink, failing the step before any command here runs.
       - name: Checkout repo (for the triage script, not PR code)
         if: ${{ ! github.event.pull_request.head.repo.fork }}
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
 
       - name: Read the labels applied by the labels and pr-risk jobs
         if: ${{ ! github.event.pull_request.head.repo.fork }}

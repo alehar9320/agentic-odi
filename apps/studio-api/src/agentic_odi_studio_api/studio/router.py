@@ -66,9 +66,11 @@ from agentic_odi_studio_api.studio.memory import (
 from agentic_odi_studio_api.studio.probes import (
     DEFAULT_BASE_URL,
     defaults,
+    invalidate_probe_cache,
     is_endpoint_reachable,
     list_models,
     probe_llm_health,
+    save_profile,
 )
 from agentic_odi_studio_api.studio.schemas import (
     AddConnectorRequest,
@@ -109,6 +111,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
     RejectProposalRequest,
+    SaveConfigRequest,
     ScheduleWorkRequest,
     SharedArtifactResponse,
     ShareMintResponse,
@@ -312,6 +315,29 @@ def put_model_key(body: ModelKeyRequest) -> dict:
             )
         ) from None
     return {"configured": True, "set_at": set_at}
+
+
+@router.post("/config")
+def save_config(body: SaveConfigRequest) -> dict:
+    """Persist LLM connection settings and invalidate the probe cache.
+
+    The probe cache is keyed on (endpoint, model, key_hash), so a credential
+    rotation naturally misses the cache. This endpoint additionally clears the
+    cache for base_url or model_name changes, which do not include the key.
+    """
+    merged = save_profile(
+        {
+            "base_url": body.base_url,
+            "api_key": body.api_key,
+            "model": body.model_name,
+            "mcp_url": body.mcp_url,
+        }
+    )
+
+    # Invalidate the probe cache so subsequent probes see the new settings
+    invalidate_probe_cache()
+
+    return {"ok": True, "saved": merged}
 
 
 @router.get("/diagnostics")
@@ -1409,6 +1435,22 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
         ],
         head_id=conversation.head_id or (turns[-1].message_id if turns else None),
     )
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, request: Request) -> dict:
+    """Remove one thread and its turns; an unknown id is a 404, not a no-op."""
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+                suggestion="Refresh the history and try again.",
+            )
+        ) from exc
+    return {"ok": True}
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)

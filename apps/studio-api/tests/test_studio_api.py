@@ -471,6 +471,7 @@ def test_promote_evidence_creates_a_scored_outcome() -> None:
         name="Call with Ada",
         content="Third time staging broke after a secret rotation.",
         job_id=job.id,
+        confidence="verified",
     )
 
     response = TestClient(create_app(repo)).post(

@@ -17,7 +17,7 @@ def _clear_http_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_http_client_uses_defaults() -> None:
+async def test_absent_values_use_defaults() -> None:
     client = get_http_client()
     try:
         assert client.pool_size == 10
@@ -65,16 +65,49 @@ async def test_retries_come_from_the_environment(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.asyncio
-async def test_invalid_environment_values_fall_back_to_defaults(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_invalid_environment_values_raise(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "not-a-number")
     monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "-5")
 
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        get_http_client()
+
+
+def test_a_typo_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "not-a-number")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        get_http_client()
+
+
+def test_a_zero_timeout_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "0")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_TIMEOUT"):
+        get_http_client()
+
+
+def test_a_nan_timeout_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "nan")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_TIMEOUT"):
+        get_http_client()
+
+
+def test_a_negative_pool_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "-1")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        get_http_client()
+
+
+@pytest.mark.asyncio
+async def test_a_valid_value_is_used(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "2.5")
+
     client = get_http_client()
     try:
-        assert client.pool_size == 10
-        assert client.timeout == 30.0
+        assert client.timeout == 2.5
     finally:
         await client.aclose()
 
