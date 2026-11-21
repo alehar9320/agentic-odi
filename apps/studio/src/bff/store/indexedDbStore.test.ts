@@ -537,6 +537,82 @@ function expectedSchema() {
       indexes: [],
     },
     {
+      store: "notices",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-at"],
+    },
+    {
+      store: "observations",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-created"],
+    },
+    {
+      store: "outbox",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-created", "by-state"],
+    },
+    {
+      store: "outcomes",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "steps",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "turns",
+      keyPath: "id",
+      autoIncrement: true,
+      indexes: ["by-conversation"],
+    },
+  ];
+}
+
+function _unused_expected_tail_removed() { return [
+    {
+      store: "conversations",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-updated"],
+    },
+    {
+      store: "evidence",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-seq"],
+    },
+    {
+      store: "interview_drafts",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-job", "by-updated"],
+    },
+    {
+      store: "jobs",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-seq"],
+    },
+    {
+      store: "meta",
+      keyPath: "key",
+      autoIncrement: false,
+      indexes: [],
+    },
+    {
+      store: "notices",
+      keyPath: "id",
+      autoIncrement: false,
+      indexes: ["by-at"],
+    },
+    {
       store: "observations",
       keyPath: "id",
       autoIncrement: false,

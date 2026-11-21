@@ -19,6 +19,7 @@ import {
   type StoredConversation,
   type StoredEvidence,
   type StoredJob,
+  type StoredNotice,
   type StoredOutcome,
   type StoredStep,
   type StoredTurn,
@@ -459,6 +460,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "conversations",
         "turns",
         "interview_drafts",
+        "notices",
       ],
       "readwrite",
     );
@@ -473,8 +475,26 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
       tx.objectStore("interview_drafts").clear(),
+      tx.objectStore("notices").clear(),
     ]);
     await tx.done;
+  }
+
+  async listNotices(): Promise<StoredNotice[]> {
+    const notices = await this.db.getAllFromIndex("notices", "by-at");
+    return notices.sort((left, right) => right.at.localeCompare(left.at));
+  }
+
+  async putNotice(notice: StoredNotice): Promise<void> {
+    await this.db.put("notices", notice);
+  }
+
+  async deleteNotice(id: string): Promise<void> {
+    await this.db.delete("notices", id);
+  }
+
+  async clearNotices(): Promise<void> {
+    await this.db.clear("notices");
   }
 
   close(): void {

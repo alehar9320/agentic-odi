@@ -1,4 +1,6 @@
-import type { Observation } from "../../types";
+import type {
+  Observation,
+} from "../../types";
 import { nowIso } from "../id";
 import {
   byCreated,
@@ -10,6 +12,7 @@ import {
   type StoredConversation,
   type StoredEvidence,
   type StoredJob,
+  type StoredNotice,
   type StoredOutcome,
   type StoredStep,
   type StoredTurn,
@@ -27,6 +30,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly evidence = new Map<string, StoredEvidence>();
   private readonly observations = new Map<string, Observation>();
   private readonly conversations = new Map<string, StoredConversation>();
+  private readonly notices = new Map<string, StoredNotice>();
   private readonly turns: StoredTurn[] = [];
   private readonly drafts = new Map<string, InterviewDraft>();
   private readonly outbox = new Map<string, OutboxRecord>();
@@ -373,12 +377,29 @@ export class MemoryLocalStore implements LocalStore {
     this.evidence.clear();
     this.observations.clear();
     this.conversations.clear();
+    this.notices.clear();
     this.turns.length = 0;
     this.drafts.clear();
     this.outbox.clear();
     this.lease = null;
     this.seq = 0;
     this.turnId = 0;
+  }
+
+  async listNotices(): Promise<StoredNotice[]> {
+    return [...this.notices.values()].sort((left, right) => right.at.localeCompare(left.at));
+  }
+
+  async putNotice(notice: StoredNotice): Promise<void> {
+    this.notices.set(notice.id, notice);
+  }
+
+  async deleteNotice(id: string): Promise<void> {
+    this.notices.delete(id);
+  }
+
+  async clearNotices(): Promise<void> {
+    this.notices.clear();
   }
 
   close(): void {
