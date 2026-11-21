@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../updater", () => ({
@@ -21,6 +21,7 @@ const stubContext = (overrides: Record<string, unknown> = {}) => ({
   probeRetry: { state: "closed", retryInMs: 0 },
   messages: [],
   openConversation: vi.fn(),
+  deleteConversation: vi.fn(async () => true),
   refreshConversations: vi.fn(),
   unreadSignalCount: 0,
   openPanel: vi.fn(),
@@ -217,6 +218,7 @@ describe("StudioBar", () => {
   });
 
   it("exports the conversation as Markdown from the overflow menu", () => {
+    vi.useFakeTimers();
     const createObjectURL = vi.fn(() => "blob:conversation");
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, "createObjectURL", {
@@ -244,8 +246,10 @@ describe("StudioBar", () => {
 
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(0);
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:conversation");
     click.mockRestore();
+    vi.useRealTimers();
   });
 
   it("puts the unread count in the bell's accessible name and opens the inbox", () => {
@@ -745,5 +749,188 @@ describe("history is grouped by day (#694 D13)", () => {
     expect(screen.getByRole("group", { name: "Today" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Yesterday" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Earlier" })).toBeNull();
+  });
+});
+
+describe("StudioBar delete conversation (#643)", () => {
+  const conversations = [
+    conversation("c-2", "Current thread", new Date(2026, 9, 22, 9, 0).toISOString(), 4),
+    conversation("c-1", "An older thread", new Date(2026, 9, 21, 9, 0).toISOString(), 1),
+  ];
+
+  function openHistory(overrides: Record<string, unknown> = {}) {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ conversationId: "c-2", conversations, ...overrides }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  }
+
+  it("asks before deleting, and says what goes with the thread", () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+
+    // Nothing is deleted until the ask is answered: the question is not the act.
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("group", { name: "Delete Current thread?" })).toHaveTextContent(
+      "Delete “Current thread”? Its 4 turns go with it.",
+    );
+  });
+
+  it("keeps the thread when the confirmation is declined", () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(deleteConversation).not.toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: "Delete Current thread?" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Delete Current thread" })).toBeInTheDocument();
+  });
+
+  it("deletes the thread once, and closes the list when it was the open one", async () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Current thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-2"));
+    expect(deleteConversation).toHaveBeenCalledOnce();
+    // The row being read is gone, so the list closes rather than framing a gap.
+    await waitFor(() =>
+      expect(screen.queryByRole("menu", { name: "Recent conversations" })).toBeNull(),
+    );
+  });
+
+  it("leaves the list open when a thread other than the open one is deleted", async () => {
+    const deleteConversation = vi.fn(async () => true);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+    expect(screen.getByRole("menu", { name: "Recent conversations" })).toBeInTheDocument();
+  });
+
+  it("shows the row again when the delete fails", async () => {
+    const deleteConversation = vi.fn(async () => false);
+    openHistory({ deleteConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete An older thread" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith("c-1"));
+    // A failed delete is not a hidden row: the thread is still there to retry.
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete An older thread" })).toBeInTheDocument();
+  });
+
+  it("names an untitled thread in the confirmation rather than quoting nothing", () => {
+    openHistory({
+      conversations: [conversation("c-9", "", new Date(2026, 9, 22, 9, 0).toISOString(), 0)],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete New conversation" }));
+
+    expect(screen.getByRole("group", { name: "Delete New conversation?" })).toHaveTextContent(
+      "This cannot be undone.",
+    );
+  });
+});
+
+describe("StudioBar rename conversation (#642)", () => {
+  const conversations = [
+    conversation("c-2", "Current thread", new Date(2026, 9, 22, 9, 0).toISOString(), 4),
+    conversation("c-1", "An older thread", new Date(2026, 9, 21, 9, 0).toISOString(), 1),
+  ];
+
+  function openHistory(overrides: Record<string, unknown> = {}) {
+    vi.mocked(useStudio).mockReturnValue(
+      stubContext({ conversationId: "c-2", conversations, ...overrides }) as never,
+    );
+    render(<StudioBar onHome={() => {}} onNew={() => {}} onChangelog={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conversation history" }));
+  }
+
+  it("opens an inline editor seeded with the current name", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename Current thread" }));
+
+    expect(screen.getByRole("textbox", { name: "Rename Current thread" })).toHaveValue(
+      "Current thread",
+    );
+    // Nothing is written just by opening the editor.
+    expect(renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("commits the new name on Enter, once", async () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.change(input, { target: { value: "Renamed thread" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(renameConversation).toHaveBeenCalledWith("c-1", "Renamed thread"));
+    expect(renameConversation).toHaveBeenCalledOnce();
+  });
+
+  it("cancels on Escape and writes nothing", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.change(input, { target: { value: "Thrown away" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    // Escape unmounts the input, which fires a last blur; that blur must not
+    // commit the name Escape just discarded.
+    fireEvent.blur(input);
+
+    expect(renameConversation).not.toHaveBeenCalled();
+    expect(screen.getByRole("menuitem", { name: /an older thread/i })).toBeInTheDocument();
+  });
+
+  it("treats an unchanged name as no rename at all", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("does not write a blank name over the thread", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({ renameConversation });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename An older thread" }));
+    const input = screen.getByRole("textbox", { name: "Rename An older thread" });
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(renameConversation).not.toHaveBeenCalled();
+  });
+
+  it("renames an untitled thread through the neutral label", () => {
+    const renameConversation = vi.fn(async () => true);
+    openHistory({
+      renameConversation,
+      conversations: [conversation("c-9", "", new Date(2026, 9, 22, 9, 0).toISOString(), 0)],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename New conversation" }));
+
+    expect(screen.getByRole("textbox", { name: "Rename New conversation" })).toHaveValue("");
   });
 });

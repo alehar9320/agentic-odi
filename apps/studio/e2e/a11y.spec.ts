@@ -1,7 +1,9 @@
-import { expect, type Page, test } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
+import type { Page } from "@playwright/test";
 
-import { COMPOSER, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { expect, test } from "./fixtures";
+
+import { COMPOSER, openStudio, rail, seedOutcomes } from "./helpers";
 import {
   contrastWalker,
   formatFindings,
@@ -55,6 +57,15 @@ type Theme = (typeof THEMES)[number];
  */
 test.use({ reducedMotion: "reduce" });
 
+/**
+ * Serial, because the final test judges the union of what the screens above it
+ * painted. Under the default mode a single failing screen left `observed`
+ * incomplete, and the staleness test then reported *every* known pair as stale —
+ * one real failure becoming a second, misleading one. In serial mode a failed
+ * screen skips the judgement instead (#1118).
+ */
+test.describe.configure({ mode: "serial" });
+
 /** The six core screens, each reachable through the shipped UI. */
 const SCREENS = ["home", "landscape", "records", "brief", "catchup", "settings"] as const;
 type Screen = (typeof SCREENS)[number];
@@ -103,7 +114,7 @@ async function goto(page: Page, screen: Screen): Promise<void> {
     await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
     await page.keyboard.press("Enter");
   } else if (screen === "catchup") {
-    await page.locator(".bar__bell").click();
+    await page.getByRole("button", { name: /^What changed:/ }).click();
   } else if (screen === "settings") {
     await page.getByRole("button", { name: "Open settings" }).click();
   }
@@ -119,8 +130,11 @@ const observed: ContrastFinding[] = [];
 
 for (const theme of THEMES) {
   for (const screen of SCREENS) {
-    test(`${screen} has no unlisted contrast pair in the ${theme} theme`, async ({ page, request }) => {
-      await resetRepository(request);
+    test(`${screen} has no unlisted contrast pair in the ${theme} theme`, async ({
+      page,
+      request,
+    }) => {
+      // The fixture emptied the canvas; the rail needs something behind it.
       await seedOutcomes(request, [OUTCOME]);
       await setTheme(page, theme);
       await installWalker(page);
@@ -154,18 +168,18 @@ test("every known pair still fails, so the list can only shrink", () => {
   ).toEqual([]);
 });
 
-test("the gate fails on a deliberately low-contrast class", async ({ page, request }) => {
-  await resetRepository(request);
+test("the gate fails on a deliberately low-contrast class", async ({ page }) => {
   await installWalker(page);
   await openStudio(page);
 
   const findings = await page.evaluate(() => {
-    const style = document.createElement("style");
-    style.textContent =
-      ".deliberately-unreadable { color: #9aa0aa; background-color: #a2a7b3; }";
-    document.head.appendChild(style);
     const bad = document.createElement("p");
     bad.className = "deliberately-unreadable";
+    // Colours go on through the CSSOM, not a <style> element: the Studio is
+    // served under a strict `style-src 'self'` CSP, which refuses an injected
+    // stylesheet, and the gate must not depend on the policy the app forbids.
+    bad.style.color = "#9aa0aa";
+    bad.style.backgroundColor = "#a2a7b3";
     bad.textContent = "Deliberately unreadable caption";
     document.body.appendChild(bad);
     return window.__odiContrastScan(document.body, "injected", "dark");

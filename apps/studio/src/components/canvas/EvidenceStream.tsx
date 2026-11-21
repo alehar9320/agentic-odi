@@ -53,6 +53,7 @@ export function EvidenceStream() {
   const [satisfaction, setSatisfaction] = useState(3.5);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<StudioError | null>(null);
+  const [moveAnnouncement, setMoveAnnouncement] = useState("");
 
   const ordered = useMemo(() => {
     const byId = new Map(evidence.map((item) => [item.id, item]));
@@ -104,12 +105,23 @@ export function EvidenceStream() {
   const move = (id: string, delta: number) => {
     const index = ordered.findIndex((item) => item.id === id);
     const target = index + delta;
-    if (index < 0 || target < 0 || target >= ordered.length) {
+    if (index < 0) {
+      return;
+    }
+    const item = ordered[index];
+    const label = item.name || item.source_name || "Untitled evidence";
+    if (target < 0) {
+      setMoveAnnouncement("Already first.");
+      return;
+    }
+    if (target >= ordered.length) {
+      setMoveAnnouncement("Already last.");
       return;
     }
     const next = [...ordered];
     [next[index], next[target]] = [next[target], next[index]];
     commit(next);
+    setMoveAnnouncement(`${label} moved to position ${target + 1} of ${ordered.length}.`);
   };
 
   const dropOn = (targetId: string) => {
@@ -127,6 +139,8 @@ export function EvidenceStream() {
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     commit(next);
+    const label = moved.name || moved.source_name || "Untitled evidence";
+    setMoveAnnouncement(`${label} moved to position ${to + 1} of ${ordered.length}.`);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>, id: string) => {
@@ -244,6 +258,11 @@ export function EvidenceStream() {
       {keptCaption ? (
         <p className="canvas-saved" role="status">
           {keptCaption}
+        </p>
+      ) : null}
+      {moveAnnouncement ? (
+        <p className="sr-only" role="status" aria-live="polite">
+          {moveAnnouncement}
         </p>
       ) : null}
 

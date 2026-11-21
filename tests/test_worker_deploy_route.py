@@ -55,10 +55,13 @@ def test_the_deploy_route_declares_its_vars_in_env() -> None:
 def test_the_deploy_route_names_the_bundle_the_asset_shelf_serves() -> None:
     #: "Worker new, page stale" is only detectable if the Worker reports the bundle it
     #: would serve, read from its own assets binding rather than echoed from a var.
+    #: The fetch and match now happen in resolveEntry(), which is called from the branch.
+    source = _source()
+    assert "env.ASSETS.fetch" in source
+    assert "resolveEntry" in source
+    assert ".match(" in source
+    assert "index-" in source
     branch = _deploy_branch()
-    assert "env.ASSETS.fetch" in branch
-    assert ".match(" in branch
-    assert "index-" in branch
     assert "entry" in branch
 
 
@@ -78,3 +81,35 @@ def test_the_deploy_vars_are_declared_as_public_and_default_to_unknown() -> None
     #: ride in the vars it reads.
     for forbidden in ("secret", "SIDECAR_URL", "KEY"):
         assert forbidden not in vars_block
+
+
+def test_the_entry_is_resolved_once_per_isolate() -> None:
+    # The route must read the asset shelf at most once per isolate. We verify the
+    # source contains a module-scope cache and uses it in the handler.
+    source = _source()
+    assert "entryCache" in source
+    branch = _deploy_branch()
+    # First access: entryCache ?? (await resolveEntry(env))
+    # Second access: entryCache = entry (assignment)
+    assert "entryCache ?? (await resolveEntry(env))" in branch
+    assert "entryCache = entry" in branch
+
+
+def test_an_unmatched_entry_says_unresolved_not_unknown() -> None:
+    # When the asset reads 200 but no bundle match is found, the value must be
+    # "unresolved" (distinct from "unknown" which means the asset read failed).
+    source = _source()
+    assert "unresolved" in source
+    # Verify the resolveEntry function returns "unresolved" on no match
+    assert '"unresolved"' in source
+    # And "unknown" is only returned on non-200 status
+    assert "page.status !== 200" in source
+    assert 'return "unknown"' in source
+
+
+def test_a_failed_asset_read_says_unknown() -> None:
+    # When the asset read fails (non-200), the value must be "unknown".
+    source = _source()
+    # The resolveEntry function returns "unknown" for non-200 responses
+    assert "page.status !== 200" in source
+    assert 'return "unknown"' in source

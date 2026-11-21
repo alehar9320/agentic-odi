@@ -61,7 +61,7 @@ def test_list_models_reports_a_failed_probe_as_a_message(monkeypatch) -> None:
     models, error = asyncio.run(probes.list_models("http://llm/v1", "key"))
 
     assert models == []
-    assert error == "connection_error: connection refused"
+    assert error == f"connection_error: {probes.OFFLINE_MESSAGE}"
 
 
 def test_models_endpoint_returns_the_list(monkeypatch) -> None:

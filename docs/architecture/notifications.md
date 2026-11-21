@@ -96,6 +96,8 @@ There is no mouse-only surface in the Catch Up feed or the job map:
   Enter/Space toggles the filter.
 - Step rows take focus, Arrow Up/Down swap them with their neighbour, and every
   action (Edit, Remove, Move up, Move down) is a normal button.
-- The changelog and connector-suggestion dialogs use `useFocusTrap`
-  (`apps/studio/src/lib/useFocusTrap.ts`): focus moves into the dialog on open,
-  Tab/Shift+Tab wrap at the edges, and focus returns to the opener on close.
+- The changelog, connector-suggestion, share, and diagnostics dialogs render
+  through the shared `Dialog` primitive
+  (`apps/studio/src/vendor/components/ui/dialog.tsx`), which owns Escape, the
+  focus trap and focus return: focus moves into the dialog on open, Tab/Shift+Tab
+  wrap at the edges, and focus returns to the opener on close.

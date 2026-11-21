@@ -9,6 +9,10 @@ import type { StudioTheme } from "../types";
  * two must agree on the same inputs or the handover changes colour; the
  * bootstrap is the only place that can run first, so the app follows it here.
  */
+
+export const THEME_MEDIA_QUERY = "(prefers-color-scheme: light)";
+export const THEME_FALLBACK: StudioTheme = "dark";
+
 export function resolveTheme(stored: StudioTheme | undefined): StudioTheme {
   if (stored === "light" || stored === "dark") {
     return stored;
@@ -16,9 +20,9 @@ export function resolveTheme(stored: StudioTheme | undefined): StudioTheme {
   if (
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: light)").matches
+    window.matchMedia(THEME_MEDIA_QUERY).matches
   ) {
     return "light";
   }
-  return "dark";
+  return THEME_FALLBACK;
 }
