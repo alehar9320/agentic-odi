@@ -454,6 +454,21 @@ ruleset on `main` requires these checks, and nothing can bypass them:
 The `protect-main` ruleset adds the branch-level rules: no deletion, no
 non-fast-forward push, and every change arrives through a pull request.
 
+The two required checks are strict: the ruleset sets
+`strict_required_status_checks_policy: true`, so a branch must be up to date with
+`main` before its checks count, and the `merge_queue` rule is enabled so a pull
+request merges against the current `main` rather than a snapshot. Both are
+repository settings the owner applies with `gh api`; they are recorded, not
+enforced from the checkout, in
+[ADR 0011](architecture/adr/0011-require-current-branches-and-queue-merges.md).
+Enabling the queue has one prerequisite: neither `ci.yml` nor `pr-guardrails.yml`
+declares the `merge_group` trigger yet, so a queued commit would report neither
+required check and could never leave the queue. Enable it only once both
+workflows run on that event; the workflow change is separate from this record.
+The half the checkout owns is the guardrail threshold:
+`.github/pr-guardrails/config.yml` sets `max_behind: 10`, so `scripts/pr_guards.py`
+warns once a branch is more than ten commits behind `main`.
+
 A ruleset cannot require a *label* — its rule types are checks, reviews, and push
 rules, not labels — so `ai-merge-safe` is enforced one step later, by the merge
 path: gate 1 of `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized`
@@ -467,7 +482,9 @@ checkout. `tests/test_adr_index.py` checks the names the documents claim against
 the job names in `.github/workflows/ci.yml` and
 `.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
 that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
-for the decision and the deferred `label gate` check.
+for the decision and the deferred `label gate` check, and
+[ADR 0011](architecture/adr/0011-require-current-branches-and-queue-merges.md) for
+strict checks, the merge queue, and the tightened freshness threshold.
 
 ## Testing
 

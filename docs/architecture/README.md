@@ -214,15 +214,26 @@ Unit tests are in `tests/scripts/test_pr_guards.py`.
 Repository rulesets `main-requires-ci-green` (id `25356329`) and `protect-main`
 (id `25656413`) both target `~DEFAULT_BRANCH`, are `active`, and set
 `current_user_can_bypass: never`. The first requires the `CI green` and
-`PR guardrails` status checks (`strict_required_status_checks_policy: false`,
-`do_not_enforce_on_create: false`); the second adds `deletion`,
-`non_fast_forward`, and `pull_request` with `required_approving_review_count: 0`
-and `require_extra_approval_for_unattributed_changes: true`. A ruleset cannot
+`PR guardrails` status checks, and the merge to `main` waits for a branch that is
+current: [ADR 0011](adr/0011-require-current-branches-and-queue-merges.md) records
+the decision to set `strict_required_status_checks_policy: true` and to enable the
+`merge_queue` rule on that ruleset, both of which the owner applies with `gh api`
+because they are repository settings, not files. The queue has a prerequisite:
+neither `ci.yml` nor `pr-guardrails.yml` declares the `merge_group` trigger yet, so
+a queued commit would report neither required check until both workflows run on
+that event. The second ruleset adds
+`deletion`, `non_fast_forward`, and `pull_request` with
+`required_approving_review_count: 0` and
+`require_extra_approval_for_unattributed_changes: true`. A ruleset cannot
 require a label, so `ai-merge-safe` is a gate of the merge path, not of
 `main`: `scripts/pr_ai_authorize.py` refuses `ai-merge-authorized` without it.
+The checkout half of the freshness decision is the guardrail threshold:
+`.github/pr-guardrails/config.yml` sets `max_behind: 10`, so
+`scripts/pr_guards.py` warns once a branch is more than ten commits behind `main`.
 Rulesets are repository settings, not files; change them with `gh api` and record
 the decision in
-[ADR 0007](adr/0007-branch-protection-enforces-checks-not-labels.md). The names
+[ADR 0007](adr/0007-branch-protection-enforces-checks-not-labels.md) and
+[ADR 0011](adr/0011-require-current-branches-and-queue-merges.md). The names
 these documents claim are checked against the workflow job names by
 `tests/test_adr_index.py`.
 

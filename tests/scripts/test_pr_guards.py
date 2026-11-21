@@ -577,7 +577,7 @@ def test_the_default_config_documents_the_thresholds() -> None:
 
     assert config["max_deletions"] == 500
     assert config["max_changed_files"] >= 1
-    assert config["max_behind"] == 50
+    assert config["max_behind"] == 10
     assert config["tolerance"] == 0.20
     assert "uv.lock" in config["generated_exclusions"]
 

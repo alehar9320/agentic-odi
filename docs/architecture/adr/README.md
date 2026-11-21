@@ -36,3 +36,4 @@ decisions.
 | [0008](0008-dependency-advisories-are-a-gate.md) | Dependency advisories are a gate, not a report | accepted |
 | [0009](0009-ai-merge-gate-reads-the-check-suite.md) | The AI merge gate reads the check suite, not the commit status | accepted |
 | [0010](0010-pre-pr-gate-covers-required-ci-jobs.md) | The pre-PR gate accounts for every required CI job | accepted |
+| [0011](0011-require-current-branches-and-queue-merges.md) | Require current branches and queue merges | accepted |
