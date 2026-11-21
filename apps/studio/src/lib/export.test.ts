@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatMessage } from "../types";
+import type { DecisionBrief } from "./brief";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec, type UiNode } from "../ui/protocol";
-import type { DecisionBrief } from "./brief";
 import {
   briefFilename,
   briefToMarkdown,
@@ -503,6 +503,46 @@ describe("conversationToMarkdown", () => {
     expect(exportFilename(exportedAt)).toBe(
       "agentic-odi-conversation-2026-10-24.md",
     );
+  });
+
+  describe("briefToMarkdown", () => {
+    const minimalBrief: DecisionBrief = {
+      schema_version: 1,
+      generated_at: "2026-10-24T12:00:00Z",
+      product_name: "Test Product",
+      vision: "Test vision",
+      decision: null,
+      opportunities: [],
+      evidence: [],
+      unlinked_evidence_count: 0,
+      dissent: [],
+      next_evidence: null,
+      provenance: {
+        kind: "live",
+        source: "local",
+        cached: false,
+        sample: false,
+        excluded_sample_rows: { outcomes: 0, evidence: 0 },
+        counted_rows: { outcomes: 1, evidence: 2 },
+        record_counts: null,
+        canvas_generated_at: null,
+      },
+    };
+
+    it("dates the brief in the reader's locale", () => {
+      const markdown = briefToMarkdown(minimalBrief);
+
+      // Should contain day number (24) and year (2026)
+      expect(markdown).toMatch(/_Decision brief — .*24.*2026/);
+      // Should not assert a specific month word order (locale-dependent)
+      // The test passes in any locale if it contains the day and year
+    });
+
+    it("keeps ISO dates in filenames", () => {
+      expect(briefFilename(new Date("2026-10-24T12:00:00Z"))).toBe(
+        "agentic-odi-decision-brief-2026-10-24.md",
+      );
+    });
   });
 });
 
