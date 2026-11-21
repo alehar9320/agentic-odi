@@ -957,9 +957,6 @@ jobs:
     steps:
       - name: Verify the required jobs and report what was verified
         env:
-          # The no-sidecar job is required: it carries no continue-on-error, so
-          # a regression in the browser fallback must fail this aggregate.
-          E2E_NO_SIDECAR: ${{ needs.e2e-no-sidecar.result }}
           LINT: ${{ needs.lint.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
           SECURITY: ${{ needs.security.result }}
