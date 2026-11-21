@@ -629,7 +629,12 @@ def _local_evidence_resolver(
     def resolve(evidence_id: str) -> EvidenceSnapshot | None:
         try:
             record = service.get_evidence(evidence_id)
-        except Exception:  # noqa: BLE001 - the store is optional context
+        except Exception as exc:  # noqa: BLE001 - the store is optional context
+            log.warning(
+                "evidence resolution failed (evidence_id=%s, error=%s)",
+                evidence_id,
+                type(exc).__name__,
+            )
             return None
         if record is None:
             return None
@@ -676,6 +681,7 @@ def _focus_context(focus: FocusRef | None, service: ODIService | None) -> str:
     try:
         described = _focus_description(focus, service)
     except Exception:  # noqa: BLE001 - the store is optional context
+        log.warning("focus description lookup failed; continuing without it")
         return ""
     if not described:
         return ""

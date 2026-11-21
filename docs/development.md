@@ -66,9 +66,10 @@ request touched. See
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is a pointer page; its three lists point at the sources that
-own the facts (the changelog, the open pull-request list, and the ready-for-dev
-issue filter). No check requires a new capability to edit it.
+`docs/roadmap.md` is a pointer page, not a register. It keeps no shipped,
+in-flight, or queued lists of its own — those facts live in `CHANGELOG.md` and
+Releases, the open-pull-request list, and the `ready-for-dev` issue filter — so
+no capability change has to edit a roadmap file to land.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -717,8 +718,8 @@ uv run pytest \
   `scripts/`).
 - Every async test is decorated with `@pytest.mark.asyncio`.
 - Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
-- The MCP server's `reset_db` autouse fixture clears in-memory state before
-  each test.
+- The MCP server's `configured_server` autouse fixture names a fresh
+  `InMemoryRepository` before each test.
 
 ### Test Coverage Map
 
@@ -739,6 +740,61 @@ uv run pytest \
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
 > results automatically.
+
+## Store schema version
+
+The SQLite event store stamps its own file-format version in a `schema_meta`
+table on open. The constants live in
+`packages/core/src/agentic_odi_core/intent_store.py`:
+
+- `CURRENT_SCHEMA_VERSION` — the format this build writes. It starts at `1`.
+- `MIGRATIONS` — a `dict[int, Callable]` keyed by the version it produces;
+  `MIGRATIONS[n]` upgrades a store from `n - 1` to `n`.
+
+`IntentStore.ensure_version()` runs on every open:
+
+- A current-version store is left untouched (no migration, no version write).
+- An unstamped (legacy) store is stamped `v1` once, then migrated forward.
+- Migrations run **in order inside one transaction**. A step that raises rolls
+  back its data *and* schema changes together with the version stamp, so a
+  half-migrated event log can never be left behind.
+- A store written by a newer build is refused with both versions named and the
+  `odi update` upgrade command, and the file is left byte-for-byte unchanged.
+
+Bump `CURRENT_SCHEMA_VERSION` **only** when you register a migration. An
+additive field that needs no data change must not bump it.
+
+## Contract drift snapshot
+
+`tests/contract/test_contract_snapshot.py` pins three surfaces together so an
+accidental change fails CI instead of a customer: `contract.TOOL_SPECS`, the
+live FastMCP registry's input schemas, and `schema.odi_schema()`.
+
+When you make a **deliberate** change to any of those, regenerate the snapshot
+locally, then review the diff like code before committing:
+
+```bash
+uv run pytest tests/contract/test_contract_snapshot.py --inline-snapshot=fix
+```
+
+CI never accepts a snapshot automatically; drift fails the build. A newly
+accepted snapshot is not proof of backward compatibility — an intentional
+breaking change needs its own compatibility decision.
+
+## The ninety-second tour
+
+`docs/tour/README.md` and `docs/tour/tour.cast` are generated, never hand-edited.
+Regenerate them in one command after a change that affects the walkthrough:
+
+```bash
+uv run python scripts/tour.py
+```
+
+`scripts/tour.py` executes every command in `docs/tour/script.md` against a
+disposable store, so a command that no longer runs fails the build rather than
+rotting in prose. `tests/test_tour.py` fails if the committed artifacts differ
+from a fresh run, if the walkthrough exceeds the ninety-second budget, or if a
+documented command cannot be executed.
 
 ## Agent Session Tracking
 

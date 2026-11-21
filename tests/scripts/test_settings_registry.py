@@ -35,7 +35,6 @@ DIRECT_READ_ALLOWLIST = {
     "apps/cli/src/agentic_odi_cli/flags.py",
     "apps/cli/src/agentic_odi_cli/mascot.py",
     "apps/cli/src/agentic_odi_cli/paths.py",
-    "apps/cli/src/agentic_odi_cli/profile.py",
     "apps/cli/src/agentic_odi_cli/update.py",
     "apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py",
     "apps/studio-api/src/agentic_odi_studio_api/app.py",

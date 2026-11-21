@@ -56,9 +56,12 @@ LLM directly; the sidecar is its only backend.
   the browser" is the LLM key described above.
 - **Sidecar → MCP:** JSON-RPC tool calls, carrying the same token.
 - **Sidecar → LLM:** OpenAI-compatible HTTP chat completions.
-- **Worker → sidecar:** the worker forwards `/api/*`, including the client's
-  `Authorization` header, to `SIDECAR_URL` (`infra/cloudflare/worker.ts:190-232`).
-  It does not authenticate the client itself.
+- **Worker → sidecar:** the worker forwards `/api/*` to `SIDECAR_URL`
+  (`infra/cloudflare/worker.ts:349-369`). It forwards an explicit allowlist —
+  `Authorization`, `Content-Type`, `Accept`, `Accept-Language`, and
+  `X-Request-ID` — and nothing else: no `Cookie`, `Origin`, `Referer`, or
+  custom header a browser extension adds. It does not authenticate the client
+  itself.
 - **Tauri → GitHub releases:** fetches `latest.json`, verifies the artifact
   signature against the key pinned in `tauri.conf.json`, and stages an update
   only after verification.

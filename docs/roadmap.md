@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-blurb: What has shipped, and what is queued.
+blurb: Where to see what shipped, what is in review, and what is queued.
 nav_group: Operate
 nav_order: 4
 slug: roadmap
@@ -8,19 +8,22 @@ slug: roadmap
 
 # Roadmap
 
-This page used to carry three hand-maintained lists — what shipped, what is in
-flight, and what is next. Every pull request that landed had to edit this file,
-and the lists drifted from the sources that already own the facts.
+This page used to keep its own lists — what has shipped, what is in flight, and
+what is queued. Each was a copy of a fact that GitHub or release-please already
+owns, and a copy drifts. The copies are gone; the pointers stay.
 
-The lists are gone. The facts live where they always belonged:
+What has shipped is in [`CHANGELOG.md`](../CHANGELOG.md) and the
+[releases page](https://github.com/alehar9320/agentic-odi/releases). An entry is
+only real when the pull request that built it is merged, and those two are where
+the proof lives.
 
-- **Shipped** is [the changelog](CHANGELOG.md) and the
-  [Releases](https://github.com/alehar9320/agentic-odi/releases) page. A thing is
-  shipped when its pull request is merged; the release is the proof.
-- **In flight** is the list of
-  [open pull requests](https://github.com/alehar9320/agentic-odi/pulls).
-- **Next** is the [ready-for-dev](https://github.com/alehar9320/agentic-odi/issues?q=is%3Aopen+is%3Aissue+label%3Aready-for-dev)
-  issue filter.
+What is in flight is the
+[open pull-request list](https://github.com/alehar9320/agentic-odi/pulls).
+
+What is queued is the
+[`ready-for-dev` issue filter](https://github.com/alehar9320/agentic-odi/issues?q=is%3Aopen+is%3Aissue+label%3Aready-for-dev).
+
+No capability pull request has to touch a roadmap file to land.
 
 If a capability you care about is missing from all three, it is not queued —
 [open an issue](https://github.com/alehar9320/agentic-odi/issues/new) and say so.
