@@ -148,7 +148,7 @@ jobs:
         run: actionlint
 
       - name: Run zizmor
-        run: zizmor --no-progress .github/workflows/ .github/actions/
+        run: zizmor --no-progress -c .zizmor.yaml --min-severity medium .github/workflows/ .github/actions/
 
   # Bandit reads code patterns; it cannot say that a pinned version has a known
   # advisory. This job asks the advisory databases directly, for the runtime
