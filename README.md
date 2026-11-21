@@ -104,8 +104,17 @@ service.
 
 ## Supported platforms
 
-Grab a prebuilt archive for your machine — each one clicks straight to
-`releases/latest/download/<asset>`:
+**Desktop app (recommended).** Download the Living Studio installer for your
+platform — it auto-updates and runs offline:
+
+[![Download macOS](https://img.shields.io/badge/Download-macOS-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+[![Download Windows](https://img.shields.io/badge/Download-Windows-blue?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+[![Download Linux](https://img.shields.io/badge/Download-Linux-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest)
+
+Pick **Living Studio.dmg** (macOS), **Living Studio.exe** (Windows), or
+**Living Studio.AppImage / .deb** (Linux) from the release assets.
+
+**Developer CLI (terminal only).** Prebuilt CLI archives for advanced users:
 
 [![Download Linux](https://img.shields.io/badge/Download-Linux-blue?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_linux_x86_64.tar.gz)
 [![Download macOS Apple Silicon](https://img.shields.io/badge/Download-macOS%20Apple%20Silicon-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/alehar9320/agentic-odi/releases/latest/download/odi_0.14.0_macos_arm64.tar.gz)

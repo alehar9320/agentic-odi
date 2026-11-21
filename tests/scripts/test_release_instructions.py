@@ -170,7 +170,7 @@ def test_verify_block_is_one_copy_pasteable_curl_command():
 
     section = build_instructions_section("v0.7.0", "alehar9320/agentic-odi", [], "")
 
-    block = _fenced_block_after(section, "### 2. Verify the download")
+    block = _fenced_block_after(section, "### Verify the download")
     urls = [line for line in block if line.startswith("http")]
     curl_lines = [line for line in block if line.startswith("curl")]
 
@@ -206,10 +206,10 @@ def test_instructions_are_numbered_steps_with_a_quick_start():
     section = build_instructions_section("v0.12.0", "alehar9320/agentic-odi", [], "")
 
     for heading in (
-        "### 1. Download the archive for your platform",
-        "### 2. Verify the download",
-        "### 3. Install",
-        "### 4. Quick start",
+        "### Developer CLI (Terminal Only)",
+        "### Verify the download",
+        "### Install",
+        "### Quick start",
     ):
         assert heading in section
     assert "odi --version" in section
