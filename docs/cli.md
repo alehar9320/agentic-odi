@@ -1,3 +1,11 @@
+---
+title: CLI Reference
+blurb: Backends, chat, entities, and scoring.
+nav_group: Build
+nav_order: 1
+slug: cli
+---
+
 # CLI Reference
 
 The `agentic-odi` CLI is a [`Typer`](https://github.com/fastapi/typer)-based
@@ -40,14 +48,16 @@ machine-readable output. Diagnostics go to stderr and failures exit non-zero
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. Invalid or non-positive values fall back to the default. |
+| `AGENTIC_ODI_MCP_TIMEOUT` | `30.0` | Seconds allowed for one MCP call and for the connection handshake. A value that is not a number greater than zero fails the command. |
 | `AGENTIC_ODI_MCP_KEEPALIVE` | `15.0` | Keepalive interval in seconds for MCP sessions; `0` disables keepalive. |
 
 Both values are parsed by `agentic_odi_core.MCPConnectionConfig.from_env()`.
 The CLI hands the timeout to the FastMCP client for every call, so a frozen
 server fails with a clear error instead of hanging. FastMCP has no
 keepalive-interval setting yet, so the interval is carried for transports that
-support session keepalive.
+support session keepalive. A malformed value stops the command with one line
+naming the variable and the form it accepts; the full register is
+[Configuration](reference/configuration.md).
 
 ## Interactive chat
 
@@ -142,14 +152,117 @@ only when you intentionally need to stage a map before capturing outcomes.
 
 # Desired Outcomes
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4
+agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to onboard" --importance 8 --satisfaction 4 --importance-n 40 --satisfaction-n 40 --method survey
 agentic-odi desired-outcomes add --job-id <job-id> --statement "Minimize the time it takes to get a working environment" --importance 8 --satisfaction 4 --claim-check '{"asked": ["How long does setup take?"], "answers": ["About a day"]}'
 agentic-odi desired-outcomes list --job-id <job-id>
 agentic-odi desired-outcomes get <outcome-id>
 agentic-odi desired-outcomes update <outcome-id> --satisfaction 6
+agentic-odi desired-outcomes update <outcome-id> --satisfaction 6 --why "after the review"
+agentic-odi desired-outcomes history <outcome-id>
+agentic-odi desired-outcomes history <outcome-id> --why --since 2026-01-01T00:00:00Z
 agentic-odi desired-outcomes delete <outcome-id> --yes
 agentic-odi desired-outcomes export --job-id <job-id> --format csv > outcomes.csv
 agentic-odi desired-outcomes export --job-id <job-id> --format json | jq '.[].opportunity_score'
 agentic-odi desired-outcomes evaluate "Minimize the time to ship when onboarding"
+
+Every outcome score carries its sample and method. `--importance-n` and
+`--satisfaction-n` record how many people stand behind each score, when known;
+`--method` records how the score was obtained (`estimate`, `survey`, or
+`import`). Omit all three for a single-person estimate — the default — and the
+rendered `sample` line reads `est.`. A count above one with `method=estimate` is
+refused, because an estimate cannot have asked people. When the two counts
+differ, `get` shows both (`n=40/12 (survey)`) so a thin dimension stays visible.
+
+Every accepted score change is written to an append-only history. Add `--why`
+to `add` or `update` to record *why* the number was given, then read the trail
+with `history`: one row per accepted change, oldest first, each row carrying the
+score and its sample/method companions. Add `--why` to `history` to show the
+signed change from a baseline, with `--since <timestamp>` choosing the baseline
+(the last snapshot at or before it; the earliest when omitted). A change that
+fails validation writes neither a score change nor a row, so the history never
+records a rejected edit. The reason is history metadata, not part of the outcome
+record.
+
+# Survey import
+agentic-odi survey import responses.csv
+agentic-odi survey import responses.csv --dry-run
+agentic-odi survey import responses.csv --match
+agentic-odi survey import responses.csv --json
+
+`survey import` reads a CSV of responses (one row per respondent, columns named
+for the outcome) and lands each outcome's accepted mean, sample size (`n`) and a
+bootstrap band computed from the real paired responses on the matching outcome.
+
+The import is a plan before it is a write. Every source row is accounted for by
+one report entry, so nothing is silently dropped:
+
+* `--dry-run` prints the match table and writes nothing — no score, event,
+  snapshot or retained response — so the report the user reads is the report the
+  real run would produce.
+* A row that matches no outcome is listed by its 1-based CSV line number
+  (including the header), and is never fuzzy-matched. When a quoted field spans
+  several physical lines, the line named is the record's *starting* line, the one
+  a person sees in their editor.
+* A row containing `0`, a score outside 1–10, a nonfinite value, a missing field
+  or an invalid id is rejected with its line number.
+* `--match` proposes one candidate per unmatched reference (a case- and
+  whitespace-normalized variant of an exact id or statement) and asks a person to
+  confirm each. A suggestion is never applied silently: without an explicit yes
+  the import fails safely and writes nothing, and a stale or ambiguous
+  confirmation cannot assign a row.
+
+A run writes only when every row is accepted. If any row is unmatched, ambiguous
+or invalid, the whole import is refused and the prior store is left unchanged, so
+a partial score write is impossible.
+
+# Evidence-aware ranking
+agentic-odi top
+agentic-odi top --job <job-id> --limit 5
+agentic-odi top --include-thin --json
+agentic-odi coverage --job <job-id>
+
+`top` lists a Job's measured outcomes, highest low end of the band first. By
+default it shows measured outcomes only and names the thin and unscored counts
+it excluded; `--include-thin` adds the thin section, while unscored outcomes stay
+counted but never listed as zero. Each row shows the score, its band or the
+reason it has none, and the per-dimension sample and method. A row whose recorded
+sample is below the advisory threshold (`MIN_MEANINGFUL_N = 20`) also gets a
+`note:` footer line naming the count, the dimension that triggered it and the
+threshold — a warning, not a filter: the outcome still renders and still ranks.
+`coverage` reports the measured/thin/unscored split for a Job. The `--json` shape
+for `top` is `{"measured": [...], "thin": [...], "excluded": {"thin": n, "none":
+n}}`, where each entry shares keys and semantics with the landscape's outcome
+entries, including an `advisory` object (`{n, threshold, method, dimension,
+message}`) or `null`.
+
+`get` shows the reason from the most recent accepted change as a `note` line, so
+the detail view carries the same "why" as the history, and prints an `advisory`
+line when the recorded sample is below the threshold. An estimate or an unknown
+count has no advisory — an unknown sample is never reported as `n=0`. When no
+reason was recorded, or the outcome has no history yet, the line is omitted
+rather than shown empty.
+
+`get` also shows the stored band and its provenance as `band` lines: the bounds,
+the sample (`band n`), the confidence level, the seed, the method and the
+computed-at. A score with no band — an estimate or an unscored outcome — reads
+`band  none`, never as a zero-width range. `band stale` is `yes` when a later
+snapshot moved the score the band was computed from, so a band is never read as
+current when it is not. The same shape is available as a tool
+(`get_outcome_interval`) and over HTTP at `GET /api/outcomes/{id}/interval`.
+
+An accepted `survey import` also keeps the exact paired responses its band was
+bootstrapped from, de-identified — an opaque per-pair token and the two numbers,
+never a name or an email — behind a named provisional retention convention
+(`survey-inputs-v1`). The read side is `get_outcome_inputs`, reachable over HTTP
+at `GET /api/outcomes/{id}/inputs` and from the CLI local backend. It returns
+`null` when no input set is retained (a legacy or aggregate-only outcome) rather
+than an empty list, because an empty list would read as "zero responses". A dry
+run or a refused import retains nothing, and a score or method edit that clears a
+stale band deletes the inputs that described it in the same write, so a later
+reader cannot reproduce a band for a score that no longer exists. The
+retention/deletion and study-lineage policy itself is still not approved; the
+convention is named in one place (`RETAINED_INPUT_REF_VERSION`) and pinned by
+tests so it stays swappable.
 
 # One-screen report: job header, phase coverage, biggest opportunities
 agentic-odi summary <job-id>
@@ -195,6 +308,66 @@ backend has no local log to count.
 Add `--json` to any command for machine-readable output. `export` writes to
 stdout only — CSV has one row per outcome with the same fields the table shows
 plus `job_id` and `step_id`, so it pipes straight into a spreadsheet or `jq`.
+
+## Propose and review outcomes
+
+`candidates` turns a quote into proposed outcomes, then records a person's
+decision on each. Extraction **proposes only**; a candidate becomes an Outcome
+only when it is accepted, and that write goes through the same outcome validator
+as any other. See [Interviews](interviews.md) for the full walkthrough.
+
+```bash
+# Propose outcomes from one quote (nothing is accepted).
+agentic-odi candidates extract --quote-id <quote-id> \
+  --quote "Minimize the time it takes to onboard when a customer signs up." \
+  --job-id <job-id>
+
+# Review what was proposed.
+agentic-odi candidates list --job-id <job-id>
+agentic-odi candidates list --status proposed --json
+agentic-odi candidates get <candidate-id>
+
+# Record a person's decision: accept, reject, or merge.
+agentic-odi candidates accept <candidate-id> --importance 9 --satisfaction 4
+agentic-odi candidates accept <candidate-id> --importance 9 --satisfaction 4 \
+  --statement "Minimize the time it takes to onboard a customer when they sign up."
+agentic-odi candidates reject <candidate-id> --reason "names a solution, not an outcome"
+agentic-odi candidates merge <candidate-id> --merged-into <outcome-id>
+```
+
+`accept` creates **exactly one** Outcome and writes the candidate's verbatim
+quote as an `Evidence` row (`source_kind="interview"`, `raw={candidate_id,
+quote_id}`) tied to it, so the number travels with the sentence that produced
+it. If that evidence write fails, the new outcome is rolled back rather than
+left without provenance. An already-decided candidate is refused rather than
+re-accepted, so a retry cannot double-write, and a candidate that lost its
+quote is refused rather than accepted without evidence. `reject` requires a
+reason and keeps it. `merge` folds a near-duplicate into an existing Outcome and
+creates no outcome.
+
+Once an outcome exists, render its decision brief:
+
+```bash
+agentic-odi brief <outcome-id>          # the case for the outcome, with each basis
+agentic-odi brief <outcome-id> --json   # the same, machine-readable
+```
+
+Every figure in the brief carries the words that explain where its number came
+from, so a figure with no data reads `0 decisions recorded` rather than a
+placeholder.
+
+## Load the sample workspace
+
+`demo` loads a labelled corpus so you can see a filled canvas before you have
+research of your own. Every row it writes carries `origin="demo"`; loading is
+additive and a second load is a no-op. `clear` removes only the `origin="demo"`
+rows and never touches your own data.
+
+```bash
+agentic-odi demo load            # 1 job, 8 steps, 40 outcomes, 12 evidence rows
+agentic-odi demo load --json     # the same counts, machine-readable
+agentic-odi demo clear --yes     # remove only the sample rows
+```
 
 ## Evidence
 
@@ -242,7 +415,8 @@ and the kept amount is reported. `.pdf` and `.docx` are refused: attach them in
 the Studio, which extracts their text.
 
 `connectors ingest --job-id <job-id>` maps every evidence-bearing record in the
-ingested batch into evidence in one step.
+ingested batch into evidence in one step. `connectors list-presets` prints every
+preset the catalog offers, with its area, before you `connectors add` one.
 
 ## The signal inbox
 
@@ -374,37 +548,10 @@ agentic-odi interviews extract <quote-id>
 agentic-odi candidates list --status proposed
 agentic-odi candidates list --interview-id <interview-id> --json
 agentic-odi candidates get <candidate-id>
-agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
-agentic-odi candidates reject <candidate-id> --reason "not a real need"
 agentic-odi candidates delete <candidate-id> --yes
 ```
 
 Deleting an interview removes its candidates along with its quotes.
-
-### Accept or reject a candidate
-
-`candidates accept` turns one proposed candidate into exactly one Outcome. The
-statement is validated before anything is written; the verbatim quote is then
-stored as an `Evidence` row with `source_kind="interview"` and
-`raw={interview_id, quote_id}`, so the number travels with the sentence that
-produced it. Accepting twice returns the first outcome — a retry never
-duplicates the outcome or its evidence.
-
-The interview must be linked to a job (`interviews add --job-id`) so the new
-outcome has somewhere to live; an unlinked interview is refused rather than
-guessed at. Pass `--statement` to edit the wording first, and `--step-id` to
-place the outcome on a job-map step.
-
-`candidates reject` keeps the candidate and requires a nonblank `--reason`, so
-a decision is defensible later. Rejecting an accepted candidate is refused: it
-would orphan the outcome the acceptance produced.
-
-```bash
-agentic-odi candidates accept <candidate-id> --importance 8 --satisfaction 3
-agentic-odi candidates accept <candidate-id> --statement "Minimize the time to onboard" \
-  --importance 8 --satisfaction 3 --json
-agentic-odi candidates reject <candidate-id> --reason "covered by another outcome"
-```
 
 ## Schema, scoring, and guidance
 
@@ -419,6 +566,8 @@ agentic-odi guidelines        # the ODI stage-by-stage guide
 agentic-odi capabilities      # what the assistant can do
 agentic-odi capabilities --json   # machine-readable manifest
 agentic-odi capabilities tools  # tool names only
+agentic-odi spine             # which stages of the quote-to-measurement spine exist
+agentic-odi spine --json      # the same, machine-readable
 ```
 
 `evaluate` returns the same verdict the `evaluate_outcome` MCP tool does, so the
@@ -445,6 +594,19 @@ record is the same `model_dump()` shape the MCP tools return, so each entry can
 be re-validated with the corresponding core Pydantic model. The default
 filename carries a UTC ISO 8601 timestamp (`YYYYMMDDTHHMMSSZ`).
 
+## Inspect the data files
+
+```bash
+agentic-odi data path                 # both resolved paths
+agentic-odi data path --json          # machine-readable JSON
+```
+
+`data path` prints the exact files the *current* configuration uses — the
+`AGENTIC_ODI_DB` and `AGENTIC_ODI_STUDIO_DB` environment overrides included —
+so a person can find the two local SQLite files without guessing
+platform-specific defaults. It never opens a database, prints credentials, or
+creates files: a missing parent directory shows up as a resolved path, nothing
+more.
 
 ## Inspect settings and feature flags
 
@@ -466,14 +628,26 @@ gates raw MCP trace debugging.
 agentic-odi profile show
 agentic-odi profile show --json
 agentic-odi profile set --product-name "My Product" --domain "acme.test"
+agentic-odi profile set --clear core_problem --clear current_focus
 agentic-odi profile path
 agentic-odi setup       # interactive baseline wizard
 ```
 
 `profile show` prints the baseline fields; add `--json` to emit the raw JSON.
+Unset fields render as `—` and explicitly empty strings as `(empty)`.
 `profile set` updates any subset of baseline fields with explicit options.
+Use `--clear <field>` (repeatable) to unset `product_name`, `domain`,
+`primary_user`, `business_model`, `core_problem`, or `current_focus`; an
+unknown name exits 2, and clear is applied after set options in the same call.
 `profile path` prints the baseline file path. `setup` runs the interactive
-baseline wizard.
+baseline wizard. Before `setup` overwrites an existing baseline it writes a
+dated `baseline.json.bak-<UTC>` copy beside it and keeps only the newest five,
+so the config directory does not grow without bound.
+
+When a profile file cannot be read or parsed, `profile show`, `profile set` and
+`setup` print one sentence naming the file and the reason, then exit 1. A
+permissions problem says `Could not read <path>: permission denied`; malformed
+JSON says `<path> is not valid JSON: <reason> (line N, column M)`.
 
 ## Manage Customer Outcomes
 
@@ -512,6 +686,7 @@ agentic-odi customer-outcomes delete <outcome-id> --yes
 # Compute an ODI Opportunity Score (top-level, also under the group)
 agentic-odi score 8 2
 agentic-odi outcomes score 8 2
+agentic-odi customer-outcomes score 8 2
 ```
 
 `score` applies the ODI opportunity formula,
@@ -519,6 +694,37 @@ agentic-odi outcomes score 8 2
 
 Set `AGENTIC_ODI_MCP_URL` (or `--mcp-url`) to point to a non-default server when
 using `--backend mcp` (default: `http://localhost:8000/mcp`).
+
+## Record what customers use today
+
+An opportunity score says a need is unmet; it does not say whether a solution
+exists and is merely disliked. The `alternatives` group records the alternatives
+in play for each Job — a product, a service, a workaround, a manual process, or
+`nothing` — and rates each one against an outcome with the customer's own
+`adequacy` (1–10). `nothing` is a real row and the most informative one, because
+it is the evidence for a new-market bet.
+
+```bash
+# Record what the customer uses today for a Job
+agentic-odi alternatives add --job-id <job-id> --name "Spreadsheet" --kind manual
+agentic-odi alternatives add --job-id <job-id> --name "Nothing today" --kind nothing
+
+# List the inventory for a Job
+agentic-odi alternatives list --job-id <job-id>
+agentic-odi alternatives links --job-id <job-id>   # every alternative with its outcome and adequacy
+
+# Rate an alternative against an outcome with the customer's own adequacy
+agentic-odi alternatives link <outcome-id> <alternative-id> --adequacy 7 --usage-n 12
+
+# Show one outcome's inventory and its solution state
+agentic-odi alternatives show <outcome-id>
+```
+
+`alternatives show` prints the explicit three-state result: `yes` when a
+solution is recorded, `no — the customer uses nothing today` when the only link
+is a `nothing` row, and `not yet inventoried — we have not asked` when there is
+no link at all. Only `yes` means a solution exists; an empty inventory is never
+rendered as "no solution".
 
 ## Schedule Work
 

@@ -38,6 +38,18 @@ class LlmHealthResponse(BaseModel):
     cached: bool  # whether the answer was served from the TTL cache
 
 
+class SaveConfigRequest(BaseModel):
+    """Persist LLM connection settings so the sidecar reads them on restart.
+
+    The same fields the GET /config endpoint returns as ``defaults``.
+    """
+
+    base_url: str
+    api_key: str = ""
+    model_name: str
+    mcp_url: str = ""
+
+
 class ModelListRequest(BaseModel):
     """Which backend to ask for its model ids. The key travels in the body, not
     the query string, so it never lands in a URL or an access log."""
@@ -62,8 +74,13 @@ class AddOutcomeRequest(BaseModel):
     importance: float | None = Field(default=None, ge=1.0, le=10.0)
     satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
     #: The questions behind the score. Required when either score is set; a
-    #: score without it is refused by the MCP tool.
+    #: score without it is refused by the MCP tool, and the by-hand HTTP path
+    #: records it as an unverified check rather than an interrogated one.
     claim_check: ClaimCheck | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] = "estimate"
+    note: str | None = Field(default=None, max_length=500)
 
 
 class CreateJobRequest(BaseModel):
@@ -90,6 +107,10 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] | None = None
+    note: str | None = Field(default=None, max_length=500)
     mcp_url: str = ""
 
 
@@ -164,21 +185,21 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     step_id: str | None = None
 
 
-class DecideCandidateRequest(BaseModel):
-    """One reviewer decision on a candidate.
-
-    ``status`` is ``accepted`` or ``rejected``. Accepting requires the
-    importance and satisfaction the outcome contract needs; rejecting requires
-    a nonblank ``reason``. Omitting ``status`` edits the statement only.
-    """
-
-    status: Literal["accepted", "rejected"] | None = None
-    statement: str | None = None
-    reason: str | None = None
-    importance: float | None = Field(default=None, ge=1.0, le=10.0)
-    satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
-    step_id: str | None = None
+class AddAlternativeRequest(BaseModel):
     mcp_url: str = ""
+    job_id: str
+    name: str
+    kind: str
+    notes: str | None = None
+    source_kind: str = "manual"
+
+
+class LinkAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    alternative_id: str
+    adequacy: float
+    usage_n: int | None = None
+    note: str | None = None
 
 
 class StudioBrief(BaseModel):
@@ -568,6 +589,7 @@ class ShareMintResponse(BaseModel):
     token: str
     url: str
     expires_at: str
+    shareable: bool
 
 
 class SharedArtifactResponse(BaseModel):

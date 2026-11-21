@@ -1,6 +1,7 @@
 """External connectors for Agentic ODI."""
 
 import json
+import logging
 import sys
 
 from agentic_odi_connectors.catalog import (
@@ -35,6 +36,7 @@ from agentic_odi_connectors.models import (
     HealthStatus,
     IngestBatch,
     IngestRecord,
+    LinkPreviewData,
     McpConnectorSettings,
     RateLimitExceededError,
     RestConnectorSettings,
@@ -48,11 +50,14 @@ from agentic_odi_connectors.registry import (
     DuplicateConnectorError,
     UnknownConnectorKindError,
 )
+from agentic_odi_connectors.rest.connector import clear_health_cache
 from agentic_odi_connectors.sink import IngestSink, get_default_sink
 
 KNOWN_KINDS = {"in_memory", "rest", "mcp"}
 
 REQUIRED_KEYS = ("kind", "health_url", "ingest_endpoint")
+
+log = logging.getLogger(__name__)
 
 
 def validate_connector_config(config: dict) -> dict:
@@ -92,11 +97,11 @@ def _load_and_validate_presets() -> None:
         with path.open(encoding="utf-8") as handle:
             payload = json.load(handle)
     except (OSError, ValueError) as exc:
-        print(f"Error reading connectors config: {exc}", file=sys.stderr)
+        log.warning("could not read connectors config: %s", exc)
         sys.exit(1)
     presets = payload.get("connectors", [])
     if not isinstance(presets, list):
-        print("Error: connectors config must contain a 'connectors' list", file=sys.stderr)
+        log.warning("connectors config must contain a 'connectors' list")
         sys.exit(1)
     bad_presets = []
     for preset in presets:
@@ -106,9 +111,10 @@ def _load_and_validate_presets() -> None:
             bad_presets.append((preset, exc.keys))
     if bad_presets:
         for preset, keys in bad_presets:
-            print(
-                f"Error: invalid connector preset {preset.get('name', 'unnamed')}: {', '.join(keys)}",
-                file=sys.stderr,
+            log.warning(
+                "invalid connector preset %s: %s",
+                preset.get("name", "unnamed"),
+                ", ".join(keys),
             )
         sys.exit(1)
 
@@ -135,24 +141,27 @@ __all__ = [
     "IngestBatch",
     "IngestRecord",
     "IngestSink",
+    "LinkPreviewData",
     "MarketplaceCache",
     "MarketplaceListing",
     "MarketplaceService",
     "McpConnectorSettings",
+    "PRESETS",
     "RateLimitExceededError",
     "RateLimiter",
-    "UnknownAreaError",
     "RestConnectorSettings",
+    "UnknownAreaError",
     "UnknownConnectorKindError",
     "UnknownPresetError",
     "build_connector",
+    "clear_health_cache",
     "config_path",
     "connector_config_from_listing",
     "connector_config_from_preset",
     "drafts_from_batch",
     "env_vars_in_listing",
-    "get_default_sink",
     "get_http_client",
+    "get_default_sink",
     "get_preset",
     "known_kinds",
     "list_presets",

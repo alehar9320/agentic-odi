@@ -5,15 +5,20 @@ from __future__ import annotations
 import sqlite3
 
 import pytest
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
+    CandidateSolution,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
     Direction,
     Evidence,
     Job,
+    Link,
     Outcome,
+    RelationshipType,
     Segment,
     SegmentVerdict,
     Signal,
@@ -584,6 +589,92 @@ def test_signals_survive_a_reload_from_the_event_log(tmp_path) -> None:
     assert reopened.dismiss_signal("missing") is None
 
 
+def _write_legacy_outcome(db_path: str, outcome_id: str = "legacy-1") -> None:
+    """Append an OUTCOME_CREATED payload shaped before the method field existed."""
+    repo = SQLiteRepository(db_path)
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    repo.store.append(
+        "OUTCOME_CREATED",
+        {
+            "id": outcome_id,
+            "job_id": "job-1",
+            "step_id": None,
+            "statement": "Minimize time",
+            "importance": 8.0,
+            "satisfaction": 6.0,
+            "opportunity_score": 10.0,
+        },
+    )
+    repo.close()
+
+
+def _method_backfill_events(db_path: str) -> list[dict]:
+    repo = SQLiteRepository(db_path)
+    events = [dict(e) for e in repo.store.get_stream() if e["type"] == "OUTCOME_METHOD_BACKFILLED"]
+    repo.close()
+    return events
+
+
+def test_legacy_outcome_reads_back_as_an_estimate(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    _write_legacy_outcome(db_path)
+
+    repo = SQLiteRepository(db_path)
+    outcome = repo.get_outcome("legacy-1")
+    assert outcome is not None
+    assert outcome.score_method == "estimate"
+    assert outcome.importance_n is None
+    assert outcome.satisfaction_n is None
+    repo.close()
+
+
+def test_method_backfill_is_idempotent_across_restarts(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    _write_legacy_outcome(db_path)
+
+    # Constructing twice must not append a second backfill event.
+    assert len(_method_backfill_events(db_path)) == 1
+    assert len(_method_backfill_events(db_path)) == 1
+
+
+def test_method_backfill_does_not_touch_a_new_row(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path)
+    repo.add_job(Job(id="job-1", name="Onboard customers"))
+    repo.add_outcome(
+        Outcome(
+            id="new-1",
+            job_id="job-1",
+            statement="Minimize time",
+            importance=8.0,
+            satisfaction=6.0,
+            score_method="survey",
+            importance_n=40,
+            satisfaction_n=40,
+        )
+    )
+    repo.close()
+
+    assert _method_backfill_events(db_path) == []
+    reopened = SQLiteRepository(db_path)
+    reopened_outcome = reopened.get_outcome("new-1")
+    assert reopened_outcome is not None
+    assert reopened_outcome.score_method == "survey"
+    reopened.close()
+
+
+def test_method_backfill_preserves_the_original_score(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    _write_legacy_outcome(db_path)
+
+    repo = SQLiteRepository(db_path)
+    reloaded = repo.get_outcome("legacy-1")
+    assert reloaded is not None
+    assert (reloaded.importance, reloaded.satisfaction) == (8.0, 6.0)
+    assert reloaded.opportunity_score == 10.0
+    repo.close()
+
+
 def _segment(id: str = "seg-1", confidence: float = 0.75) -> Segment:
     return Segment(
         id=id,
@@ -713,3 +804,136 @@ def test_last_event_id_is_the_rowid_of_the_event_just_appended(tmp_path) -> None
     repo.update_step("missing", {"name": "Prepare"})
     assert repo.last_event_id() == after_step
     repo.close()
+
+
+def _link(
+    link_id: str = "link-1",
+    *,
+    source_id: str = "outcome-1",
+    target_id: str = "evidence-1",
+) -> Link:
+    return Link(
+        id=link_id,
+        source_type="outcome",
+        source_id=source_id,
+        target_type="evidence",
+        target_id=target_id,
+        relationship_type=RelationshipType.evidence_for,
+    )
+
+
+def test_add_get_and_list_a_link_round_trips(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    link = _link()
+
+    assert repo.add_link(link) == link
+    assert repo.get_link("link-1") == link
+    assert [item.id for item in repo.list_links(source_id="outcome-1")] == ["link-1"]
+    repo.close()
+
+
+def test_links_survive_a_reload(tmp_path) -> None:
+    db_path = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path)
+    link = _link()
+    repo.add_link(link)
+    repo.close()
+
+    reloaded = SQLiteRepository(db_path)
+    assert reloaded.get_link("link-1") == link
+    reloaded.close()
+
+
+def test_adding_the_same_link_twice_raises_conflict(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    repo.add_link(_link("link-1"))
+
+    with pytest.raises(ConflictError):
+        repo.add_link(_link("link-2"))
+    repo.close()
+
+
+def test_removing_a_link_reports_whether_it_existed(tmp_path) -> None:
+    repo = SQLiteRepository(str(tmp_path / "odi.db"))
+    repo.add_link(_link())
+
+    assert repo.remove_link("link-1") is True
+    assert repo.get_link("link-1") is None
+    assert repo.remove_link("link-1") is False
+    repo.close()
+
+
+def test_a_concurrent_duplicate_link_is_rejected(tmp_path, monkeypatch) -> None:
+    import threading
+    import time
+
+    from agentic_odi_core.intent_store import IntentStore
+
+    # Widen the window between the duplicate check and the append so the test
+    # would catch a regression to a check that is not atomic with the write.
+    real_append = IntentStore.append
+
+    def slow_append(self, *args, **kwargs):
+        time.sleep(0.02)
+        return real_append(self, *args, **kwargs)
+
+    monkeypatch.setattr(IntentStore, "append", slow_append)
+
+    db_path = str(tmp_path / "odi.db")
+    repos = [SQLiteRepository(db_path) for _ in range(6)]
+    barrier = threading.Barrier(len(repos))
+    outcomes: list[str] = []
+
+    def worker(repo: SQLiteRepository) -> None:
+        try:
+            barrier.wait()
+            repo.add_link(_link("link-race"))
+            outcomes.append("added")
+        except ConflictError:
+            outcomes.append("conflict")
+
+    threads = [threading.Thread(target=worker, args=(repo,)) for repo in repos]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert outcomes.count("added") == 1
+    assert outcomes.count("conflict") == len(repos) - 1
+    reopened = SQLiteRepository(db_path)
+    assert len(reopened.list_links()) == 1
+    for repo in repos:
+        repo.close()
+    reopened.close()
+
+
+def _candidate(id: str = "cand-1") -> CandidateSolution:
+    return CandidateSolution(
+        id=id,
+        title="Guided setup checklist",
+        hypothesis="A checklist will reduce the time to first value.",
+        outcome_ids=["o-1", "o-2"],
+        strategy_path=StrategyKind.DIFFERENTIATED,
+        evidence_ids=["e-1"],
+    )
+
+
+def test_candidates_survive_a_reload_from_the_event_log(tmp_path) -> None:
+    db = str(tmp_path / "odi.db")
+    repo = SQLiteRepository(db_path=db)
+    repo.add_job(Job(id="job-1", name="Rotate a leaked secret"))
+    repo.add_candidate(_candidate())
+
+    assert repo.update_candidate("cand-1", {"status": "accepted"}) is not None
+
+    reopened = SQLiteRepository(db_path=db)
+    restored = reopened.get_candidate("cand-1")
+    assert restored is not None
+    assert restored.title == "Guided setup checklist"
+    assert restored.hypothesis == "A checklist will reduce the time to first value."
+    assert restored.outcome_ids == ["o-1", "o-2"]
+    assert restored.status is CandidateStatus.ACCEPTED
+    assert restored.strategy_path is StrategyKind.DIFFERENTIATED
+    assert restored.evidence_ids == ["e-1"]
+    assert [candidate.id for candidate in reopened.list_candidates()] == ["cand-1"]
+    assert reopened.get_candidate("missing") is None

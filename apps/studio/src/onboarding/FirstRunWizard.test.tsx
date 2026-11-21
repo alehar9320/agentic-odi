@@ -164,9 +164,8 @@ describe("FirstRunWizard", () => {
     );
     expect(studio.openPanel).not.toHaveBeenCalled();
     expect(studio.openSetup).not.toHaveBeenCalled();
-    // "Start your own job" clears the sample before it finishes the tour, so
-    // the dialog can close a tick before the completed state is written. Wait
-    // for the write rather than sampling it the moment the dialog goes away.
+    // The provider persists on an effect after the dialog closes, so read the
+    // stored record once it has flushed instead of racing it.
     await waitFor(() =>
       expect(stored()).toMatchObject({
         status: "done",

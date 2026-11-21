@@ -27,12 +27,29 @@ class ToolName(str, Enum):
     GET_OUTCOMES = "get_outcomes"
     GET_OUTCOME = "get_outcome"
     UPDATE_OUTCOME = "update_outcome"
+    GET_OUTCOME_HISTORY = "get_outcome_history"
+    GET_OUTCOME_DELTA = "get_outcome_delta"
+    GET_OUTCOME_INTERVAL = "get_outcome_interval"
+    GET_OUTCOME_INPUTS = "get_outcome_inputs"
+    IMPORT_SURVEY = "import_survey"
+    GET_SURVEY_IMPORT_PLAN = "get_survey_import_plan"
+    COMMIT_SURVEY_IMPORT = "commit_survey_import"
+    RANK_OUTCOMES = "rank_outcomes"
     DELETE_OUTCOME = "delete_outcome"
     ADD_CUSTOMER_OUTCOME = "add_customer_outcome"
     GET_CUSTOMER_OUTCOME = "get_customer_outcome"
     LIST_CUSTOMER_OUTCOMES = "list_customer_outcomes"
     UPDATE_CUSTOMER_OUTCOME = "update_customer_outcome"
     DELETE_CUSTOMER_OUTCOME = "delete_customer_outcome"
+    ADD_ALTERNATIVE = "add_alternative"
+    GET_ALTERNATIVE = "get_alternative"
+    LIST_ALTERNATIVES = "list_alternatives"
+    DELETE_ALTERNATIVE = "delete_alternative"
+    LINK_ALTERNATIVE = "link_alternative"
+    UNLINK_ALTERNATIVE = "unlink_alternative"
+    GET_OUTCOME_ALTERNATIVES = "get_outcome_alternatives"
+    GET_HAS_EXISTING_SOLUTION = "get_has_existing_solution"
+    LIST_ALTERNATIVE_LINKS = "list_alternative_links"
     ADD_EVIDENCE = "add_evidence"
     GET_EVIDENCE = "get_evidence"
     LIST_EVIDENCE = "list_evidence"
@@ -49,8 +66,6 @@ class ToolName(str, Enum):
     GET_CANDIDATE = "get_candidate"
     UPDATE_CANDIDATE = "update_candidate"
     DELETE_CANDIDATE = "delete_candidate"
-    ACCEPT_CANDIDATE = "accept_candidate"
-    REJECT_CANDIDATE = "reject_candidate"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -58,6 +73,14 @@ class ToolName(str, Enum):
     GET_FRAMEWORK_GUIDELINES = "get_odi_framework_guidelines"
     GET_CAPABILITIES = "get_capabilities"
     GET_CAPABILITIES_MANIFEST = "get_capabilities_manifest"
+    ACCEPT_CANDIDATE = "accept_candidate"
+    REJECT_CANDIDATE = "reject_candidate"
+    MERGE_CANDIDATE = "merge_candidate"
+    SCORE_OUTCOME = "get_outcome_score"
+    RENDER_BRIEF = "get_brief"
+    RECORD_DECISION = "record_decision"
+    TRACK_BET = "track_bet"
+    MEASURE_BET = "get_measurement"
     LIST_SIGNALS = "list_signals"
     MARK_SIGNAL_READ = "mark_signal_read"
     DISMISS_SIGNAL = "dismiss_signal"
@@ -81,6 +104,9 @@ class ToolName(str, Enum):
     GET_TRACEABILITY_REPORT = "get_traceability_report"
     OPEN_STUDY = "open_study"
     LIST_STUDIES = "list_studies"
+    LINKS_ADD = "links_add"
+    LINKS_LIST = "links_list"
+    LINKS_REMOVE = "links_remove"
 
 
 class ToolEffect(str, Enum):
@@ -219,7 +245,12 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "importance",
             "satisfaction",
             "step_id",
+            "importance_n",
+            "satisfaction_n",
+            "score_method",
+            "note",
             "claim_check",
+            "objectives",
         ),
         required=("job_id", "statement"),
         returns="The created Outcome.",
@@ -247,10 +278,93 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         name="update_outcome",
         summary="Update an Outcome's statement or scores.",
         effect=_derive_effect("update_outcome"),
-        arguments=("outcome_id", "statement", "importance", "satisfaction", "step_id"),
+        arguments=(
+            "outcome_id",
+            "statement",
+            "importance",
+            "satisfaction",
+            "step_id",
+            "importance_n",
+            "satisfaction_n",
+            "score_method",
+            "note",
+            "objectives",
+        ),
         required=("outcome_id",),
         returns="The updated Outcome.",
         stage="2",
+    ),
+    ToolName.GET_OUTCOME_HISTORY.value: ToolSpec(
+        name="get_outcome_history",
+        summary="List the accepted score snapshots for an Outcome, oldest first.",
+        effect=_derive_effect("get_outcome_history"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="A list of score snapshots, oldest first.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_DELTA.value: ToolSpec(
+        name="get_outcome_delta",
+        summary="The signed score change across an Outcome's recorded snapshots.",
+        effect=_derive_effect("get_outcome_delta"),
+        arguments=("outcome_id", "since"),
+        required=("outcome_id",),
+        returns="The signed importance/satisfaction/opportunity deltas and a direction.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_INTERVAL.value: ToolSpec(
+        name="get_outcome_interval",
+        summary="The stored band and its provenance for an Outcome, or a no-band result.",
+        effect=_derive_effect("get_outcome_interval"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The band's bounds, sample, seed, confidence, method, computed-at and staleness.",
+        stage="4",
+    ),
+    ToolName.GET_OUTCOME_INPUTS.value: ToolSpec(
+        name="get_outcome_inputs",
+        summary="The paired survey inputs a stored band was reproduced from, or a no-inputs result.",
+        effect=_derive_effect("get_outcome_inputs"),
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The de-identified paired inputs and their versioned input ref, or null.",
+        stage="4",
+    ),
+    ToolName.IMPORT_SURVEY.value: ToolSpec(
+        name="import_survey",
+        summary="Land a survey's per-outcome means, sample and band on matching Outcomes.",
+        effect=_derive_effect("import_survey"),
+        arguments=("rows",),
+        required=("rows",),
+        returns="The updated Outcomes keyed by id.",
+        stage="4",
+    ),
+    ToolName.GET_SURVEY_IMPORT_PLAN.value: ToolSpec(
+        name="get_survey_import_plan",
+        summary="Plan a survey import without writing: every row's fate and line number.",
+        effect=_derive_effect("get_survey_import_plan"),
+        arguments=("rows", "confirmed_matches"),
+        required=("rows",),
+        returns="Per-row accepted/unmatched/ambiguous/invalid reports with line numbers.",
+        stage="4",
+    ),
+    ToolName.COMMIT_SURVEY_IMPORT.value: ToolSpec(
+        name="commit_survey_import",
+        summary="Write a survey import only when every row resolves; otherwise refuse.",
+        effect=ToolEffect.WRITE,
+        arguments=("rows", "confirmed_matches"),
+        required=("rows",),
+        returns="The updated Outcomes keyed by id, or a refusal naming the unresolved rows.",
+        stage="4",
+    ),
+    ToolName.RANK_OUTCOMES.value: ToolSpec(
+        name="rank_outcomes",
+        summary="Rank a Job's Outcomes by evidence strength into measured/thin/none sections.",
+        effect=_derive_effect("rank_outcomes"),
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="The measured/thin/none sections with per-outcome score, band, sample and method.",
+        stage="4",
     ),
     ToolName.DELETE_OUTCOME.value: ToolSpec(
         name="delete_outcome",
@@ -321,9 +435,89 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         required=("outcome_id",),
         returns="The deleted Customer Outcome ID.",
     ),
+    ToolName.ADD_ALTERNATIVE.value: ToolSpec(
+        name="add_alternative",
+        summary="Record what a customer uses today for one Job.",
+        effect=_derive_effect("add_alternative"),
+        arguments=("job_id", "name", "kind", "notes", "source_kind"),
+        required=("job_id", "name", "kind"),
+        returns="The created Alternative.",
+        stage="2",
+    ),
+    ToolName.GET_ALTERNATIVE.value: ToolSpec(
+        name="get_alternative",
+        summary="Get a single Alternative by ID.",
+        effect=_derive_effect("get_alternative"),
+        arguments=("alternative_id",),
+        required=("alternative_id",),
+        returns="The Alternative, or an error string if not found.",
+        stage="2",
+    ),
+    ToolName.LIST_ALTERNATIVES.value: ToolSpec(
+        name="list_alternatives",
+        summary="List the Alternatives recorded for a Job.",
+        effect=_derive_effect("list_alternatives"),
+        arguments=("job_id", "limit", "offset"),
+        returns="A list of Alternatives.",
+        stage="2",
+    ),
+    ToolName.DELETE_ALTERNATIVE.value: ToolSpec(
+        name="delete_alternative",
+        summary="Delete an Alternative and its links.",
+        effect=_derive_effect("delete_alternative"),
+        arguments=("alternative_id",),
+        required=("alternative_id",),
+        returns="The deleted Alternative ID.",
+        stage="2",
+    ),
+    ToolName.LINK_ALTERNATIVE.value: ToolSpec(
+        name="link_alternative",
+        summary="Rate one Alternative against one Outcome with the customer's adequacy.",
+        effect=_derive_effect("link_alternative"),
+        arguments=("outcome_id", "alternative_id", "adequacy", "usage_n", "note"),
+        required=("outcome_id", "alternative_id", "adequacy"),
+        returns="The created Alternative link.",
+        stage="2",
+    ),
+    ToolName.UNLINK_ALTERNATIVE.value: ToolSpec(
+        name="unlink_alternative",
+        summary="Remove one Alternative-to-Outcome link.",
+        effect=_derive_effect("unlink_alternative"),
+        arguments=("outcome_id", "alternative_id"),
+        required=("outcome_id", "alternative_id"),
+        returns="The removed link's identifiers.",
+        stage="2",
+    ),
+    ToolName.GET_OUTCOME_ALTERNATIVES.value: ToolSpec(
+        name="get_outcome_alternatives",
+        summary="The Alternatives recorded for one Outcome, with each adequacy rating.",
+        effect=ToolEffect.READ,
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="A list of Alternatives paired with their adequacy link.",
+        stage="2",
+    ),
+    ToolName.GET_HAS_EXISTING_SOLUTION.value: ToolSpec(
+        name="get_has_existing_solution",
+        summary="Whether an existing solution is recorded: yes, nothing linked, or not asked.",
+        effect=ToolEffect.READ,
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="One of yes, no_linked_nothing, no_link_at_all.",
+        stage="2",
+    ),
+    ToolName.LIST_ALTERNATIVE_LINKS.value: ToolSpec(
+        name="list_alternative_links",
+        summary="Every recorded alternative for one Job, each with its outcome and adequacy.",
+        effect=ToolEffect.READ,
+        arguments=("job_id",),
+        required=("job_id",),
+        returns="A list of outcome/alternative/link triples for the whole Job.",
+        stage="2",
+    ),
     ToolName.ADD_EVIDENCE.value: ToolSpec(
         name="add_evidence",
-        summary="Capture an evidence record from a connector.",
+        summary="Capture an evidence record from a connector with optional impact and confidence ratings.",
         effect=_derive_effect("add_evidence"),
         arguments=(
             "source_name",
@@ -336,6 +530,8 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             "job_id",
             "step_id",
             "outcome_id",
+            "impact",
+            "confidence",
         ),
         required=("source_name", "source_kind", "name", "content"),
         returns="The created Evidence record.",
@@ -437,17 +633,17 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     ),
     ToolName.EXTRACT_CANDIDATES.value: ToolSpec(
         name="extract_candidates",
-        summary="Propose outcome candidates from one interview quote.",
+        summary="Propose candidates from an interview quote, or raw text with a job.",
         effect=_derive_effect("extract_candidates"),
-        arguments=("quote_id", "stage_hint"),
+        arguments=("quote_id", "stage_hint", "quote", "job_id", "job_name"),
         required=("quote_id",),
         returns="The newly stored OutcomeCandidates (valid ones proposed, invalid ones rejected).",
     ),
     ToolName.LIST_CANDIDATES.value: ToolSpec(
         name="list_candidates",
-        summary="List outcome candidates, optionally filtered by interview or status.",
+        summary="List candidates, filtered by interview, quote, job or status.",
         effect=_derive_effect("list_candidates"),
-        arguments=("interview_id", "status", "limit", "offset"),
+        arguments=("interview_id", "status", "limit", "offset", "quote_id", "job_id"),
         returns="A list of OutcomeCandidates.",
     ),
     ToolName.GET_CANDIDATE.value: ToolSpec(
@@ -473,22 +669,6 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("candidate_id",),
         required=("candidate_id",),
         returns="The deleted candidate ID.",
-    ),
-    ToolName.ACCEPT_CANDIDATE.value: ToolSpec(
-        name="accept_candidate",
-        summary="Accept a candidate into exactly one outcome, with its quote as evidence.",
-        effect=_derive_effect("accept_candidate"),
-        arguments=("candidate_id", "importance", "satisfaction", "statement", "step_id"),
-        required=("candidate_id", "importance", "satisfaction"),
-        returns="The accepted candidate, the new Outcome, and the verbatim Evidence.",
-    ),
-    ToolName.REJECT_CANDIDATE.value: ToolSpec(
-        name="reject_candidate",
-        summary="Reject a candidate with a nonblank reason, keeping it and its quote.",
-        effect=_derive_effect("reject_candidate"),
-        arguments=("candidate_id", "reason"),
-        required=("candidate_id", "reason"),
-        returns="The rejected OutcomeCandidate.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",
@@ -552,6 +732,78 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("get_capabilities_manifest"),
         arguments=(),
         returns="The full tool manifest JSON.",
+    ),
+    ToolName.ACCEPT_CANDIDATE.value: ToolSpec(
+        name="accept_candidate",
+        summary="Accept a proposed outcome, creating exactly one Outcome.",
+        effect=_derive_effect("accept_candidate"),
+        arguments=("candidate_id", "statement", "importance", "satisfaction", "step_id"),
+        required=("candidate_id", "importance", "satisfaction"),
+        returns="The created Outcome.",
+        stage="2",
+    ),
+    ToolName.REJECT_CANDIDATE.value: ToolSpec(
+        name="reject_candidate",
+        summary="Reject a proposed outcome; a non-empty reason is required and kept.",
+        effect=_derive_effect("reject_candidate"),
+        arguments=("candidate_id", "reason"),
+        required=("candidate_id", "reason"),
+        returns="The rejected candidate.",
+        stage="2",
+    ),
+    ToolName.MERGE_CANDIDATE.value: ToolSpec(
+        name="merge_candidate",
+        summary="Fold a proposed outcome into an existing Outcome; creates none.",
+        effect=_derive_effect("merge_candidate"),
+        arguments=("candidate_id", "merged_into"),
+        required=("candidate_id", "merged_into"),
+        returns="The merged candidate.",
+        stage="2",
+    ),
+    ToolName.SCORE_OUTCOME.value: ToolSpec(
+        name="get_outcome_score",
+        summary="Read an outcome's scores as a sample, with its sample size.",
+        effect=ToolEffect.READ,
+        arguments=("outcome_id",),
+        required=("outcome_id",),
+        returns="The score sample for the outcome.",
+        stage="4",
+    ),
+    ToolName.RENDER_BRIEF.value: ToolSpec(
+        name="get_brief",
+        summary="Render the brief for a subject, each figure carrying its basis.",
+        effect=ToolEffect.READ,
+        arguments=("subject_id",),
+        required=("subject_id",),
+        returns="The brief document for the subject.",
+        stage=None,
+    ),
+    ToolName.RECORD_DECISION.value: ToolSpec(
+        name="record_decision",
+        summary="Record a decision about a subject, with its rationale.",
+        effect=_derive_effect("record_decision"),
+        arguments=("subject_id", "choice", "rationale"),
+        required=("subject_id", "choice", "rationale"),
+        returns="The recorded decision.",
+        stage=None,
+    ),
+    ToolName.TRACK_BET.value: ToolSpec(
+        name="track_bet",
+        summary="Track a bet under a decision, with the metric that would move.",
+        effect=_derive_effect("track_bet"),
+        arguments=("decision_id", "statement", "metric"),
+        required=("decision_id", "statement", "metric"),
+        returns="The tracked bet.",
+        stage=None,
+    ),
+    ToolName.MEASURE_BET.value: ToolSpec(
+        name="get_measurement",
+        summary="Read what a bet measured; an unmeasured bet reports nothing yet.",
+        effect=ToolEffect.READ,
+        arguments=("bet_id",),
+        required=("bet_id",),
+        returns="The measurement for the bet.",
+        stage=None,
     ),
     ToolName.GET_HEALTH.value: ToolSpec(
         name="get_health",
@@ -737,6 +989,46 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         effect=_derive_effect("list_studies"),
         arguments=("job_id",),
         returns="A list of Studies. Empty until a study has been opened.",
+    ),
+    ToolName.LINKS_ADD.value: ToolSpec(
+        name="links_add",
+        summary="Create a typed link between two agentic-odi entities.",
+        effect=_derive_effect("links_add"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "external_system",
+            "external_id",
+            "preview",
+        ),
+        required=("source_type", "source_id", "target_type", "target_id", "relationship_type"),
+        returns="The created Link record.",
+    ),
+    ToolName.LINKS_LIST.value: ToolSpec(
+        name="links_list",
+        summary="List links, optionally filtered by source/target entity and relationship type.",
+        effect=_derive_effect("links_list"),
+        arguments=(
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "limit",
+            "offset",
+        ),
+        returns="A list of Link records.",
+    ),
+    ToolName.LINKS_REMOVE.value: ToolSpec(
+        name="links_remove",
+        summary="Remove a link by ID.",
+        effect=_derive_effect("links_remove"),
+        arguments=("link_id",),
+        required=("link_id",),
+        returns="True if the link was removed, False if not found.",
     ),
 }
 

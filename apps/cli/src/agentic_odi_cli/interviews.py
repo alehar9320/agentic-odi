@@ -16,7 +16,6 @@ import typer
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import (
     render_candidate,
-    render_candidate_acceptance,
     render_candidate_list,
     render_deleted,
     render_interview,
@@ -51,7 +50,6 @@ def import_transcript(
     import sys
     from pathlib import Path
 
-    display = "stdin" if path == "-" else path
     if path == "-":
         text = sys.stdin.read()
         filename = None
@@ -68,7 +66,6 @@ def import_transcript(
         "text": text,
         "title": title,
         "participant_label": participant,
-        "display_name": display,
     }
     if filename is not None:
         args["filename"] = filename
@@ -200,9 +197,29 @@ def extract(
 candidates_app = typer.Typer(help="Review outcome candidates proposed from quotes.")
 
 
+@candidates_app.command("extract")
+def extract_spine_candidates(
+    quote_id: str = typer.Option(..., help="Stable id for the quote text"),
+    quote: str = typer.Option(..., help="The verbatim quote text to extract from"),
+    job_id: str = typer.Option(..., help="The Job the candidates would become outcomes of"),
+    job_name: str | None = typer.Option(None, help="Optional Job name for the extractor"),
+    stage_hint: str | None = typer.Option(None, help="Optional job-stage hint"),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Propose outcome candidates from a raw quote. Proposes only; accepts nothing."""
+    args: dict[str, Any] = {"quote_id": quote_id, "quote": quote, "job_id": job_id}
+    if job_name is not None:
+        args["job_name"] = job_name
+    if stage_hint is not None:
+        args["stage_hint"] = stage_hint
+    typer.echo(render_candidate_list(run_tool("extract_candidates", args), as_json=json_output))
+
+
 @candidates_app.command("list")
 def list_candidates(
     interview_id: str | None = typer.Option(None, help="Only candidates for this interview"),
+    quote_id: str | None = typer.Option(None, help="Only candidates for this quote"),
+    job_id: str | None = typer.Option(None, help="Only candidates for this job"),
     status: str | None = typer.Option(None, help="Only candidates with this status"),
     limit: int | None = typer.Option(None, help="Maximum candidates to return"),
     offset: int = typer.Option(0, help="Skip this many candidates first"),
@@ -212,6 +229,10 @@ def list_candidates(
     args: dict[str, Any] = {"offset": offset}
     if interview_id is not None:
         args["interview_id"] = interview_id
+    if quote_id is not None:
+        args["quote_id"] = quote_id
+    if job_id is not None:
+        args["job_id"] = job_id
     if status is not None:
         args["status"] = status
     if limit is not None:
@@ -254,18 +275,14 @@ def delete_candidate(
 
 @candidates_app.command("accept")
 def accept_candidate(
-    candidate_id: str = typer.Argument(..., help="Outcome candidate ID"),
-    importance: float = typer.Option(..., help="Importance score, 1.0 to 10.0"),
-    satisfaction: float = typer.Option(..., help="Current satisfaction, 1.0 to 10.0"),
-    statement: str | None = typer.Option(None, help="Edit the statement before accepting"),
-    step_id: str | None = typer.Option(None, help="Job-map Step the new outcome belongs to"),
+    candidate_id: str = typer.Argument(..., help="Candidate ID"),
+    importance: float = typer.Option(..., min=1.0, max=10.0, help="Importance score (1-10)"),
+    satisfaction: float = typer.Option(..., min=1.0, max=10.0, help="Satisfaction score (1-10)"),
+    statement: str | None = typer.Option(None, help="An edited statement to accept instead."),
+    step_id: str | None = typer.Option(None, help="Optional Step ID to attach the outcome to."),
     json_output: bool = JSON_OPTION,
 ) -> None:
-    """Accept a candidate into exactly one outcome, with its quote as evidence.
-
-    The statement is validated before anything is written; accepting twice
-    returns the first outcome, so a retry never duplicates it.
-    """
+    """Accept a candidate, creating exactly one Outcome."""
     args: dict[str, Any] = {
         "candidate_id": candidate_id,
         "importance": importance,
@@ -275,19 +292,34 @@ def accept_candidate(
         args["statement"] = statement
     if step_id is not None:
         args["step_id"] = step_id
-    typer.echo(render_candidate_acceptance(run_tool("accept_candidate", args), as_json=json_output))
+    outcome = run_tool("accept_candidate", args)
+    if json_output:
+        typer.echo(json.dumps(outcome, indent=2))
+    else:
+        typer.echo(
+            f"Outcome created: {outcome.get('id') if isinstance(outcome, dict) else outcome}"
+        )
 
 
 @candidates_app.command("reject")
 def reject_candidate(
-    candidate_id: str = typer.Argument(..., help="Outcome candidate ID"),
-    reason: str = typer.Option(..., help="Why the candidate is rejected (required)"),
+    candidate_id: str = typer.Argument(..., help="Candidate ID"),
+    reason: str = typer.Option(..., help="Why the candidate is rejected (required)."),
     json_output: bool = JSON_OPTION,
 ) -> None:
-    """Reject a candidate, keeping it and the reason beside its quote."""
-    typer.echo(
-        render_candidate(
-            run_tool("reject_candidate", {"candidate_id": candidate_id, "reason": reason}),
-            as_json=json_output,
-        )
+    """Reject a candidate. The reason is required and kept."""
+    candidate = run_tool("reject_candidate", {"candidate_id": candidate_id, "reason": reason})
+    typer.echo(render_candidate(candidate, as_json=json_output))
+
+
+@candidates_app.command("merge")
+def merge_candidate(
+    candidate_id: str = typer.Argument(..., help="Candidate ID"),
+    merged_into: str = typer.Option(..., help="The existing Outcome ID to fold into."),
+    json_output: bool = JSON_OPTION,
+) -> None:
+    """Fold a candidate into an existing Outcome. Creates no outcome."""
+    candidate = run_tool(
+        "merge_candidate", {"candidate_id": candidate_id, "merged_into": merged_into}
     )
+    typer.echo(render_candidate(candidate, as_json=json_output))

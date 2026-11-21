@@ -110,7 +110,7 @@ function DayDivider() {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReplyFor, sendMessage, openPanel } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, dismissFailedTurn } = useStudio();
   const id = useAuiState((state) => state.message.id);
   const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
@@ -131,20 +131,22 @@ function AssistantMessage() {
     <>
       <DayDivider />
       {/* `aria-busy` keeps a screen reader from announcing every streamed token;
-          it reads the reply once the turn settles. */}
-      <article className="message message--assistant" aria-busy={running}>
+          it reads the reply once the turn settles. The primitive owns the
+          wrapper — hover state and the top anchor come from it — and renders
+          the same `article` the turn had before. */}
+      <MessagePrimitive.Root
+        className="message message--assistant"
+        aria-busy={running}
+        render={<article />}
+      >
       <AssistantAvatar />
       <div className="message__body">
         {/* Named on the reply it describes, never on every reply on screen, and
             said once instead of warned about in a strip above the work. */}
         {offlineReplyFor === id ? (
-          <button
-            type="button"
-            className="message__tag"
-            onClick={() => openPanel("settings")}
-          >
-            Local draft, no model connected
-          </button>
+          <span className="message__tag" aria-label="This reply came from the built-in assistant">
+            Built-in assistant
+          </span>
         ) : null}
 
         {/* One row for the work a turn did, and the answer on its own. The
@@ -197,6 +199,7 @@ function AssistantMessage() {
             error={error}
             retryText={retryText}
             onRetry={(text) => void sendMessage(text)}
+            onDelete={() => dismissFailedTurn(id)}
           />
         ) : null}
 
@@ -281,7 +284,7 @@ function AssistantMessage() {
           </ActionBarPrimitive.Root>
         ) : null}
       </div>
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }
@@ -314,7 +317,7 @@ function UserMessage() {
   return (
     <>
       <DayDivider />
-      <article className="message message--user">
+      <MessagePrimitive.Root className="message message--user" render={<article />}>
       <div className="message__column message__column--user">
       <p className="message__byline">{name}</p>
       <div
@@ -379,7 +382,7 @@ function UserMessage() {
       <span className="message__avatar message__avatar--user" aria-hidden="true">
         {initial}
       </span>
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }
@@ -388,9 +391,9 @@ function SystemMessage() {
   return (
     <>
       <DayDivider />
-      <article className="message message--notice">
+      <MessagePrimitive.Root className="message message--notice" render={<article />}>
         <MessagePrimitive.Parts components={{ Text: TextPart }} />
-      </article>
+      </MessagePrimitive.Root>
     </>
   );
 }

@@ -22,7 +22,7 @@ async def test_get_health_reports_accessible_store():
 
 @pytest.mark.asyncio
 async def test_get_health_reports_degraded_store(monkeypatch):
-    monkeypatch.setattr(server._repo, "health", lambda: False)
+    monkeypatch.setattr(server.get_repository(), "health", lambda: False)
 
     async with Client(mcp) as client:
         res = await client.call_tool("get_health", {})

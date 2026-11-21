@@ -51,6 +51,7 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://pypi.org/project/",
     "https://codecov.io",
     "https://developers.cloudflare.com",
+    "https://img.shields.io",
     "https://docs.entire.io",
     "https://www.chromatic.com",
     "https://playwright.dev",
@@ -70,6 +71,11 @@ ALLOWED_EXTERNAL_PREFIXES = (
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
+    # Composio's documented MCP entry points, cited as sources by the
+    # connectors guide: the shared OAuth URL the preset encodes, and the
+    # session-create endpoint the session-scoped recipe calls.
+    "https://connect.composio.dev/mcp",
+    "https://backend.composio.dev/api/v3.1/tool_router/session",
     # The local endpoints, which the site points developers at.
     "http://localhost:8000/mcp",
     "http://localhost:8000",
@@ -515,8 +521,9 @@ def test_page_weights_are_within_budget(page: str):
     # The page budget is a soft ceiling: individual pages are coverage records
     # (ledgers, entity docs, schema references), not decoration, so the ceiling
     # moves with legitimate content growth rather than trimming reference
-    # material. The Living Studio guide is now the long pole at ~111.5 KB: its
-    # 15 reference tables (180 rows) and 512 inline code spans cover the studio
-    # catalog, the ODI schema, and every agent surface, and it grows with each
-    # one. It is a coverage record, not decoration, so the ceiling moves again.
-    assert size <= 120 * 1024, f"{page}: {size} bytes"
+    # material. The MCP reference is the long pole at ~142 KB: it lists every
+    # tool's schema, and the merged interview, candidate and trust surfaces add
+    # dozens of entries. It grew ~28 KB when those branches landed together, so
+    # the ceiling moves once more -- and the next growth should extract the tool
+    # list into its own page rather than raise this number again.
+    assert size <= 164 * 1024, f"{page}: {size} bytes"
