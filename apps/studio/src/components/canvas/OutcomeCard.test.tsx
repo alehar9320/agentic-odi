@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { OutcomeCard } from "./OutcomeCard";
+import { CustomerWords, OutcomeCard, WaysToFix } from "./OutcomeCard";
+import type { Remedy } from "../../domain/Remedies";
+import type { SessionEvidence } from "../../domain/Verbatims";
 
 vi.mock("../../api/studioApi", () => ({
   fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
@@ -237,5 +239,158 @@ describe("OutcomeCard advances link", () => {
     render(<OutcomeCard outcome={drifted} />);
     expect(screen.getByText(/Old objective wording \(method\)/i)).toBeInTheDocument();
     expect(screen.queryByText(/new objective/i)).toBeNull();
+  });
+});
+
+const fixes: Remedy[] = [
+  {
+    id: "remedy-reduce-first-step",
+    title: "Remove the first manual step",
+    rationale: "Deleting that step is the smallest change that moves the score.",
+    effort: "small",
+    source: "illustrative",
+  },
+  {
+    id: "remedy-name-the-owner",
+    title: "Give the hand-off a named owner",
+    rationale: "Naming one person is cheap and makes the gap measurable.",
+    effort: "medium",
+    source: "illustrative",
+  },
+];
+
+const realFixes: Remedy[] = fixes.map((fix) => ({ ...fix, source: "real" as const }));
+
+const sessionQuote = {
+  content: "We keep the spreadsheet open beside the tool because we don't trust it yet.",
+  source_name: "Interview — operations lead",
+  source_kind: "interview",
+};
+
+describe("WaysToFix", () => {
+  it("badges the trigger as simulated before the list is opened", () => {
+    // The CTA has to read as illustrative at the point of use, not only in a
+    // footnote after the reader has already opened two "recommendations".
+    render(<WaysToFix remedies={fixes} />);
+
+    const trigger = screen.getByRole("button", { name: "Ways to fix this (2)" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Simulated")).toBeInTheDocument();
+  });
+
+  it("drops the simulated label when a backend supplies the fixes", () => {
+    render(<WaysToFix remedies={realFixes} />);
+
+    expect(screen.getByRole("button", { name: "Ways to fix this (2)" })).toBeInTheDocument();
+    expect(screen.queryByText("Simulated")).toBeNull();
+    expect(screen.queryByText(/no backend computes remedies/i)).toBeNull();
+  });
+
+  it("lists each fix with its effort and rationale when opened", () => {
+    render(<WaysToFix remedies={fixes} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Ways to fix this (2)" }));
+
+    expect(screen.getByText("Remove the first manual step")).toBeInTheDocument();
+    expect(screen.getByText("Deleting that step is the smallest change that moves the score.")).toBeInTheDocument();
+    expect(screen.getByText("small")).toBeInTheDocument();
+    expect(screen.getByText("Give the hand-off a named owner")).toBeInTheDocument();
+    expect(screen.getByText("medium")).toBeInTheDocument();
+  });
+});
+
+describe("CustomerWords", () => {
+  const illustrative: SessionEvidence = { quotes: [sessionQuote], count: null, basis: "illustrative" };
+
+  it("hides the count instead of inventing one when there is no provenance", () => {
+    render(<CustomerWords evidence={illustrative} />);
+
+    const trigger = screen.getByRole("button", { name: "View customer quotes & session data" });
+    expect(trigger.textContent).toBe("View customer quotes & session data");
+  });
+
+  it("labels an illustrative session as simulated at the point of use", () => {
+    render(<CustomerWords evidence={{ ...illustrative, count: 142 }} />);
+
+    expect(
+      screen.getByRole("button", { name: "View customer quotes & session data (142)" }),
+    ).toBeInTheDocument();
+    // The label belongs beside the control, before the quotes are read.
+    expect(screen.getByText("Simulated")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "View customer quotes & session data (142)" }));
+
+    expect(screen.getByText(/We keep the spreadsheet open/)).toBeInTheDocument();
+    expect(screen.getByText("Interview — operations lead (interview)")).toBeInTheDocument();
+    expect(screen.getByText(/no session layer in this store yet/i)).toBeInTheDocument();
+  });
+
+  it("drops the simulated label when the store supplies real quotes", () => {
+    render(<CustomerWords evidence={{ quotes: [sessionQuote], count: 3, basis: "real" }} />);
+
+    expect(screen.queryByText("Simulated")).toBeNull();
+    expect(screen.queryByText(/no session layer/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "View customer quotes & session data (3)" }));
+
+    expect(screen.getByText(/We keep the spreadsheet open/)).toBeInTheDocument();
+  });
+});
+
+describe("OutcomeCard finding support", () => {
+  it("offers two labelled ways to fix the finding in the detail card", () => {
+    render(<OutcomeCard outcome={outcome} />);
+
+    const trigger = screen.getByRole("button", { name: "Ways to fix this (2)" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Remove the first manual step")).toBeInTheDocument();
+    expect(screen.getByText("Give the hand-off a named owner")).toBeInTheDocument();
+    expect(screen.getAllByText("Simulated").length).toBeGreaterThan(0);
+  });
+
+  it("shows the session quotes behind the finding, uncounted without provenance", () => {
+    render(<OutcomeCard outcome={outcome} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "View customer quotes & session data" }));
+
+    expect(screen.getByText(/We keep the spreadsheet open/)).toBeInTheDocument();
+    expect(screen.getAllByText("Simulated").length).toBeGreaterThan(0);
+  });
+
+  it("uses the real evidence count from the canvas provenance", () => {
+    harness.state.canvasState = {
+      kind: "ready",
+      data: {
+        jobs: [],
+        steps: [],
+        outcomes: [],
+        evidence: [],
+        source: "local",
+        provenance: {
+          kind: "live",
+          reason: "Loaded from the sidecar.",
+          generated_at: "2026-11-15T00:00:00Z",
+          record_counts: { jobs: 2, steps: 8, outcomes: 12, evidence: 142 },
+        },
+      },
+    } as unknown as typeof harness.state.canvasState;
+
+    try {
+      render(<OutcomeCard outcome={outcome} />);
+
+      const trigger = screen.getByRole("button", {
+        name: "View customer quotes & session data (142)",
+      });
+      fireEvent.click(trigger);
+      expect(screen.getByText(/We keep the spreadsheet open/)).toBeInTheDocument();
+    } finally {
+      harness.state.canvasState = {
+        kind: "ready",
+        data: { jobs: [], steps: [], outcomes: [], source: "seed" },
+      };
+    }
   });
 });

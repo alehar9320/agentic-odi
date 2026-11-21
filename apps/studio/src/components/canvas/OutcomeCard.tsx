@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { getRemedies, type Remedy } from "../../domain/Remedies";
+import { getSessionEvidence, type SessionEvidence } from "../../domain/Verbatims";
 import {
   fetchExistingSolution,
   fetchOutcomeAlternatives,
@@ -22,6 +24,134 @@ import type { ExistingSolution, Outcome, OutcomeAlternative, OutcomeInterval } f
 import { CopyIcon } from "../icons";
 import { DetailBlock } from "../workspace/DetailBlock";
 import { ScorePopover } from "./ScorePopover";
+
+/**
+ * The illustrative results behind a finding, labelled where they are used.
+ *
+ * Both interfaces in `domain/` have no backend yet (#741). A remedy or a
+ * session quote that came from a mock must say so on the control the reader is
+ * about to press, not in a note underneath it — an unlabelled "2 ways to fix
+ * this" gets quoted onward as if it were analysis. The amber badge is the same
+ * one the bundled sample rows use.
+ */
+export function WaysToFix({ remedies }: { remedies: Remedy[] }) {
+  const [open, setOpen] = useState(false);
+  const illustrative = remedies.some((remedy) => remedy.source !== "real");
+
+  return (
+    <section className="card__support">
+      <div className="card__support-head">
+        <button
+          type="button"
+          className="quiet-action"
+          aria-expanded={open}
+          title="Show the changes that would move this finding"
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {open ? "Hide" : "Ways to fix this"} ({remedies.length})
+        </button>
+        {illustrative ? (
+          <span
+            className="badge badge--amber"
+            title="No backend computes remedies yet; these are labelled examples."
+          >
+            Simulated
+          </span>
+        ) : null}
+      </div>
+
+      {open && (
+        <>
+          <ul className="card__support-list">
+            {remedies.map((remedy) => (
+              <li key={remedy.id}>
+                <p className="card__support-title">
+                  {remedy.title}
+                  <span className="badge badge--blue">{remedy.effort}</span>
+                  {remedy.source !== "real" ? (
+                    <span
+                      className="badge badge--amber"
+                      title="An example, not a computed recommendation."
+                    >
+                      Simulated
+                    </span>
+                  ) : null}
+                </p>
+                <p className="card__support-rationale">{remedy.rationale}</p>
+              </li>
+            ))}
+          </ul>
+          {illustrative ? (
+            <p className="ui-caption card__support-note">
+              Simulated — no backend computes remedies yet
+            </p>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The customer words behind a finding.
+ *
+ * The count is the honest part: it is the canvas's real evidence count when a
+ * provenance says what that is, and it is absent — never estimated — when none
+ * does. The quotes themselves say "Simulated" until a session layer exists.
+ */
+export function CustomerWords({ evidence }: { evidence: SessionEvidence }) {
+  const [open, setOpen] = useState(false);
+  const illustrative = evidence.basis !== "real";
+  const count = evidence.count;
+  const label =
+    count == null
+      ? "View customer quotes & session data"
+      : `View customer quotes & session data (${count})`;
+
+  return (
+    <section className="card__support">
+      <div className="card__support-head">
+        <button
+          type="button"
+          className="quiet-action"
+          aria-expanded={open}
+          title="Show the customer words recorded against this canvas"
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          {open ? "Hide customer quotes" : label}
+        </button>
+        {illustrative ? (
+          <span
+            className="badge badge--amber"
+            title="The store has no session or verbatim layer yet; these are labelled examples."
+          >
+            Simulated
+          </span>
+        ) : null}
+      </div>
+
+      {open && (
+        <>
+          <ul className="card__support-list">
+            {evidence.quotes.map((quote, index) => (
+              <li key={`${quote.source_name}-${index}`}>
+                <p className="card__evidence">“{quote.content}”</p>
+                <p className="card__support-source">
+                  {quote.source_name} ({quote.source_kind})
+                </p>
+              </li>
+            ))}
+          </ul>
+          {illustrative ? (
+            <p className="ui-caption card__support-note">
+              Simulated — no session layer in this store yet
+            </p>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
 
 export function OutcomeCard({
   outcome,
@@ -143,6 +273,15 @@ export function OutcomeCard({
 
   const opp = outcome.opportunity_score;
   const statement = outcome.statement ?? "Untitled outcome";
+  // The finding this card is about, read through the #741 interfaces rather
+  // than inline literals; a real backend fills both without a UI change.
+  const findings = useMemo(() => ({ kind: "outcome", id: outcomeId }), [outcomeId]);
+  const remedies = useMemo(() => getRemedies(findings), [findings]);
+  const provenance = canvasState.data?.provenance ?? null;
+  const sessionEvidence = useMemo(
+    () => getSessionEvidence(findings, provenance),
+    [findings, provenance],
+  );
   const scored = hasScore(opp);
   const underserved = scored && isUnderserved(opp);
   const pill = scored
@@ -235,6 +374,9 @@ export function OutcomeCard({
           ) : null}
         </div>
       ) : null}
+
+      <WaysToFix remedies={remedies} />
+      <CustomerWords evidence={sessionEvidence} />
 
       {showConfidence && (
         <div className={`claim-check claim-check--${confidence.level}`}>

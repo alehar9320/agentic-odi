@@ -1,6 +1,7 @@
 import { chromaticPlugin } from "@chromatic-com/vitest/plugin";
 import { playwright } from "@vitest/browser-playwright";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
@@ -15,6 +16,14 @@ import { defineConfig } from "vitest/config";
  * is therefore an explicit, reviewable act: one new file, not a wider glob.
  */
 export default defineConfig({
+  // Same `@` mapping as vite.config.ts: `@/` is the vendored component tree, and
+  // a visual test that renders a component reaching into it (OutcomeCard ->
+  // ScorePopover -> @/components/ui/dialog) needs it to resolve here too.
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src/vendor", import.meta.url)),
+    },
+  },
   plugins: [
     react(),
     chromaticPlugin({

@@ -235,7 +235,7 @@ describe("CapabilityRegistry", () => {
     localStorage.removeItem("studio.token");
   });
 
-  it("returns all eight capability ids", async () => {
+  it("returns all eleven capability ids", async () => {
     const statuses = await capabilityRegistry.statuses({
       base_url: "http://localhost:8001/v1",
       api_key: "local",
@@ -255,8 +255,27 @@ describe("CapabilityRegistry", () => {
       "sidecar-connectors",
       "sidecar-mcp",
       "sidecar-import",
+      "remedies",
+      "session-verbatims",
     ]);
-    expect(statuses).toHaveLength(9);
+    expect(statuses).toHaveLength(11);
+  });
+
+  it("reports the not-yet-backed capabilities as unavailable with a reason", async () => {
+    // #741: the interfaces exist, the backends do not. Settings and the status
+    // line must say so rather than implying a working service behind the mocks.
+    const statuses = await capabilityRegistry.statuses({
+      base_url: "http://localhost:8001/v1",
+      api_key: "local",
+      model_name: "local-tools-model",
+      mcp_url: "http://localhost:8000/mcp",
+      theme: "dark",
+    });
+    const byId = Object.fromEntries(statuses.map((c) => [c.id, c]));
+    expect(byId["remedies"].status).toBe("unavailable");
+    expect(byId["remedies"].reason).toBeTruthy();
+    expect(byId["session-verbatims"].status).toBe("unavailable");
+    expect(byId["session-verbatims"].reason).toBeTruthy();
   });
 });
 

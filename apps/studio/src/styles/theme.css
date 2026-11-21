@@ -2376,6 +2376,54 @@ a {
   line-height: 1.5;
 }
 
+/* The two illustrative results behind a finding (#741): a disclosure whose
+   trigger carries the label, so the reader knows what they are about to read. */
+.card__support {
+  display: grid;
+  gap: 6px;
+}
+
+.card__support-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.card__support-list {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.card__support-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.card__support-rationale {
+  margin: 2px 0 0;
+}
+
+.card__support-source {
+  margin: 2px 0 0;
+  color: var(--faint);
+  font-size: 0.72rem;
+}
+
+.card__support-note {
+  margin: 0;
+}
+
 .card__actions {
   display: flex;
   flex-wrap: wrap;

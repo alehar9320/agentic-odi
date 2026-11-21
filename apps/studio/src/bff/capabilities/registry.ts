@@ -16,7 +16,9 @@ export type CapabilityId =
   | "sidecar-llm"
   | "sidecar-connectors"
   | "sidecar-mcp"
-  | "sidecar-import";
+  | "sidecar-import"
+  | "remedies"
+  | "session-verbatims";
 
 /**
  * What a probe has actually established. `unknown` is its own answer: a thing
@@ -93,6 +95,25 @@ const localStatuses: Record<CapabilityId, Capability> = {
     label: "Sidecar import",
     description: "Imports canvas data and memory from a reachable sidecar.",
     status: "unavailable",
+  },
+  // Both are typed interfaces with no backend yet (#741). Registered here so
+  // Settings and the status line tell the truth about the gap instead of
+  // implying a working service behind the labelled mocks.
+  remedies: {
+    id: "remedies",
+    label: "Suggested ways to fix a finding",
+    description:
+      "Computes remedies for a finding. The interface exists; nothing fills it yet, so the panel shows labelled examples.",
+    status: "unavailable",
+    reason: "No backend computes remedies yet.",
+  },
+  "session-verbatims": {
+    id: "session-verbatims",
+    label: "Customer quotes and session data",
+    description:
+      "Reads the quotes behind a finding. The interface exists; the store has no session or verbatim layer yet.",
+    status: "unavailable",
+    reason: "No session or verbatim layer in the store yet.",
   },
 };
 
@@ -262,6 +283,8 @@ export class CapabilityRegistry {
       localStatuses["local-memory"],
       localStatuses["deterministic-assistant"],
       ...results,
+      localStatuses["remedies"],
+      localStatuses["session-verbatims"],
     ];
   }
 }
