@@ -20,6 +20,7 @@ ASSETS = ROOT / "brand" / "assets"
 ASSET_NAMES = (
     "odi-mascot.svg",
     "odi-mark.svg",
+    "odi-chrome-mark.svg",
     "odi-mascot-256.png",
     "odi-mascot-512.png",
     "odi-mascot-1024.png",
@@ -150,6 +151,34 @@ def test_svg_assets_are_well_formed_and_script_free():
         assert root.get("viewBox") == "0 0 32 32"
         assert root.get("shape-rendering") == "crispEdges"
         assert not any(element.tag.endswith("script") for element in root.iter())
+
+
+def test_chrome_mark_is_a_script_free_vector_with_the_expected_colours():
+    """The chrome mark is the one vector Odi; it must be safe and on-palette."""
+    path = ASSETS / "odi-chrome-mark.svg"
+    root = ET.parse(path).getroot()
+    assert root.tag.endswith("svg")
+    assert root.get("viewBox") == "0 0 32 32"
+    assert root.get("shape-rendering") is None
+    assert not any(element.tag.endswith("script") for element in root.iter())
+
+    text = path.read_text(encoding="utf-8")
+    for colour in ("#131722", "#B4794C", "#DCA871", "#F6EAD8", "#1B1410"):
+        assert colour in text, colour
+
+
+def test_chrome_mark_and_the_studio_component_cannot_drift():
+    """Every path in the asset must survive into the generated component."""
+    asset = ET.parse(ASSETS / "odi-chrome-mark.svg").getroot()
+    paths = [
+        element.get("d")
+        for element in asset.iter()
+        if element.tag.endswith("path") and element.get("d")
+    ]
+    assert paths, "the chrome mark must carry its curved features as paths"
+    component = (ROOT / "apps/studio/src/components/OdiMascot.tsx").read_text(encoding="utf-8")
+    for path in paths:
+        assert path in component, path
 
 
 def test_mascot_svg_carries_the_golden_ratio_guide_layer():

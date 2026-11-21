@@ -237,6 +237,51 @@ def mark_raster() -> Raster:
     return raster
 
 
+def chrome_mark_shapes() -> str:
+    """Return the chrome mark's SVG body: the head as shapes, not a rect grid.
+
+    The pixel ``mark_raster`` is a 32-unit grid — perfect for a favicon or a
+    desktop icon, where the grid *is* the medium, but blurry when a browser
+    scales 32 units onto a 40- or 64-pixel button at a fractional device-pixel
+    ratio. This draws the same head from the same constants and ``PALETTE`` as
+    smooth shapes, so it stays sharp at any size.
+    """
+    ink = PALETTE["ink"]
+    fur = PALETTE["fur"]
+    fur_light = PALETTE["fur_light"]
+    cream = PALETTE["cream"]
+    tile = PALETTE["tile"]
+    return (
+        f'<rect width="{GRID}" height="{GRID}" rx="7" fill="{tile}"/>'
+        f'<circle cx="5.6" cy="10.5" r="3" fill="{fur}"/>'
+        f'<circle cx="26.4" cy="10.5" r="3" fill="{fur}"/>'
+        f'<ellipse cx="16" cy="17" rx="11" ry="6.8" fill="{fur}"/>'
+        f'<ellipse cx="8.7" cy="19.9" rx="2.4" ry="1.8" fill="{fur_light}"/>'
+        f'<ellipse cx="23.3" cy="19.9" rx="2.4" ry="1.8" fill="{fur_light}"/>'
+        f'<g fill="none" stroke="{ink}" stroke-width="1">'
+        '<rect x="5.3" y="13" width="7.4" height="6.4" rx="2.2"/>'
+        '<rect x="19.3" y="13" width="7.4" height="6.4" rx="2.2"/>'
+        '<path d="M12.7 14.6h6.6"/>'
+        "</g>"
+        f'<rect x="6.6" y="14.1" width="4.8" height="4.8" rx="1.6" fill="{ink}"/>'
+        f'<rect x="20.6" y="14.1" width="4.8" height="4.8" rx="1.6" fill="{ink}"/>'
+        f'<circle cx="8.1" cy="15.5" r="0.75" fill="{cream}"/>'
+        f'<circle cx="22.1" cy="15.5" r="0.75" fill="{cream}"/>'
+        f'<ellipse cx="16" cy="20" rx="4" ry="2.5" fill="{cream}"/>'
+        f'<rect x="13.6" y="17.1" width="4.8" height="2.3" rx="1.15" fill="{ink}"/>'
+        f'<path d="M14.7 21.3q1.3 1 2.6 0" fill="none" stroke="{ink}" '
+        'stroke-width="0.9" stroke-linecap="round"/>'
+    )
+
+
+def chrome_mark_svg() -> str:
+    """Render the chrome mark as a standalone, resolution-independent SVG."""
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {GRID} {GRID}" '
+        f'width="{GRID}" height="{GRID}">{chrome_mark_shapes()}</svg>'
+    )
+
+
 def bust_raster() -> Raster:
     """Draw the full Odi bust: head, PM business suit attire, and outcome spark."""
     body = Raster()
