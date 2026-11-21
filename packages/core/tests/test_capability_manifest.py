@@ -42,10 +42,13 @@ def test_every_tool_has_summary_effect_and_returns() -> None:
 def test_effect_derivation_matches_naming_rule() -> None:
     """Known pure calculations are reads; other unrecognized verbs default to writes."""
     pure_calculations = {"evaluate_outcome", "compute_opportunity"}
+    # A ``links_*`` name is not self-describing, so a read link tool declares its
+    # effect explicitly rather than relying on the prefix rule.
+    read_exceptions = {"links_list"}
     for name, spec in TOOL_SPECS.items():
-        if name.startswith(("get_", "list_")) or name in pure_calculations:
+        if name.startswith(("get_", "list_")) or name in pure_calculations or name in read_exceptions:
             assert spec.effect == ToolEffect.READ, (
-                f"Tool {name} (starts with get_/list_) should be READ, got {spec.effect}"
+                f"Tool {name} should be READ, got {spec.effect}"
             )
         elif name.startswith("delete_"):
             assert spec.effect == ToolEffect.DESTRUCTIVE, (
