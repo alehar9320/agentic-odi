@@ -27,6 +27,7 @@ from pr_sweep import (
     main,
     parse_payload,
     render_json,
+    render_report,
     render_table,
 )
 
@@ -328,3 +329,65 @@ def test_main_reports_a_missing_fixtures_file(
 
     assert main(["--fixtures", str(missing)]) == 1
     assert "could not read open pull requests" in capsys.readouterr().err
+
+
+# --- Rendering a saved report ------------------------------------------------
+
+
+def test_render_report_reproduces_the_table_from_the_saved_json() -> None:
+    """The workflow posts the report it validated, so both forms must agree."""
+    pull_requests = _pull_requests()
+    grouped = bucket_all(pull_requests, _context(pull_requests))
+    report = json.loads(render_json(grouped, len(pull_requests), "30d", NOW))
+
+    assert render_report(report) == render_table(grouped, len(pull_requests), "30d", NOW)
+
+
+def test_render_report_rejects_a_payload_without_buckets() -> None:
+    with pytest.raises(ValueError):
+        render_report({"window": "30d", "total_pull_requests": 1})
+
+
+def test_render_report_rejects_a_row_missing_a_table_field() -> None:
+    """A damaged report must fail loudly, not render blanks into the comment."""
+    payload = {
+        "window": "30d",
+        "total_pull_requests": 1,
+        "buckets": {"draft": [{"number": 1}]},
+    }
+
+    with pytest.raises(ValueError):
+        render_report(payload)
+
+
+def test_main_render_prints_the_saved_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pull_requests = _pull_requests()
+    grouped = bucket_all(pull_requests, _context(pull_requests))
+    report = tmp_path / "sweep-report.json"
+    report.write_text(render_json(grouped, len(pull_requests), "30d", NOW), encoding="utf-8")
+
+    assert main(["--render", str(report)]) == 0
+    output = capsys.readouterr().out
+
+    assert "open pull request(s) within --since 30d" in output
+    assert "## green-mergeable (1)" in output
+    assert "#1101" in output
+
+
+def test_main_render_reports_a_missing_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["--render", str(tmp_path / "gone.json")]) == 1
+    assert "could not read the saved report" in capsys.readouterr().err
+
+
+def test_main_render_reports_a_malformed_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = tmp_path / "sweep-report.json"
+    report.write_text("{}", encoding="utf-8")
+
+    assert main(["--render", str(report)]) == 1
+    assert "could not render the saved report" in capsys.readouterr().err

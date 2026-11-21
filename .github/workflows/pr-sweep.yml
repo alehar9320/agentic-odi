@@ -68,14 +68,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPORT=$(cat "$RUNNER_TEMP/sweep-report.json")
-          # Extract the table from the JSON for a readable comment
-          TABLE=$(uv run python scripts/pr_sweep.py --live --since 30d 2>/dev/null || echo "_Failed to render table_")
-          BODY="## Weekly PR Sweep Report
-
-          \`\`\`
-          $TABLE
-          \`\`\`
-
-          *Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
-          gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+          # Post the report this job already fetched and validated. Sweeping a
+          # second time here made the comment a different read of the queue:
+          # it could disagree with the validated numbers, or be rate-limited
+          # and post "failed" for a run that had already succeeded.
+          {
+            echo '## Weekly PR Sweep Report'
+            echo
+            uv run python scripts/pr_sweep.py --render "$RUNNER_TEMP/sweep-report.json"
+            echo
+            echo "*Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
+          } > "$RUNNER_TEMP/sweep-comment.md"
+          gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/sweep-comment.md"

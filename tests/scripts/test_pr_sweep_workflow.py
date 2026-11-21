@@ -113,3 +113,23 @@ def test_workflow_has_concurrency_control() -> None:
     text = SWEEP.read_text(encoding="utf-8")
     assert "concurrency:" in text
     assert "cancel-in-progress: true" in text
+
+
+def test_the_comment_posts_the_report_the_job_validated() -> None:
+    """One live sweep per run: the comment renders the saved report.
+
+    A second ``--live`` call for the comment made the posted table an
+    independent read of the queue, so it could disagree with the validated
+    numbers, or fail after validation passed.
+    """
+    document = yaml.safe_load(SWEEP.read_text(encoding="utf-8"))
+    steps = {
+        step["name"]: step["run"] for step in document["jobs"]["pr-sweep"]["steps"] if "run" in step
+    }
+
+    assert steps["Run PR sweep (live)"].count("--live") == 1
+    comment = steps["Post or update tracking issue comment"]
+    assert "--render" in comment
+    assert "sweep-report.json" in comment
+    assert "--live" not in comment
+    assert "--body-file" in comment

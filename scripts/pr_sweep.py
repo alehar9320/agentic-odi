@@ -18,6 +18,7 @@ Run it locally with::
 
     uv run python scripts/pr_sweep.py --since 30d
     uv run python scripts/pr_sweep.py --since 30d --live --json
+    uv run python scripts/pr_sweep.py --render "$RUNNER_TEMP/sweep-report.json"
 """
 
 from __future__ import annotations
@@ -320,12 +321,30 @@ def context_for(
 # ---------------------------------------------------------------------------
 
 
-def _age(pr: OpenPullRequest, now: datetime) -> str:
-    days = max((now - pr.created_at).days, 0)
-    return f"{days}d"
+@dataclass(frozen=True)
+class TableRow:
+    """The columns a rendered table needs, from the queue or a saved report."""
+
+    number: int
+    age_days: int
+    is_draft: bool
+    mergeable: str
+    last_push: str
+    files_touched: int
 
 
-def render_bucket(name: str, rows: list[OpenPullRequest], now: datetime) -> str:
+def _table_row(pr: OpenPullRequest, now: datetime) -> TableRow:
+    return TableRow(
+        number=pr.number,
+        age_days=max((now - pr.created_at).days, 0),
+        is_draft=pr.is_draft,
+        mergeable=pr.mergeable or "UNKNOWN",
+        last_push=pr.updated_at.date().isoformat(),
+        files_touched=len(pr.files),
+    )
+
+
+def _render_rows(name: str, rows: list[TableRow]) -> str:
     """One bucket as the table a person reads."""
     lines = [f"## {name} ({len(rows)})", ""]
     if not rows:
@@ -333,13 +352,17 @@ def render_bucket(name: str, rows: list[OpenPullRequest], now: datetime) -> str:
         return "\n".join(lines)
     lines.append("| PR | Age | Draft | Mergeable | Last push | Files |")
     lines.append("|---|---|---|---|---|---|")
-    for pr in rows:
+    for row in rows:
         lines.append(
-            f"| #{pr.number} | {_age(pr, now)} | {'yes' if pr.is_draft else 'no'} "
-            f"| {pr.mergeable or 'UNKNOWN'} | {pr.updated_at.date().isoformat()} "
-            f"| {len(pr.files)} |"
+            f"| #{row.number} | {row.age_days}d | {'yes' if row.is_draft else 'no'} "
+            f"| {row.mergeable} | {row.last_push} | {row.files_touched} |"
         )
     return "\n".join(lines)
+
+
+def render_bucket(name: str, rows: list[OpenPullRequest], now: datetime) -> str:
+    """One bucket as the table a person reads."""
+    return _render_rows(name, [_table_row(pr, now) for pr in rows])
 
 
 def render_table(
@@ -385,6 +408,61 @@ def render_json(
     return json.dumps(payload, indent=2, sort_keys=False)
 
 
+def _report_row(row: object) -> TableRow:
+    """Read one bucket row out of a saved ``--json`` report."""
+    if not isinstance(row, dict):
+        raise ValueError("report row is not an object")
+    number = row.get("number")
+    age_days = row.get("age_days")
+    is_draft = row.get("is_draft")
+    mergeable = row.get("mergeable")
+    last_push = row.get("last_push")
+    files_touched = row.get("files_touched")
+    if (
+        not isinstance(number, int)
+        or not isinstance(age_days, int)
+        or not isinstance(is_draft, bool)
+        or not isinstance(mergeable, str)
+        or not isinstance(last_push, str)
+        or not isinstance(files_touched, int)
+    ):
+        raise ValueError("report row is missing a table field")
+    return TableRow(
+        number=number,
+        age_days=age_days,
+        is_draft=is_draft,
+        mergeable=mergeable,
+        last_push=last_push,
+        files_touched=files_touched,
+    )
+
+
+def render_report(payload: object) -> str:
+    """Render a saved ``--json`` report as the same table a live run prints.
+
+    The weekly workflow validates the report it fetched and then posts it.
+    Reading the saved file back keeps the posted table the one that was
+    validated: a second live read could disagree with it, or be rate-limited
+    and post a failure the validated report never had.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("expected a JSON report object")
+    total = payload.get("total_pull_requests")
+    window = payload.get("window")
+    buckets = payload.get("buckets")
+    if not isinstance(total, int) or not isinstance(window, str) or not isinstance(buckets, dict):
+        raise ValueError("report is missing window, total_pull_requests, or buckets")
+
+    lines = [f"{total} open pull request(s) within --since {window}", ""]
+    for name in BUCKETS:
+        rows = buckets.get(name, [])
+        if not isinstance(rows, list):
+            raise ValueError(f"report bucket {name!r} is not a list")
+        lines.append(_render_rows(name, [_report_row(row) for row in rows]))
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
 # ---------------------------------------------------------------------------
 # The command line
 # ---------------------------------------------------------------------------
@@ -414,7 +492,26 @@ def main(argv: list[str] | None = None) -> int:
         help="fixtures file for the offline default",
     )
     parser.add_argument("--json", action="store_true", help="print the report as JSON")
+    parser.add_argument(
+        "--render",
+        type=Path,
+        metavar="PATH",
+        help="print the markdown table from a saved --json report instead of sweeping",
+    )
     args = parser.parse_args(argv)
+
+    if args.render:
+        try:
+            payload = json.loads(args.render.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            print(f"could not read the saved report: {error}", file=sys.stderr)
+            return 1
+        try:
+            print(render_report(payload))
+        except ValueError as error:
+            print(f"could not render the saved report: {error}", file=sys.stderr)
+            return 1
+        return 0
 
     try:
         window = parse_window(args.since)
