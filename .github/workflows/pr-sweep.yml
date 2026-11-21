@@ -48,19 +48,19 @@ jobs:
       - name: Validate report is non-empty
         run: |
           python3 -c "
-import json, sys
-with open('$RUNNER_TEMP/sweep-report.json') as f:
-    data = json.load(f)
-total = data.get('total_pull_requests', 0)
-counts = data.get('counts', {})
-if total == 0:
-    print('::error::Sweep report has zero total pull requests — run may be broken')
-    sys.exit(1)
-if sum(counts.values()) == 0:
-    print('::error::Sweep report has zero bucket counts — run may be broken')
-    sys.exit(1)
-print(f'Report valid: {total} PRs across {len(counts)} buckets')
-"
+          import json, sys
+          with open('$RUNNER_TEMP/sweep-report.json') as f:
+              data = json.load(f)
+          total = data.get('total_pull_requests', 0)
+          counts = data.get('counts', {})
+          if total == 0:
+              print('::error::Sweep report has zero total pull requests — run may be broken')
+              sys.exit(1)
+          if sum(counts.values()) == 0:
+              print('::error::Sweep report has zero bucket counts — run may be broken')
+              sys.exit(1)
+          print(f'Report valid: {total} PRs across {len(counts)} buckets')
+          "
 
       - name: Post or update tracking issue comment
         if: env.TRACKING_ISSUE != ''
@@ -72,9 +72,9 @@ print(f'Report valid: {total} PRs across {len(counts)} buckets')
           TABLE=$(uv run python scripts/pr_sweep.py --live --since 30d 2>/dev/null || echo "_Failed to render table_")
           BODY="## Weekly PR Sweep Report
 
-\`\`\`
-$TABLE
-\`\`\`
+          \`\`\`
+          $TABLE
+          \`\`\`
 
-*Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
+          *Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
           gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$BODY"
