@@ -87,6 +87,11 @@ def compute_opportunity_score(importance: float, satisfaction: float) -> float:
     return float(importance + max(importance - satisfaction, 0.0))
 
 
+#: Where a row came from. ``user`` is a row a person entered; ``demo`` is the
+#: deliberate sample workspace; ``sample`` is the site sample; ``imported`` is
+#: an imported record. One vocabulary serves the demo loader, the site sample
+#: and imports, so a sample row is never mistaken for the user's own data.
+Origin = Literal["user", "demo", "sample", "imported"]
 #: Opportunity scores are compared to one decimal place: a stored score within
 #: half of the last digit of the recomputed value is a rounding difference, not
 #: drift. Half of that digit (0.05) is the Studio's score-mismatch tolerance;
@@ -125,6 +130,17 @@ JOB_NAME_PATTERN = r"^[A-Za-z0-9 _-]+$"
 JOB_NAME_MIN_LENGTH = 3
 JOB_NAME_MAX_LENGTH = 64
 JOB_DESCRIPTION_MAX_LENGTH = 500
+ScoreMethod = Literal["estimate", "survey", "import"]
+
+SCORE_SNAPSHOT_NOTE_MAX = 500
+
+
+def utc_now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 string.
+
+    One helper so every snapshot timestamp shares a format and timezone.
+    """
+    return datetime.now(timezone.utc).isoformat()
 
 
 class Job(BaseModel):
@@ -141,6 +157,7 @@ class Job(BaseModel):
         max_length=JOB_DESCRIPTION_MAX_LENGTH,
         description="Detailed description of the Job",
     )
+    origin: Origin = Field("user", description="Where this row came from")
 
 
 def create_job(name: str, description: str | None = None) -> Job:
@@ -159,6 +176,7 @@ class Step(BaseModel):
     stage_index: int | None = Field(
         None, ge=1, le=8, description="Position (1-8) in the canonical stage order"
     )
+    origin: Origin = Field("user", description="Where this row came from")
 
 
 #: The V2MOM lists an outcome may advance. The vision is a statement, values
@@ -235,6 +253,7 @@ class Outcome(BaseModel):
     opportunity_score: float | None = Field(
         None, description="Opportunity score (Importance + max(Importance - Satisfaction, 0))"
     )
+    origin: Origin = Field("user", description="Where this row came from")
     trace: list[OutcomeAlignment] = Field(
         default_factory=list,
         description=(
@@ -249,6 +268,142 @@ class Outcome(BaseModel):
         None,
         description="The Study wave this outcome was measured in, or None for a row that predates studies",
     )
+    importance_n: int | None = Field(
+        default=None, ge=1, description="People behind the importance score, when known"
+    )
+    satisfaction_n: int | None = Field(
+        default=None, ge=1, description="People behind the satisfaction score, when known"
+    )
+    score_method: ScoreMethod = Field(
+        default="estimate",
+        description="How the score was obtained: a one-person estimate, a survey, or an import",
+    )
+    opportunity_low: float | None = Field(
+        None, description="Low end of the score band, when a band was computed (B3)"
+    )
+    opportunity_high: float | None = Field(
+        None, description="High end of the score band, when a band was computed (B3)"
+    )
+    interval_n: int | None = Field(
+        None, ge=1, description="Observations the band was computed from (B3)"
+    )
+    interval_seed: int | None = Field(None, description="Seed that reproduces the band (B3)")
+    interval_confidence_level: float | None = Field(
+        None, description="Confidence level of the band, e.g. 0.95 (B3)"
+    )
+    interval_computed_at: str | None = Field(
+        None, description="When the band was computed, for staleness (B3.2)"
+    )
+
+    @model_validator(mode="after")
+    def _count_requires_a_sample(self) -> Outcome:
+        # A count above one means people were asked; an estimate cannot have asked them.
+        if self.score_method == "estimate" and (
+            (self.importance_n or 0) > 1 or (self.satisfaction_n or 0) > 1
+        ):
+            raise ValueError(
+                "score_method 'estimate' cannot carry a sample count above 1; "
+                "use 'survey' or 'import' when people were asked"
+            )
+        if (self.opportunity_low is None) != (self.opportunity_high is None):
+            raise ValueError("a band needs both opportunity_low and opportunity_high")
+        if (
+            self.opportunity_low is not None
+            and self.opportunity_high is not None
+            and self.opportunity_low > self.opportunity_high
+        ):
+            raise ValueError("opportunity_low cannot exceed opportunity_high")
+        # Provenance describes a band. With no band there is nothing to describe,
+        # so drop it rather than letting a cleared band keep a stale seed/level.
+        if self.opportunity_low is None:
+            self.interval_n = None
+            self.interval_seed = None
+            self.interval_confidence_level = None
+            self.interval_computed_at = None
+        return self
+
+
+class ScoreSnapshot(BaseModel):
+    """One accepted score state, kept so "did it move?" is a subtraction.
+
+    A snapshot records the score *and* its sample/method companions, because a
+    history of bare numbers cannot answer "did the evidence change or the
+    estimate?". It is written by one helper on every score-mutating path and
+    lives in the append-only event log, so replay reproduces it.
+
+    A snapshot is only written for an *accepted* mutation; a validation failure
+    creates neither a score change nor a snapshot.
+
+    The writer appends on every accepted ``update_outcome``, so a metadata-only
+    edit (method/count) and an equal-value re-submission each add a snapshot.
+    That is deliberate: the trail records that the decision was re-affirmed or
+    re-evidenced, and it keeps the count/method-only evidence state visible
+    rather than collapsing two unlike states into one identical number.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_id: str = Field(..., description="The outcome this snapshot belongs to")
+    at: str = Field(
+        default_factory=utc_now_iso,
+        description="ISO-8601 UTC timestamp of the accepted mutation",
+    )
+    importance: float | None = Field(None, ge=1.0, le=10.0)
+    satisfaction: float | None = Field(None, ge=1.0, le=10.0)
+    opportunity_score: float | None = None
+    importance_n: int | None = Field(None, ge=1)
+    satisfaction_n: int | None = Field(None, ge=1)
+    method: ScoreMethod = "estimate"
+    note: str | None = Field(
+        None,
+        max_length=SCORE_SNAPSHOT_NOTE_MAX,
+        description="Why the number was given, when the caller recorded one",
+    )
+
+
+class SurveyInputSet(BaseModel):
+    """The accepted paired survey inputs a band can be reproduced from (B3.1).
+
+    Persisted in the append-only event log so a stored band is reproducible
+    after a reload, not only for the process that imported it. Each entry is the
+    paired ``(importance, satisfaction)`` a respondent gave, in the canonical
+    order the import accepted them, plus a de-identified ``respondent_ref``.
+
+    No personal identifier is stored: ``respondent_ref`` is a caller-supplied
+    opaque token (the import's respondent id or a row label), never a name or an
+    email, and it is kept only so a repeated respondent stays one person under
+    the retention policy. It is not a public aggregate payload.
+
+    ``input_ref`` is the versioned reference the interval slice records: it is
+    derived from the inputs so a band can name the exact set it came from, and it
+    changes when the set changes. ``study_id``/``wave`` are the lineage links the
+    retention decision must define; both are optional here because the policy is
+    not yet approved, so a missing link stays ``None`` rather than a guessed
+    study.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    outcome_id: str = Field(..., description="The outcome these paired inputs belong to")
+    job_id: str = Field(..., description="The owning job, so a cross-job link is detectable")
+    input_ref: str = Field(..., description="Versioned reference to this exact input set (B3.1)")
+    pairs: list[tuple[float, float]] = Field(
+        default_factory=list,
+        description="Accepted (importance, satisfaction) pairs in canonical import order",
+    )
+    respondent_refs: list[str] = Field(
+        default_factory=list,
+        description="De-identified per-pair respondent tokens, kept only to de-duplicate",
+    )
+    study_id: str | None = Field(None, description="Study lineage, when the policy defines it")
+    wave: str | None = Field(None, description="Study wave lineage, when the policy defines it")
+    method: str = Field("survey", description="How the inputs were obtained")
+
+    @model_validator(mode="after")
+    def _refs_match_pairs(self) -> SurveyInputSet:
+        # A respondent token per pair, or none at all: a partial list would let a
+        # caller pair the wrong token with the wrong answers.
+        if self.respondent_refs and len(self.respondent_refs) != len(self.pairs):
+            raise ValueError("respondent_refs must be empty or one token per pair")
+        return self
 
 
 class ValueMetric(BaseModel):
@@ -311,6 +466,7 @@ class Evidence(BaseModel):
     job_id: str | None = Field(None, description="Job this evidence supports")
     step_id: str | None = Field(None, description="Job-map Step this evidence supports")
     outcome_id: str | None = Field(None, description="Desired Outcome this evidence supports")
+    origin: Origin = Field("user", description="Where this row came from")
     impact: Literal["high", "medium", "low"] = Field(
         "medium",
         description=(
@@ -323,6 +479,116 @@ class Evidence(BaseModel):
             "Whether the record was confirmed by the person (verified) or "
             "asserted without confirmation (claimed)"
         ),
+    )
+
+
+class Interview(BaseModel):
+    """A research conversation: who took part, when, and the job it informs.
+
+    ``participant_label`` is a free-text label, never a real name, email, or
+    company. The quote rows are the unit of work; there is no raw-transcript
+    field, because a filesystem/BLOB store would be a second record of truth.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str | None = Field(None, description="The Job this interview informs")
+    title: str = Field(..., description="Short human-readable title for the interview")
+    participant_label: str = Field(
+        ..., description="Free-text label such as 'Ana' or 'Participant 3', never a real name"
+    )
+    participant_role: str | None = Field(None, description="The participant's role, if known")
+    conducted_at: str | None = Field(
+        None, description="ISO-8601 date/time the interview was conducted"
+    )
+    source_kind: str = Field("manual", description="Where the transcript came from, e.g. manual")
+    notes: str | None = Field(None, description="Researcher notes about the interview")
+
+
+class InterviewQuote(BaseModel):
+    """One verbatim sentence from an interview, in service-assigned order."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    interview_id: str = Field(..., description="The Interview this quote belongs to")
+    speaker: str | None = Field(None, description="Who said it, if the transcript names them")
+    text: str = Field(..., description="The verbatim quote text")
+    ordinal: int = Field(..., ge=0, description="Service-assigned order within the interview")
+    start_ms: int | None = Field(None, ge=0, description="Start offset in milliseconds")
+    end_ms: int | None = Field(None, ge=0, description="End offset in milliseconds")
+
+
+class CandidateStatus(str, Enum):
+    """Where a candidate is in its life: proposed, accepted, rejected, or parked."""
+
+    PROPOSED = "proposed"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    MERGED = "merged"
+    PARKED = "parked"
+
+
+class OutcomeCandidate(BaseModel):
+    """A desired-outcome statement proposed from one interview quote.
+
+    A candidate is not an :class:`Outcome`; it carries the evidence and the
+    decision until a person accepts it. ``status`` is the whole state machine,
+    and ``outcome_id`` records what acceptance produced so a retry cannot make
+    a second outcome.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    interview_id: str = Field(..., description="The Interview the quote belongs to")
+    quote_id: str = Field(..., description="The verbatim quote this candidate came from")
+    statement: str = Field(..., description="The proposed desired-outcome statement")
+    rationale: str = Field(
+        "", description="Why the extractor proposed it, or why a validator refused it"
+    )
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Extractor confidence, 0 to 1")
+    status: CandidateStatus = Field(CandidateStatus.PROPOSED, description="Review state")
+    merged_into: str | None = Field(
+        None, description="The candidate or outcome this was merged into, once merged"
+    )
+    outcome_id: str | None = Field(
+        None, description="The Outcome acceptance produced, once accepted"
+    )
+    decision_reason: str | None = Field(
+        None, description="The reviewer's reason, required when rejected"
+    )
+
+
+class ExtractedCandidate(BaseModel):
+    """A candidate the spine extractor proposed from a raw quote.
+
+    Distinct from :class:`OutcomeCandidate`, which belongs to an Interview quote
+    in the store: the spine's demo and tests hand over a quote string directly,
+    so this record carries the job and step it would attach to instead of a
+    required interview link.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    quote_id: str = Field(..., description="The source quote this candidate came from")
+    statement: str = Field(..., description="The proposed ODI desired-outcome statement")
+    rationale: str = Field(
+        "", description="Why the extractor proposed it, or the validator's reason when rejected"
+    )
+    confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Extractor confidence, displayed not thresholded"
+    )
+    status: CandidateStatus = Field(
+        CandidateStatus.PROPOSED, description="Where this candidate sits in review"
+    )
+    interview_id: str | None = Field(None, description="The interview record, if known")
+    job_id: str | None = Field(
+        None, description="The Job this candidate would become an outcome of"
+    )
+    step_id: str | None = Field(None, description="The Step this candidate would attach to")
+    outcome_id: str | None = Field(
+        None, description="The Outcome an acceptance created, or a merge folded into"
+    )
+    merged_into: str | None = Field(
+        None, description="The existing Outcome a merge folded this candidate into"
+    )
+    rejection_reason: str | None = Field(
+        None, description="Why a person rejected this candidate; required to reject"
     )
 
 
@@ -342,6 +608,115 @@ class CustomerOutcome(BaseModel):
     @property
     def opportunity_score(self) -> float:
         return self.customer_value.opportunity_score
+
+
+#: B-provisional convention (M2-07). The *allowed values* of ``source_kind`` and
+#: their meaning are not yet approved, so the product runs on this named set:
+#: ``manual`` (a person typed it), ``interview`` (recorded from a research
+#: conversation), ``import`` (landed from a file), ``customer`` (the customer
+#: supplied it directly). The field is a plain string so an unapproved value is
+#: never silently dropped; the set is named here in one place and swappable.
+ALTERNATIVE_SOURCE_KINDS = ("manual", "interview", "import", "customer")
+
+#: M2-07 provisional convention. The alternative *kinds* a customer can be using
+#: today. ``nothing`` is a real, informative row: it is the evidence for a
+#: new-market bet, not an absent one.
+AlternativeKind = Literal["product", "service", "workaround", "manual", "nothing"]
+
+
+class Alternative(BaseModel):
+    """What a customer uses today for one Job (M2-07).
+
+    A competitor, a spreadsheet, a workaround, or nothing. Recorded so
+    "underserved" has something to be underserved relative to. An alternative is
+    never inferred from a score or created by an import: it is customer-provided.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str = Field(..., description="The ID of the Job this alternative serves")
+    name: str = Field(..., min_length=1, description="Short human-readable label")
+    kind: AlternativeKind = Field(..., description="What kind of alternative this is")
+    notes: str | None = Field(None, description="Customer-provided source notes, kept as text")
+    source_kind: str = Field(
+        "manual",
+        description="Where the record came from; see ALTERNATIVE_SOURCE_KINDS (provisional)",
+    )
+
+
+#: M2-07.2 provisional convention. The one sentence every surface renders for
+#: the solution state of an outcome. ``no_linked_nothing`` and ``no_link_at_all``
+#: must never be worded the same way: "we asked and the customer uses nothing" is
+#: evidence for a new-market bet, "we have not asked" is an unknown. The exact
+#: wording is the M2-07.2 gate, so it is named here rather than inlined per
+#: surface (the brief, the CLI and the Studio row all read this map).
+EXISTING_SOLUTION_LABELS: dict[str, str] = {
+    "yes": "Existing solution: yes — a solution is recorded.",
+    "no_linked_nothing": "Existing solution: no — the customer uses nothing today.",
+    "no_link_at_all": "Existing solution: not yet inventoried — we have not asked.",
+}
+
+
+class AlternativeLink(BaseModel):
+    """A customer's adequacy rating for one alternative against one outcome (M2-07).
+
+    Adequacy belongs to the link, not the alternative: the same competitor is
+    adequate for one need and useless for another. The rating is the customer's
+    own, never derived from the opportunity score.
+    """
+
+    outcome_id: str = Field(..., description="The outcome this link rates")
+    alternative_id: str = Field(..., description="The alternative this link rates")
+    adequacy: float = Field(
+        ..., ge=1.0, le=10.0, description="How adequate the alternative is for the outcome (1-10)"
+    )
+    usage_n: int | None = Field(
+        None, ge=1, description="People behind the rating, when known; unknown stays None"
+    )
+    note: str | None = Field(None, description="Customer-provided note, kept as text")
+
+
+class DecisionRecord(BaseModel):
+    """A recorded decision about a subject (typically an accepted outcome).
+
+    Persisted so the loop can be replayed: a decision names what was chosen and
+    why, and is the parent of the :class:`BetRecord` that tests it.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject_id: str = Field(..., description="The Outcome this decision is about")
+    choice: str = Field(..., description="What was chosen")
+    rationale: str = Field(..., description="Why it was chosen")
+    decided_at: str = Field(..., description="ISO-8601 timestamp of the decision")
+
+
+class BetRecord(BaseModel):
+    """A bet: a decision's claim, plus the metric that would move if it is right.
+
+    ``baseline`` is ``None`` when the metric has not been measured yet — an
+    unknown baseline, not a measured zero.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    decision_id: str = Field(..., description="The Decision this bet tests")
+    statement: str = Field(..., description="The claim being bet on")
+    metric: str = Field(..., description="The metric that would move")
+    baseline: float | None = Field(
+        default=None, description="The metric's value before the bet, if known"
+    )
+
+
+class MeasurementRecord(BaseModel):
+    """What a bet measured, against its baseline.
+
+    ``value`` may be ``None``: a measurement that has not been taken is
+    representable without inventing a number.
+    """
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    bet_id: str = Field(..., description="The Bet this measurement belongs to")
+    metric: str = Field(..., description="The metric that was measured")
+    value: float | None = Field(default=None, description="The measured value, if taken")
+    observed_at: str = Field(..., description="ISO-8601 timestamp of the observation")
 
 
 class StudyStatus(str, Enum):
@@ -472,15 +847,6 @@ class Strategy(BaseModel):
         ),
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class CandidateStatus(str, Enum):
-    """Where a candidate is in its life: proposed, accepted, rejected, or parked."""
-
-    PROPOSED = "proposed"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
-    PARKED = "parked"
 
 
 class CandidateSolution(BaseModel):

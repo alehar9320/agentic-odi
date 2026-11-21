@@ -275,4 +275,46 @@ describe("EvidenceStream", () => {
 
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it("announces the new position after a keyboard move", () => {
+    renderWith();
+
+    fireEvent.keyDown(screen.getByRole("listitem", { name: /Call with Ada/ }), {
+      key: "ArrowDown",
+    });
+
+    expect(screen.getByText("Call with Ada moved to position 2 of 3.")).toBeInTheDocument();
+  });
+
+  it("announces the boundary instead of moving", () => {
+    renderWith();
+
+    // ArrowUp on first item should announce boundary
+    fireEvent.keyDown(screen.getByRole("listitem", { name: /Call with Ada/ }), {
+      key: "ArrowUp",
+    });
+
+    expect(screen.getByText("Already first.")).toBeInTheDocument();
+
+    // ArrowDown on last item should announce boundary
+    fireEvent.keyDown(screen.getByRole("listitem", { name: /Support ticket/ }), {
+      key: "ArrowDown",
+    });
+
+    expect(screen.getByText("Already last.")).toBeInTheDocument();
+  });
+
+  it("does not announce when the move is a no-op drop", () => {
+    renderWith();
+
+    const first = screen.getByRole("listitem", { name: /Call with Ada/ });
+    // Drag and drop on itself should be a no-op
+    fireEvent.dragStart(first);
+    fireEvent.dragOver(first);
+    fireEvent.drop(first);
+
+    // No announcement should be made
+    expect(screen.queryByText(/moved to position/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/already (first|last)/i)).not.toBeInTheDocument();
+  });
 });

@@ -61,6 +61,7 @@ CI_JOB_COVERAGE: dict[str, tuple[str, ...]] = {
     "tauri-check": (),
     "tauri-build": (),
     "e2e": (),
+    "e2e-smoke": (),
 }
 
 CI_ONLY_REASONS: dict[str, str] = {
@@ -81,6 +82,10 @@ CI_ONLY_REASONS: dict[str, str] = {
         "drives Chromium against a built Studio and both services; advisory at merge time "
         "and owned by the e2e lane"
     ),
+    "e2e-smoke": (
+        "drives Chromium against a built Studio and both services; a real boot, and the "
+        "one browser lane that blocks a merge, so CI owns it"
+    ),
 }
 
 TIER_NOTES = {
@@ -88,7 +93,10 @@ TIER_NOTES = {
         "Not run: mypy, studio unit tests/build, website build, e2e, tauri, dependency audit."
     ),
     "default": "Not run: e2e (owned by the e2e lane), tauri, dependency audit.",
-    "full": ("Not run: e2e (owned by the e2e lane), tauri-check, tauri-build, dependency audit."),
+    "full": (
+        "Not run: e2e and e2e-smoke (owned by the e2e lane), tauri-check, tauri-build, "
+        "dependency audit."
+    ),
 }
 
 
@@ -194,6 +202,12 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str] | bool]:
             mapped = True
             continue
         if path.startswith("tests/"):
+            targets["tests_root"] = True
+            mapped = True
+            continue
+        if path.startswith("infra/"):
+            # The Cloudflare Worker is TypeScript with no JS runner here, so its
+            # contract is pinned by the root suite (`tests/test_worker_*.py`).
             targets["tests_root"] = True
             mapped = True
             continue

@@ -43,6 +43,10 @@ _BUILD_INFO_VERSION = re.compile(r'^VERSION\s*=\s*"([^"]+)"')
 # Unanchored, because the key sits inside `"vars": { ... }`, which may be
 # written on one line or spread over several.
 _WRANGLER_VERSION = re.compile(r'"RELEASE_VERSION"\s*:\s*"([^"]+)"')
+# The onboarding User-Agent must name the running build, so a literal version
+# here is a claim the release cannot keep true.
+CLI_SOURCE = "apps/cli/src"
+_HARDCODED_USER_AGENT = re.compile(r"agentic-odi/\d")
 
 
 def _declared_version(pyproject: Path) -> str:
@@ -129,12 +133,30 @@ def check_parity(root: Path) -> list[tuple[str, str, str]]:
     ]
 
 
+def hardcoded_user_agents(root: Path) -> list[tuple[str, str]]:
+    """``(relative_path, line)`` for every literal ``agentic-odi/<digit>`` under the CLI."""
+    base = root / CLI_SOURCE
+    if not base.is_dir():
+        return []
+    return [
+        (path.relative_to(root).as_posix(), line.strip())
+        for path in sorted(base.rglob("*.py"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if _HARDCODED_USER_AGENT.search(line)
+    ]
+
+
 def main(argv: list[str]) -> int:
     root = Path(argv[1]) if len(argv) > 1 else ROOT
     drifts = check_parity(root)
     if drifts:
         for rel, declared, released in drifts:
             print(f"{rel}: {declared} != released {released}", file=sys.stderr)
+        return 1
+    literals = hardcoded_user_agents(root)
+    if literals:
+        for rel, line in literals:
+            print(f"{rel}: hardcoded user-agent {line!r}", file=sys.stderr)
         return 1
     print(released_version(root))
     return 0

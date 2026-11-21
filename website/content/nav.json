@@ -72,6 +72,36 @@
           "slug": "observability",
           "source": "docs/architecture/observability.md",
           "title": "Observability"
+        },
+        {
+          "blurb": "Quote to candidate to outcome: propose, review, and accept.",
+          "slug": "interviews",
+          "source": "docs/interviews.md",
+          "title": "Interviews"
+        },
+        {
+          "blurb": "The opportunity score, its basis, bands, and the landscape.",
+          "slug": "scoring",
+          "source": "docs/scoring.md",
+          "title": "Scoring"
+        },
+        {
+          "blurb": "Brief to decision to bet to measure, and the honest empty states.",
+          "slug": "decision",
+          "source": "docs/decision.md",
+          "title": "Decisions"
+        },
+        {
+          "blurb": "Connect an external agent over MCP: connect, read, write under consent, and errors.",
+          "slug": "integration",
+          "source": "docs/integration.md",
+          "title": "Integrate an Agent"
+        },
+        {
+          "blurb": "Quote to candidate to outcome to score to brief to decision to bet to measure.",
+          "slug": "spine",
+          "source": "docs/architecture/spine.md",
+          "title": "The ODI Spine"
         }
       ],
       "title": "Build"
@@ -103,7 +133,7 @@
           "title": "Agent Assignment"
         },
         {
-          "blurb": "What has shipped, and what is queued.",
+          "blurb": "Where to see what shipped, what is in review, and what is queued.",
           "slug": "roadmap",
           "source": "docs/roadmap.md",
           "title": "Roadmap"

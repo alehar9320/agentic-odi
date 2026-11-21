@@ -14,10 +14,13 @@ never the tool that happened to run.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+log = logging.getLogger(__name__)
 
 ClaimStatus = Literal["cited", "hypothesis", "uncited"]
 
@@ -103,18 +106,18 @@ _IMPERATIVE_VERBS: frozenset[str] = frozenset(
         "open",
         "pick",
         "press",
+        "rate",
         "read",
         "record",
         "review",
         "run",
-        "rate",
         "save",
-        "sort",
-        "tag",
         "search",
         "select",
+        "sort",
         "start",
         "stop",
+        "tag",
         "tell",
         "try",
         "type",
@@ -383,7 +386,12 @@ class EvidenceIndex:
         if self.resolver is not None:
             try:
                 return self.resolver(evidence_id)
-            except Exception:  # noqa: BLE001 - a resolver is optional context
+            except Exception as exc:  # noqa: BLE001 - a resolver is optional context
+                log.warning(
+                    "evidence resolver failed (evidence_id=%s, error=%s)",
+                    evidence_id,
+                    type(exc).__name__,
+                )
                 return None
         return None
 
