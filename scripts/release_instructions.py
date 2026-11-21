@@ -227,11 +227,22 @@ def build_instructions_section(
         lead += f" (released {released})"
     lines.append(
         f"{lead} are attached to this release. Pick your platform and follow the "
-        "four steps below — no clone and no Python toolchain required."
+        "steps below — no clone and no Python toolchain required."
     )
     lines.append("")
 
-    lines.append("### 1. Download the archive for your platform")
+    # The Living Studio desktop app is the primary download. List it first so
+    # end users reach the installer they actually want before the CLI archives.
+    if studio_artifacts:
+        lines.extend(_build_studio_section(tag, repo, studio_artifacts))
+        lines.append("")
+
+    lines.append("### Developer CLI (Terminal Only)")
+    lines.append("")
+    lines.append(
+        "The **CLI** is a `uv`-managed Python tool. Download the archive for your "
+        "platform, verify it, then run the one-line installer:"
+    )
     lines.append("")
     if cli_artifacts:
         lines.append("| Platform | Archive | SHA-256 |")
@@ -247,7 +258,7 @@ def build_instructions_section(
         lines.append("The per-platform archives are listed under **Assets** on this release page.")
         lines.append("")
 
-    lines.append("### 2. Verify the download")
+    lines.append("### Verify the download")
     lines.append("")
     if cli_artifacts:
         lines.append(
@@ -271,7 +282,7 @@ def build_instructions_section(
         lines.extend(_verify_block(dl_base, f"odi_{version}_<platform>.tar.gz", "linux_x86_64"))
         lines.append("")
 
-    lines.append("### 3. Install")
+    lines.append("### Install")
     lines.append("")
     lines.append("**Linux / macOS**")
     lines.append("```bash")
@@ -307,16 +318,13 @@ def build_instructions_section(
     lines.append("</details>")
     lines.append("")
 
-    lines.append("### 4. Quick start")
+    lines.append("### Quick start")
     lines.append("```bash")
     lines.append("odi --version")
     lines.append("odi --help")
     lines.append("odi jobs list")
     lines.append("```")
     lines.append("")
-
-    if studio_artifacts:
-        lines.extend(_build_studio_section(tag, repo, studio_artifacts))
 
     related = [
         (kind, next((a for a in artifacts if a["name"] == kind), None))
