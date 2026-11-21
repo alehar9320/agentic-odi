@@ -28,6 +28,9 @@ from typing import Any
 
 import httpx
 import typer
+from agentic_odi_connectors.paths import config_path as connectors_config_path
+from agentic_odi_core.paths import default_odi_db_path
+from agentic_odi_core.settings import api_key, present_variable_names
 
 from agentic_odi_cli import paths, version
 
@@ -39,7 +42,6 @@ STUDIO_START_COMMAND = "uv run python -m agentic_odi_studio_api.main"
 MCP_START_COMMAND = "uv run python -m agentic_odi_mcp_server"
 
 STATUSES = ("pass", "warn", "fail", "skip")
-_API_ENV_VAR = "AGENTIC_ODI_API_KEY"
 
 
 @dataclass(frozen=True)
@@ -100,7 +102,7 @@ def _redact(text: str) -> str:
     if not text:
         return text
     cleaned = _redact_userinfo(text)
-    secret = os.environ.get(_API_ENV_VAR)
+    secret = api_key()
     if secret:
         cleaned = cleaned.replace(secret, "***")
     return cleaned
@@ -119,10 +121,6 @@ def _redact_userinfo(text: str) -> str:
     return re.sub(r"(https?://)[^/@\s]+@", r"\1***@", text)
 
 
-def _env_names() -> list[str]:
-    return sorted(name for name in os.environ if name.startswith("AGENTIC_ODI_"))
-
-
 def _environment() -> dict[str, Any]:
     return {
         "platform": sys.platform,
@@ -130,34 +128,25 @@ def _environment() -> dict[str, Any]:
         "cli_version": version.VERSION,
         "commit": version.COMMIT,
         "target": version.TARGET,
-        "env_vars": _env_names(),
+        "env_vars": present_variable_names(),
     }
 
 
 def _db_path() -> Path:
-    raw = os.environ.get("AGENTIC_ODI_DB", "~/.agentic-odi/odi.db")
-    return Path(raw).expanduser()
+    """The store the rest of the product would open, resolved in one place."""
+    return default_odi_db_path()
 
 
 def _connectors_path() -> Path:
-    override = os.environ.get("AGENTIC_ODI_CONNECTORS_CONFIG")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / ".config" / "agentic-odi" / "connectors.json"
-
-
-def _cache_dir() -> Path:
-    xdg = os.environ.get("XDG_CACHE_HOME")
-    root = Path(xdg).expanduser() if xdg else Path.home() / ".cache"
-    return root / "agentic-odi"
+    """The registry file the CLI and the sidecar share."""
+    return connectors_config_path()
 
 
 def find_repo_root(start: Path | None = None) -> Path | None:
     """Walk up for the two app packages, mirroring the desktop shell."""
-    override = os.environ.get("AGENTIC_ODI_REPO_ROOT")
-    if override:
-        candidate = Path(override).expanduser()
-        return candidate if candidate.is_dir() else None
+    override = paths.repo_root_override()
+    if override is not None:
+        return override if override.is_dir() else None
 
     current = (start or Path.cwd()).resolve()
     for candidate in (current, *current.parents):
@@ -538,7 +527,7 @@ def check_paths_writable() -> Check:
     targets = {
         "install": paths.install_root(),
         "config": paths.config_dir(),
-        "cache": _cache_dir(),
+        "cache": paths.cache_dir(),
     }
     broken: list[str] = []
     for name, path in targets.items():

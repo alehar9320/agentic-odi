@@ -73,6 +73,33 @@ def config_dir() -> Path:
     return Path.home() / ".config" / "agentic-odi"
 
 
+def cache_dir() -> Path:
+    """Resolve the cache directory.
+
+    Resolution order:
+    1. XDG_CACHE_HOME/agentic-odi (POSIX)
+    2. ~/.cache/agentic-odi (POSIX fallback)
+    """
+    xdg_cache_home = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache_home:
+        return Path(xdg_cache_home) / "agentic-odi"
+
+    return Path.home() / ".cache" / "agentic-odi"
+
+
+def repo_root_override() -> Path | None:
+    """Resolve the repository root named by ``AGENTIC_ODI_REPO_ROOT``.
+
+    Returns the path the variable names, without checking that it exists, so a
+    caller can tell "unset" (walk up for the workspace) from "set to a path that
+    is not there" (report it and stop guessing).
+    """
+    override = os.environ.get("AGENTIC_ODI_REPO_ROOT")
+    if not override:
+        return None
+    return Path(override).expanduser()
+
+
 def versions_dir() -> Path:
     """Resolve the versions directory where installed versions are stored."""
     return install_root() / "versions"
