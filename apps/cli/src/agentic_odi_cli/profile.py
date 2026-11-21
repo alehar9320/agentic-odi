@@ -92,15 +92,15 @@ _CLEARABLE_PROFILE_FIELDS = (
 
 
 def config_dir() -> Path:
-    """Return the XDG config dir for agentic-odi.
+    """Return the config directory for agentic-odi.
 
-    Uses XDG_CONFIG_HOME if set; otherwise falls back to HOME/agentic-odi.
+    Delegates to :func:`agentic_odi_cli.paths.config_dir` so the CLI has one
+    resolution order: ``XDG_CONFIG_HOME``, then ``~/.config/agentic-odi`` on
+    POSIX, and ``%APPDATA%\\agentic-odi`` on Windows.
     """
-    xdg = os.getenv("XDG_CONFIG_HOME")
-    if xdg:
-        return Path(xdg) / "agentic-odi"
-    home = Path(os.getenv("HOME", ""))
-    return home / "agentic-odi"
+    from agentic_odi_cli.paths import config_dir as resolve_config_dir
+
+    return resolve_config_dir()
 
 
 def baseline_file() -> Path:
