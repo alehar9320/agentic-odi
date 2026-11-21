@@ -242,7 +242,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/settings/AboutSection.test.tsx` | The transport is supported, so the provider syncs currentVersion from the |
 | `apps/studio/src/components/settings/ConnectionsSection.test.tsx` | The failure-isolation contract: both sections are composed from props, |
 | `apps/studio/src/components/settings/ContextSection.test.tsx` | — |
-| `apps/studio/src/components/settings/DataSection.test.tsx` | — |
+| `apps/studio/src/components/settings/DataSection.test.tsx` | Storage facts, workspace export and import, and the error states around them. |
 | `apps/studio/src/components/settings/InstallSection.test.tsx` | #800: the desktop app is already its own window, so it cannot be installed. |
 | `apps/studio/src/components/settings/ModelSection.test.tsx` | The key control asks the sidecar for a key's state on mount; a unit test does |
 | `apps/studio/src/components/settings/SettingsLayout.test.tsx` | The updater's state stays in the Updates row. |
