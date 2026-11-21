@@ -426,3 +426,13 @@ def test_config_dir_is_absolute_when_home_is_unset(monkeypatch, tmp_path):
     monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
 
     assert profile.config_dir().is_absolute()
+
+
+def test_baseline_inferred_survives_dict_round_trip() -> None:
+    """An inferred baseline must not silently become human-authored on save."""
+
+    original = profile.Baseline(inferred=True, product_name="Acme", confidence=0.9)
+
+    restored = profile.Baseline.from_dict(original.to_dict())
+
+    assert restored.inferred is True
