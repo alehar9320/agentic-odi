@@ -19,7 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-STORE_PATH_ENV = "AGENTIC_ODI_STUDIO_SECRETS"
+from agentic_odi_studio_api.studio.paths import profile_path
+
+SECRETS_FILENAME = "studio-secrets.json"
 
 MODEL_KEY_NAME = "model_key"
 
@@ -29,11 +31,13 @@ class SecretStoreError(RuntimeError):
 
 
 def secrets_path() -> Path:
-    """Return the path to the per-install secret store."""
-    env = os.getenv(STORE_PATH_ENV)
-    if env:
-        return Path(env)
-    return Path.home() / ".config" / "agentic-odi" / "studio-secrets.json"
+    """Return the path to the per-install secret store.
+
+    The location is the profile directory ``paths.profile_path`` resolves, so
+    this module reads no environment of its own; ``XDG_CONFIG_HOME`` moves it
+    the same way it moves every other profile file.
+    """
+    return profile_path(SECRETS_FILENAME)
 
 
 def _read() -> dict[str, Any]:

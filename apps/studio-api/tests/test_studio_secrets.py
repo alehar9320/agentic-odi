@@ -20,7 +20,14 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture(autouse=True)
 def isolate_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(tmp_path / "studio-secrets.json"))
+    # The store lives in the profile directory, so relocating the profile is the
+    # supported way to isolate it: no test-only environment variable exists.
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+
+def _store_path(tmp_path: Path) -> Path:
+    """Where the store lands under the relocated profile directory."""
+    return tmp_path / "agentic-odi" / secrets.SECRETS_FILENAME
 
 
 def _client() -> TestClient:
@@ -92,9 +99,8 @@ def test_store_file_is_written_with_owner_only_permissions() -> None:
 def test_unwritable_store_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # A store path inside a file cannot be created, so the write must raise
     # rather than silently drop the key.
-    blocker = tmp_path / "blocker"
+    blocker = tmp_path / "agentic-odi"
     blocker.write_text("not a directory", encoding="utf-8")
-    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(blocker / "nested" / "secrets.json"))
 
     with pytest.raises(secrets.SecretStoreError):
         secrets.set_model_key("sk-DO-NOT-LEAK")
@@ -105,9 +111,8 @@ def test_unwritable_store_routes_return_500(
 ) -> None:
     # A store path inside a file cannot be created, so the write route must fail
     # closed with a 500 rather than pretend the key was handled.
-    blocker = tmp_path / "blocker"
+    blocker = tmp_path / "agentic-odi"
     blocker.write_text("not a directory", encoding="utf-8")
-    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(blocker / "nested" / "secrets.json"))
 
     client = _client()
     written = client.put("/api/settings/model-key", json={"value": "sk-DO-NOT-LEAK"})
@@ -125,9 +130,9 @@ def test_unreadable_store_route_returns_500(
 ) -> None:
     # A store file that exists but cannot be parsed makes the read route fail
     # closed with a 500 (covers the get_model_key error branch).
-    store = tmp_path / "studio-secrets.json"
+    store = _store_path(tmp_path)
+    store.parent.mkdir(parents=True)
     store.write_text("{not valid json", encoding="utf-8")
-    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(store))
 
     client = _client()
     read = client.get("/api/settings/model-key")
@@ -138,9 +143,9 @@ def test_load_model_key_ignores_non_dict_entry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # A stored entry that is not an object is treated as no key at all.
-    store = tmp_path / "studio-secrets.json"
+    store = _store_path(tmp_path)
+    store.parent.mkdir(parents=True)
     store.write_text(json.dumps({"model_key": "not-a-dict"}), encoding="utf-8")
-    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(store))
 
     assert secrets.load_model_key() is None
     assert secrets.model_key_status() == {"configured": False, "set_at": None}
@@ -152,8 +157,6 @@ def test_unique_temp_file_per_write_does_not_clobber_concurrent_writer(
     # Two concurrent writers must each install their own key: a shared tmp
     # pathname would let one clobber the other and report success for the wrong
     # key. Unique temp files make each write land under its own name.
-    monkeypatch.setenv(secrets.STORE_PATH_ENV, str(tmp_path / "studio-secrets.json"))
-
     import threading
 
     results: list[str] = []

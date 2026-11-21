@@ -16,6 +16,8 @@ import os
 import secrets
 from pathlib import Path
 
+from agentic_odi_core.settings import config_dir
+
 TOKEN_PATH_ENV = "AGENTIC_ODI_STUDIO_TOKEN"  # nosec B105 - env var name, not a secret
 
 # The token is a bearer capability, not a config value: it must not be
@@ -30,6 +32,16 @@ def token_path() -> Path:
     if env:
         return Path(env)
     return Path.home() / ".config" / "agentic-odi" / "studio-token"
+
+
+def profile_path(filename: str) -> Path:
+    """A file in this install's profile directory.
+
+    Resolved through ``agentic_odi_core.settings.config_dir`` so the
+    ``XDG_CONFIG_HOME`` override and the ``~/.config/agentic-odi`` default are
+    decided in one place rather than re-read from the environment here.
+    """
+    return config_dir() / filename
 
 
 def _tighten(path: Path) -> None:

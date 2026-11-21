@@ -95,7 +95,7 @@ def _stream(path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
 def test_config_returns_env_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Isolate the per-user secret store so this assertion does not depend on a
     # key the developer happens to have saved (atomic-test rule in AGENTS.md).
-    monkeypatch.setenv("AGENTIC_ODI_STUDIO_SECRETS", str(tmp_path / "studio-secrets.json"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://llm:9999/v1")
     monkeypatch.setenv("AGENTIC_ODI_API_KEY", "secret-key")
     monkeypatch.setenv("AGENTIC_ODI_MODEL", "my-model")
