@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FirstRunWizard, OnboardingProvider } from "../../onboarding";
 import { UpdateProvider, createUpdateService } from "../../updater";
@@ -69,10 +69,19 @@ function renderPanel() {
   );
 }
 
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+function openSection(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
 describe("Settings layout (#533)", () => {
   it('shows "Take the tour" in exactly one place and opens the tour', async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
     renderPanel();
+    openSection("About");
 
     const tourLinks = screen.getAllByRole("button", { name: "Take the tour" });
     expect(tourLinks).toHaveLength(1);
@@ -84,6 +93,7 @@ describe("Settings layout (#533)", () => {
   it("keeps Updates to one state line and at most one action", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
     renderPanel();
+    openSection("Updates");
 
     const updates = screen.getByRole("region", { name: "Updates" });
     expect(within(updates).getByText(service.statusLine())).toBeInTheDocument();
@@ -93,6 +103,7 @@ describe("Settings layout (#533)", () => {
   it("puts build facts and the product essay in About, not the updater", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
     renderPanel();
+    openSection("About");
 
     const about = screen.getByRole("region", { name: "About" });
     expect(within(about).getByText(`v${__STUDIO_VERSION__}`)).toBeInTheDocument();

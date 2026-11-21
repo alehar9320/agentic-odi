@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useStudio, type ConnectionReport } from "../state/StudioContext";
+import {
+  SETTINGS_SECTIONS,
+  readSettingsSection,
+  rememberSettingsSection,
+} from "./settings/sections";
 import { AboutSection } from "./settings/sections/AboutSection";
 import { ConnectionsSection } from "./settings/sections/ConnectionsSection";
 import { ContextSection } from "./settings/sections/ContextSection";
@@ -10,10 +15,16 @@ import { ModelSection } from "./settings/sections/ModelSection";
 import { UpdatesSection } from "./settings/sections/UpdatesSection";
 
 /**
- * Settings is a frame, not a section. Each named section below is its own
- * module that reads its own source and reports its own failure, so a broken
- * connector fetch shows its error in Connections and leaves the model controls
- * beside it working.
+ * Settings is five named sections behind an index, not one scroll.
+ *
+ * The sections are declared as data in `settings/sections.ts`, and this panel
+ * renders the open one and marks it in the index, so "where do I change the
+ * model?" is one click rather than a scroll. The open section is remembered per
+ * browser, and an id that is no longer a section falls back to Model.
+ *
+ * Each section is still its own module that reads its own source and reports
+ * its own failure, so a broken connector fetch shows its error in Connections
+ * and leaves the model controls working when Model is opened.
  *
  * The one piece of state kept here is the connection survey: opening Settings
  * is the person asking what is connected. The answer belongs to the panel that
@@ -52,6 +63,18 @@ export function SettingsPanel() {
     surveyConnections,
   } = useStudio();
 
+  const [section, setSection] = useState(() => readSettingsSection());
+  const paneRef = useRef<HTMLDivElement>(null);
+  // Focus follows a deliberate jump, never the initial render — the lens header
+  // already takes focus when Settings opens.
+  const jumped = useRef(false);
+
+  useEffect(() => {
+    if (jumped.current) {
+      paneRef.current?.focus();
+    }
+  }, [section]);
+
   // Opening Settings is the person asking what is connected, which is the first moment
   // a probe is owed to them. The answer is kept here, in the panel that asked: a passive
   // read of a settings page must not restyle the window, because the hosted studio
@@ -73,54 +96,94 @@ export function SettingsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function openSection(id: string) {
+    jumped.current = true;
+    setSection(id);
+    rememberSettingsSection(id);
+  }
+
+  const active =
+    SETTINGS_SECTIONS.find((candidate) => candidate.id === section) ?? SETTINGS_SECTIONS[0];
+
   return (
     <div className="settings">
-      <ContextSection
-        brief={brief}
-        openSetup={openSetup}
-        displayName={displayName}
-        setDisplayName={setDisplayName}
-        closeSetup={closeSetup}
-        clearChat={clearChat}
-        refreshCanvas={refreshCanvas}
-      />
+      <nav className="settings__index" aria-label="Settings sections">
+        {SETTINGS_SECTIONS.map((candidate) => (
+          <button
+            key={candidate.id}
+            type="button"
+            className={`settings__index-link${candidate.id === active.id ? " is-active" : ""}`}
+            aria-current={candidate.id === active.id ? "true" : undefined}
+            title={candidate.blurb}
+            onClick={() => openSection(candidate.id)}
+          >
+            {candidate.label}
+          </button>
+        ))}
+      </nav>
 
-      <DataSection sidecarReachable={sidecarReachable} />
+      <div className="settings__pane" data-section={active.id} ref={paneRef} tabIndex={-1}>
+        <p className="settings__blurb">{active.blurb}</p>
 
-      <ModelSection
-        settings={settings}
-        saveSettings={saveSettings}
-        models={models}
-        modelsLoading={modelsLoading}
-        modelsMessage={modelsMessage}
-        refreshModels={refreshModels}
-      />
+        {active.id === "settings-model" ? (
+          <ModelSection
+            settings={settings}
+            saveSettings={saveSettings}
+            models={models}
+            modelsLoading={modelsLoading}
+            modelsMessage={modelsMessage}
+            refreshModels={refreshModels}
+          />
+        ) : null}
 
-      <ConnectionsSection
-        settings={settings}
-        saveSettings={saveSettings}
-        modelHealthy={survey ? survey.llmHealthy : llmHealth.healthy}
-        sidecarKnown={survey ? survey.sidecarReachable : sidecarReachable}
-        mcpKnown={survey ? survey.mcpReachable : mcpReachable}
-        capabilities={capabilities}
-        connectors={connectors}
-        connectorsError={connectorsError}
-        connectorsLoading={connectorsLoading}
-        presets={presets}
-        presetError={presetError}
-        presetsLoading={presetsLoading}
-        refreshConnectors={refreshConnectors}
-        refreshPresets={refreshPresets}
-        addConnector={addConnector}
-        deleteConnector={deleteConnector}
-        openCustomize={openCustomize}
-      />
+        {active.id === "settings-connections" ? (
+          <ConnectionsSection
+            settings={settings}
+            saveSettings={saveSettings}
+            modelHealthy={survey ? survey.llmHealthy : llmHealth.healthy}
+            sidecarKnown={survey ? survey.sidecarReachable : sidecarReachable}
+            mcpKnown={survey ? survey.mcpReachable : mcpReachable}
+            capabilities={capabilities}
+            connectors={connectors}
+            connectorsError={connectorsError}
+            connectorsLoading={connectorsLoading}
+            presets={presets}
+            presetError={presetError}
+            presetsLoading={presetsLoading}
+            refreshConnectors={refreshConnectors}
+            refreshPresets={refreshPresets}
+            addConnector={addConnector}
+            deleteConnector={deleteConnector}
+            openCustomize={openCustomize}
+          />
+        ) : null}
 
-      <UpdatesSection />
+        {active.id === "settings-data" ? (
+          <>
+            <ContextSection
+              brief={brief}
+              openSetup={openSetup}
+              displayName={displayName}
+              setDisplayName={setDisplayName}
+              closeSetup={closeSetup}
+              clearChat={clearChat}
+              refreshCanvas={refreshCanvas}
+            />
+            <DataSection sidecarReachable={sidecarReachable} />
+          </>
+        ) : null}
 
-      <AboutSection settings={settings} capabilities={capabilities} />
+        {active.id === "settings-updates" ? (
+          <>
+            <UpdatesSection />
+            <InstallSection />
+          </>
+        ) : null}
 
-      <InstallSection />
+        {active.id === "settings-about" ? (
+          <AboutSection settings={settings} capabilities={capabilities} />
+        ) : null}
+      </div>
     </div>
   );
 }

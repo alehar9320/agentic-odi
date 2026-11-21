@@ -74,9 +74,14 @@ function stubContext(): StudioContextValue {
   } as unknown as StudioContextValue;
 }
 
+function openAbout() {
+  fireEvent.click(screen.getByRole("button", { name: "About" }));
+}
+
 describe("DiagnosticsModal", () => {
   beforeEach(() => {
     modalProps.onClose.mockClear();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -182,6 +187,7 @@ describe("DiagnosticsModal", () => {
       </UpdateProvider>,
     );
 
+    openAbout();
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();
@@ -224,6 +230,7 @@ describe("DiagnosticsModal", () => {
     // The key control reads whether a key is set on mount; that is not a
     // diagnostics request, so the consent gate is measured against diagnostics.
     expect(calls.filter((url) => url === "/api/diagnostics")).toEqual([]);
+    openAbout();
     fireEvent.click(screen.getByRole("button", { name: "Create diagnostics bundle" }));
 
     expect(await screen.findByRole("dialog", { name: "Review diagnostics" })).toBeInTheDocument();

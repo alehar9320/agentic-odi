@@ -42,7 +42,10 @@ import { KNOWN_PAIRS } from "./a11y/knownPairs";
  * with no owner.
  *
  * Screens: home, the opportunity landscape, the records lens, the decision
- * brief, catch-up, and settings — each in both themes.
+ * brief, catch-up, and each of Settings' five sections — each in both themes.
+ * Settings is scanned section by section because it renders one at a time: a
+ * single scan of the default section would stop measuring the other four, and a
+ * pair that only lives in Connections is exactly what this gate exists to catch.
  */
 
 const THEMES = ["dark", "light"] as const;
@@ -66,8 +69,33 @@ test.use({ reducedMotion: "reduce" });
  */
 test.describe.configure({ mode: "serial" });
 
-/** The six core screens, each reachable through the shipped UI. */
-const SCREENS = ["home", "landscape", "records", "brief", "catchup", "settings"] as const;
+/**
+ * The index labels, which are also the screens: opening Settings on each one is
+ * the shipped way to reach that section.
+ */
+const SETTINGS_SECTIONS = {
+  "settings-model": "Model",
+  "settings-connections": "Connections",
+  "settings-data": "Data",
+  "settings-updates": "Updates",
+  "settings-about": "About",
+} as const;
+
+type SettingsScreen = keyof typeof SETTINGS_SECTIONS;
+
+function isSettingsScreen(screen: Screen): screen is SettingsScreen {
+  return screen in SETTINGS_SECTIONS;
+}
+
+/** The core screens, each reachable through the shipped UI. */
+const SCREENS = [
+  "home",
+  "landscape",
+  "records",
+  "brief",
+  "catchup",
+  ...(Object.keys(SETTINGS_SECTIONS) as SettingsScreen[]),
+] as const;
 type Screen = (typeof SCREENS)[number];
 
 const OUTCOME = {
@@ -116,8 +144,12 @@ async function goto(page: Page, screen: Screen): Promise<void> {
     await page.keyboard.press("Enter");
   } else if (screen === "catchup") {
     await page.getByRole("button", { name: /^What changed:/ }).click();
-  } else if (screen === "settings") {
+  } else if (isSettingsScreen(screen)) {
     await page.getByRole("button", { name: "Open settings" }).click();
+    await page
+      .getByRole("navigation", { name: "Settings sections" })
+      .getByRole("button", { name: SETTINGS_SECTIONS[screen], exact: true })
+      .click();
   }
   await expect(page.getByRole("main")).toBeVisible();
 }

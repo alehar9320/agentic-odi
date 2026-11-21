@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FirstRunWizard, OnboardingProvider } from "../onboarding";
 import { UpdateProvider, createUpdateService } from "../updater";
@@ -96,6 +96,70 @@ function renderPanel() {
   );
 }
 
+/** The index is the only door to a section; Model opens first. */
+function openSection(name: string) {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+describe("SettingsPanel sections", () => {
+  it("offers five named sections in order and opens Model first", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    const index = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(
+      within(index)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Model", "Connections", "Data", "Updates", "About"]);
+    expect(within(index).getByRole("button", { name: "Model" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByLabelText(/^model/i)).toBeInTheDocument();
+  });
+
+  it("renders one section at a time", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    renderPanel();
+
+    // Model is open; Connections is not until it is asked for.
+    expect(screen.queryByLabelText("MCP server URL")).toBeNull();
+    openSection("Connections");
+    expect(screen.getByLabelText("MCP server URL")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^model/i)).toBeNull();
+  });
+
+  it("remembers the open section and falls back to Model for an unknown id", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+
+    const first = renderPanel();
+    openSection("About");
+    expect(window.localStorage.getItem("studio.settings.section")).toBe("settings-about");
+    first.unmount();
+
+    renderPanel();
+    expect(screen.getByRole("button", { name: "About" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+  });
+
+  it("falls back to Model when the stored section is no longer one", () => {
+    vi.mocked(useStudio).mockReturnValue(stubContext());
+    window.localStorage.setItem("studio.settings.section", "settings-appearance");
+
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "Model" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByLabelText(/^model/i)).toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel model catalog", () => {
   it("offers the endpoint's models as suggestions and keeps typing free", () => {
     vi.mocked(useStudio).mockReturnValue(
@@ -132,6 +196,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ deleteConnector: del }));
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getAllByText(/notion/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /remove notion/i }));
@@ -142,6 +207,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
     renderPanel();
+    openSection("Connections");
 
     expect(
       screen.getByRole("region", { name: /voice of customer/i }),
@@ -158,6 +224,7 @@ describe("SettingsPanel connectors", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     fireEvent.click(screen.getByRole("button", { name: /connect notion/i }));
     expect(add).toHaveBeenCalledWith({ preset: "notion" });
@@ -167,6 +234,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.queryByText(/gong transcripts/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/slack friction stream/i)).not.toBeInTheDocument();
@@ -189,6 +257,7 @@ describe("SettingsPanel connectors", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext({ connectors: [] }));
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByText(/no connectors registered/i)).toBeInTheDocument();
   });
@@ -211,6 +280,7 @@ describe("SettingsPanel connector catalog failures", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByRole("alert").textContent).toContain(
       "The connector catalog is unreachable.",
@@ -233,6 +303,7 @@ describe("SettingsPanel connector catalog failures", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.queryByRole("button", { name: /^connect /i })).toBeNull();
   });
@@ -253,6 +324,7 @@ describe("SettingsPanel connector list failures", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
     expect(screen.queryByText(/no connectors registered/i)).toBeNull();
@@ -282,6 +354,7 @@ describe("SettingsPanel capabilities", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     const dataRow = screen.getByText(/local canvas data/i).closest("li");
     expect(dataRow).toBeInTheDocument();
@@ -307,6 +380,7 @@ describe("SettingsPanel capabilities", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     const row = screen.getByText("Configured").closest("li");
     expect(row).toHaveTextContent(/configured, not checked/i);
@@ -337,6 +411,7 @@ describe("SettingsPanel about section", () => {
         </OnboardingProvider>
       </UpdateProvider>,
     );
+    openSection("About");
 
     const about = screen.getByRole("region", { name: "About" });
     expect(within(about).getByText(`v${STUDIO_VERSION}`)).toBeInTheDocument();
@@ -361,6 +436,7 @@ describe("SettingsPanel tour entry", () => {
         </OnboardingProvider>
       </UpdateProvider>,
     );
+    openSection("About");
 
     const tourLinks = screen.getAllByRole("button", { name: "Take the tour" });
     expect(tourLinks).toHaveLength(1);
@@ -392,7 +468,9 @@ describe("SettingsPanel tour entry", () => {
         </OnboardingProvider>
       </UpdateProvider>,
     );
+    openSection("About");
 
+    openSection("About");
     const about = screen.getByRole("region", { name: "About" });
     await waitFor(() => expect(browserService.getSnapshot().phase).not.toBe("checking"));
 
@@ -423,6 +501,7 @@ describe("SettingsPanel connection survey", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(await screen.findByText("unavailable")).toBeInTheDocument();
     expect(surveyConnections).toHaveBeenCalledOnce();
@@ -431,28 +510,34 @@ describe("SettingsPanel connection survey", () => {
 });
 
 describe("SettingsPanel section modules", () => {
-  it("composes the sections in order", () => {
+  it("gives every section module exactly one home in the index", () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
-    const { container } = renderPanel();
+    renderPanel();
 
-    // Context, Data, Model, Connections (bridge), Updates, About, Install.
-    expect(screen.getByText(/your context/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
+    // Model owns the endpoint controls and nothing else is on screen with it.
     expect(screen.getByRole("heading", { name: /^model$/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Updates" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /studio bridge/i })).toBeNull();
 
-    const text = container.textContent ?? "";
-    expect(text.indexOf("Your context")).toBeLessThan(text.indexOf("Data"));
-    expect(text.indexOf("Data")).toBeLessThan(text.indexOf("Model"));
-    expect(text.indexOf("Model")).toBeLessThan(text.indexOf("Studio bridge"));
+    openSection("Connections");
+    expect(screen.getByRole("heading", { name: /studio bridge/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^model$/i })).toBeNull();
+
+    openSection("Data");
+    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^data$/i })).toBeInTheDocument();
+
+    openSection("Updates");
+    expect(screen.getByRole("region", { name: "Updates" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^install$/i })).toBeInTheDocument();
+
+    openSection("About");
+    expect(screen.getByRole("region", { name: "About" })).toBeInTheDocument();
   });
 
-  it("keeps the Model section intact when the connector fetch fails", () => {
+  it("keeps the Model section usable when the connector fetch fails", () => {
     // #531: a broken connector fetch shows the Connections error and leaves the
-    // model controls beside it working, because each section owns its failure.
+    // model controls working, because each section owns its failure.
     vi.mocked(useStudio).mockReturnValue(
       stubContext({
         connectors: [],
@@ -467,8 +552,11 @@ describe("SettingsPanel section modules", () => {
     );
 
     renderPanel();
+    openSection("Connections");
 
     expect(screen.getByRole("alert").textContent).toContain("The connector list is unreachable.");
+
+    openSection("Model");
     expect(screen.getByLabelText(/^model/i)).toHaveValue("m");
     expect(screen.getByLabelText("Base URL")).toHaveValue("http://x");
   });
