@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from agentic_odi_studio_api.studio.observability import log_turn, redact
 
@@ -170,3 +171,42 @@ def test_log_turn_redacts_nested_values(caplog) -> None:
     payload = json.loads(caplog.records[0].getMessage())
     assert payload["context"]["api_key"] == "[redacted]"
     assert payload["context"]["name"] == "studio"
+
+
+def test_a_list_of_mappings_is_redacted(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(request_id="req-1", messages=[{"api_key": "CANARY"}])
+
+    assert "CANARY" not in caplog.text
+
+
+def test_deep_nesting_is_redacted() -> None:
+    redacted = redact({"a": {"b": {"c": {"token": "CANARY"}}}})
+
+    assert "CANARY" not in json.dumps(redacted)
+
+
+def test_a_nested_quote_is_redacted() -> None:
+    redacted = redact({"evidence": {"quote": "CANARY WORDS"}})
+
+    assert "CANARY" not in json.dumps(redacted)
+
+
+def test_a_nested_token_in_a_logged_mapping_is_redacted(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(request_id="req-1", context={"request": {"authorization": "Bearer CANARY"}})
+
+    assert "CANARY" not in caplog.text
+
+
+def test_a_non_sensitive_nested_value_survives() -> None:
+    redacted = redact({"context": {"model": "m", "rounds": 2}})
+
+    assert redacted["context"] == {"model": "m", "rounds": 2}
+
+
+def test_a_cyclic_mapping_does_not_hang() -> None:
+    cyclic: dict[str, Any] = {}
+    cyclic["self"] = cyclic
+
+    assert redact(cyclic) is not None

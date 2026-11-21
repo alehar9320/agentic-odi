@@ -30,7 +30,11 @@ permissions:
   issues: write # gh label create lives under the issues API
 
 concurrency:
-  group: label-merge-conflicts-${{ github.ref }}
+  # `github.ref` is `refs/heads/main` for every `workflow_run` completion, so a
+  # group keyed on it put every pull request's finished CI run in one group and
+  # `cancel-in-progress` killed all but one of them. Key on the commit for a
+  # workflow_run, the PR for a pull request, and the ref only for the sweep.
+  group: label-merge-conflicts-${{ github.event.workflow_run.head_sha || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

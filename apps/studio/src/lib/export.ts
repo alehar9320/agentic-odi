@@ -94,16 +94,23 @@ function claimsLines(content: string, claims: Claim[]): string[] {
   // line rather than vanishing with the sentence it could not be matched to —
   // but a sentence already on the page is not printed twice over a label that
   // would not attach.
-  const printed = lines.join(" ").replace(/\s+/g, " ");
+  const normalise = (value: string) =>
+    value.replace(/\s+/g, " ").replace(/[.!?]+$/, "").trim();
+  const printedSentences = new Set<string>();
+  for (const block of blocks) {
+    for (const item of block.items) {
+      for (const segment of item) {
+        printedSentences.add(normalise(segment.text));
+      }
+      printedSentences.add(normalise(item.map((s) => s.text).join("")));
+    }
+  }
   for (const claim of claims) {
     if (emitted.has(claim.index)) {
       continue;
     }
-    const sentence = claim.text
-      .replace(/\s+/g, " ")
-      .replace(/[.!?]+$/, "")
-      .trim();
-    if (sentence && printed.includes(sentence)) {
+    const sentence = normalise(claim.text);
+    if (sentence && printedSentences.has(sentence)) {
       continue;
     }
     lines.push(`${claim.text}${claimSuffix(claim)}`, "");
@@ -208,7 +215,8 @@ export function exportFilename(exportedAt: Date = new Date()): string {
 
 const NOT_RECORDED = "Not recorded.";
 
-const LOCAL_DATE = new Intl.DateTimeFormat("en-GB", {
+// Prose dates follow the reader's locale; filenames stay ISO because a filename is a sort key.
+const DOCUMENT_DATE = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
   month: "long",
   year: "numeric",
@@ -365,7 +373,7 @@ export function briefToMarkdown(brief: DecisionBrief): string {
   const lines: string[] = [
     `# ${brief.product_name}`,
     "",
-    `_Decision brief — ${LOCAL_DATE.format(
+    `_Decision brief — ${DOCUMENT_DATE.format(
       Number.isNaN(generatedAt.getTime()) ? new Date() : generatedAt,
     )}_`,
     "",

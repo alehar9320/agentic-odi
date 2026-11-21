@@ -10,7 +10,8 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * The static preview answers `/api/**` with the SPA shell and status 200, which
  * the client sees as a JSON parse failure. Each test therefore routes `/api/**`
- * to a 503 HTML answer, the shape a dead reverse proxy produces and the shape
+ * itself: a 503 HTML page (a dead reverse proxy), a 502 (the hosted Worker),
+ * or an aborted connection (nothing listening). All three are the shapes
  * `isTransportFailure` recognises. Service workers are blocked so that a cached
  * shell cannot answer a navigation or hide the network from the test.
  */

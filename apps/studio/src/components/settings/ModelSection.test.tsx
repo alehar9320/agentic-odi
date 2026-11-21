@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { StudioConfig } from "../../types";
 import { ModelSection } from "./sections/ModelSection";
 
+// The key control asks the sidecar for a key's state on mount; a unit test does
+// not need a live sidecar, and no test here reads a stored value.
+vi.mock("../../api/studioApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../api/studioApi")>()),
+  fetchModelKeyStatus: vi.fn().mockResolvedValue({ configured: false, set_at: null }),
+  saveModelKey: vi.fn().mockResolvedValue({ configured: true, set_at: "2026-01-01T00:00:00Z" }),
+}));
+
 const settings: StudioConfig = {
   base_url: "http://localhost:8001/v1",
   api_key: "local",
@@ -49,17 +57,17 @@ describe("ModelSection", () => {
     expect(refreshModels).toHaveBeenCalled();
   });
 
-  it("toggles API key visibility", () => {
+  it("never renders a stored key, only its state, and offers a replace action", async () => {
     renderSection();
+
+    // The value is not in the DOM: the control reports only that a key is set.
+    expect(screen.queryByDisplayValue("local")).toBeNull();
+    const replace = await screen.findByRole("button", { name: /replace key/i });
+    fireEvent.click(replace);
 
     const input = screen.getByLabelText("API key") as HTMLInputElement;
     expect(input.type).toBe("password");
-
-    fireEvent.click(screen.getByRole("button", { name: /show api key/i }));
-    expect(input.type).toBe("text");
-
-    fireEvent.click(screen.getByRole("button", { name: /hide api key/i }));
-    expect(input.type).toBe("password");
+    expect(input.value).toBe("");
   });
 
   it("saves a changed model when the field is left and says so once", () => {

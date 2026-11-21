@@ -96,6 +96,22 @@ def test_an_unknown_clear_name_exits_2(tmp_path, monkeypatch) -> None:
     assert "current_focus" in res.output
 
 
+def test_show_reports_a_malformed_profile_without_a_traceback(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    from agentic_odi_cli.profile import baseline_file
+
+    target = baseline_file()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text('{"a": 1,}')
+
+    res = runner.invoke(app, ["profile", "show"])
+
+    assert res.exit_code == 1
+    assert "not valid JSON" in res.output
+    assert "line" in res.output
+    assert "Traceback" not in res.output
+
+
 def test_show_distinguishes_none_from_empty(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     runner.invoke(app, ["profile", "set", "--product-name", ""])

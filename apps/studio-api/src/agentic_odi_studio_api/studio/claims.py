@@ -14,10 +14,13 @@ never the tool that happened to run.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
+
+log = logging.getLogger(__name__)
 
 ClaimStatus = Literal["cited", "hypothesis", "uncited"]
 
@@ -26,6 +29,9 @@ MAX_EVIDENCE_PER_CLAIM = 3
 
 #: Why a cited claim was downgraded. Stable, so the client can explain it.
 UNKNOWN_EVIDENCE_ID = "unknown_evidence_id"
+
+#: A sentence named more records than it may carry; the first three stand.
+TOO_MANY_EVIDENCE_IDS = "too_many_evidence_ids"
 
 #: Tools whose arguments or results name a record the reply may cite.
 EVIDENCE_TOOLS: frozenset[str] = frozenset(
@@ -37,8 +43,8 @@ _LIST_PREFIX = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 _HEADING_PREFIX = re.compile(r"^\s*#{1,6}\s+")
 
 #: A period after one of these is punctuation inside the word, not a sentence end.
-#: Every entry is a word after which a period does not end a sentence. A wrongly
-#: added entry merges two claims, which is worse than splitting one.
+#: Every entry is a word after which a period does not end a sentence. A wrongly-added
+#: entry merges two claims, which is worse than splitting one.
 _ABBREVIATIONS: frozenset[str] = frozenset(
     {
         "ag",
@@ -84,6 +90,8 @@ _IMPERATIVE_VERBS: frozenset[str] = frozenset(
         "check",
         "choose",
         "click",
+        "compare",
+        "confirm",
         "connect",
         "copy",
         "create",
@@ -91,9 +99,14 @@ _IMPERATIVE_VERBS: frozenset[str] = frozenset(
         "edit",
         "focus",
         "follow",
+        "label",
+        "link",
+        "mark",
+        "note",
         "open",
         "pick",
         "press",
+        "rate",
         "read",
         "record",
         "review",
@@ -101,14 +114,40 @@ _IMPERATIVE_VERBS: frozenset[str] = frozenset(
         "save",
         "search",
         "select",
+        "sort",
         "start",
         "stop",
+        "tag",
         "tell",
         "try",
         "type",
         "use",
+        "verify",
         "write",
     }
+)
+
+#: An opener that is also a noun ("record", "run", "review") looks like an
+#: instruction, but only is one when the sentence carries no finite verb. A
+#: declarative reads "<noun> <finite verb>" ("Review latency is …"); an
+#: instruction reads "<verb> <object>" ("Check the invoice …"). The finite
+#: verbs are the auxiliaries and modals plus the common irregular past forms
+#: and the regular ``-ed`` ending, checked across the first six words.
+_IMPERATIVE_OPENERS = re.compile(
+    r"^(?:" + "|".join(sorted(_IMPERATIVE_VERBS)) + r")\b", re.IGNORECASE
+)
+_DECLARATIVE_CONTINUATION = re.compile(
+    r"\b(?:"
+    r"is|are|was|were|am|be|been|being|"
+    r"has|have|had|do|does|did|"
+    r"will|would|shall|should|can|could|may|might|must|"
+    r"fell|felt|found|gave|goes|went|grown|grew|ran|rise|rose|"
+    r"saw|seen|sent|took|taken|came|come|made|said|told|"
+    r"thought|brought|bought|caught|taught|kept|left|lost|met|"
+    r"paid|put|read|sold|spent|stood|understood|won|wrote|written|"
+    r"[a-z]{4,}ed"
+    r")\b",
+    re.IGNORECASE,
 )
 
 
@@ -248,13 +287,19 @@ def _strip_markers(text: str) -> tuple[str, list[tuple[str, tuple[str, ...]]]]:
 
 
 def _is_exempt(text: str) -> bool:
-    """Questions and instructions make no claim, so they carry no marker."""
+    """Questions and instructions make no claim, so they carry no marker.
+
+    A declarative that merely opens with a verb that is also a noun is not an
+    instruction: it makes a claim and must carry a marker like any other.
+    """
     if not text:
         return True
     if text.endswith("?"):
         return True
-    first = re.match(r"[A-Za-z']+", text)
-    return bool(first and first.group(0).lower() in _IMPERATIVE_VERBS)
+    if not _IMPERATIVE_OPENERS.match(text):
+        return False
+    head = " ".join(text.split()[:6])
+    return _DECLARATIVE_CONTINUATION.search(head) is None
 
 
 def _records(value: Any) -> Iterable[dict[str, Any]]:
@@ -341,7 +386,12 @@ class EvidenceIndex:
         if self.resolver is not None:
             try:
                 return self.resolver(evidence_id)
-            except Exception:  # noqa: BLE001 - a resolver is optional context
+            except Exception as exc:  # noqa: BLE001 - a resolver is optional context
+                log.warning(
+                    "evidence resolver failed (evidence_id=%s, error=%s)",
+                    evidence_id,
+                    type(exc).__name__,
+                )
                 return None
         return None
 
@@ -374,7 +424,8 @@ def split_claims(text: str, index: EvidenceIndex | None = None) -> list[Claim]:
         masked_line = masked[line_start : line_start + len(line)]
         if _LIST_PREFIX.match(line):
             body = _LIST_PREFIX.sub("", line, count=1)
-            units = [body]
+            masked_body = masked_line[len(line) - len(body) :]
+            units = _sentences(body, masked_body) or [body]
         else:
             body = line
             masked_body_end = len(masked_line)
@@ -395,9 +446,11 @@ def split_claims(text: str, index: EvidenceIndex | None = None) -> list[Claim]:
             if hypothesis:
                 status = "hypothesis"
             elif evidence_ids:
+                unique_ids = list(dict.fromkeys(evidence_ids))
+                overflow = len(unique_ids) > MAX_EVIDENCE_PER_CLAIM
                 resolved: list[EvidenceSnapshot] = []
                 unknown = False
-                for evidence_id in list(dict.fromkeys(evidence_ids))[:MAX_EVIDENCE_PER_CLAIM]:
+                for evidence_id in unique_ids[:MAX_EVIDENCE_PER_CLAIM]:
                     snapshot = index.resolve(evidence_id) if index is not None else None
                     if snapshot is None:
                         if index is None:
@@ -412,6 +465,8 @@ def split_claims(text: str, index: EvidenceIndex | None = None) -> list[Claim]:
                 else:
                     status = "cited"
                     evidence = tuple(resolved)
+                    if overflow:
+                        reason = TOO_MANY_EVIDENCE_IDS
             else:
                 if _is_exempt(display):
                     continue
@@ -433,6 +488,7 @@ __all__ = [
     "EVIDENCE_TOOLS",
     "MAX_EVIDENCE_PER_CLAIM",
     "UNKNOWN_EVIDENCE_ID",
+    "TOO_MANY_EVIDENCE_IDS",
     "Claim",
     "ClaimStatus",
     "EvidenceIndex",

@@ -25,10 +25,12 @@ isolation, and coverage rules stay in
 | Path | Covers |
 |---|---|
 | `apps/cli/tests/conftest.py` | Shared conftest for CLI tests. |
+| `apps/cli/tests/test_alternatives_cli.py` | Alternatives CLI: local backend, output, solution state, and errors (M2-07). |
 | `apps/cli/tests/test_backend.py` | Backend seam: local SQLite backend and remote MCP backend. |
 | `apps/cli/tests/test_backend_edges.py` | Edge-case tests for backend validation, parsing, and MCP failures. |
 | `apps/cli/tests/test_backend_selection.py` | — |
 | `apps/cli/tests/test_build_info.py` | — |
+| `apps/cli/tests/test_candidates_cli.py` | Tests for the candidates CLI group and the interviews extract command (A4). |
 | `apps/cli/tests/test_chat_cli.py` | Tests for the interactive CLI chat. |
 | `apps/cli/tests/test_chat_runtime.py` | Runtime tests for the interactive chat loop and command handlers. |
 | `apps/cli/tests/test_chat_wizard.py` | Tests for the /connect wizard. |
@@ -40,10 +42,13 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_customer_outcomes_cli.py` | Customer Outcomes CLI: local backend, aliases, output, and errors. |
 | `apps/cli/tests/test_data_export.py` | `data-export` writes a restorable snapshot of the local store. |
 | `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
+| `apps/cli/tests/test_demo_cli.py` | Tests for ``odi demo`` — the labelled sample workspace. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
+| `apps/cli/tests/test_interviews_cli.py` | Tests for the interviews CLI group (A1). |
 | `apps/cli/tests/test_jobs_cli.py` | Tests for the Jobs CLI command group. |
+| `apps/cli/tests/test_link_outcome_errors.py` | Linking an outcome to an objective that does not exist is a backend error. |
 | `apps/cli/tests/test_mascot.py` | The Odi banner: shape, colour, and when it is allowed to appear. |
 | `apps/cli/tests/test_onboard.py` | Tests for first-run onboarding signal extraction and gating. |
 | `apps/cli/tests/test_paths.py` | — |
@@ -60,24 +65,29 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_steps_cli.py` | — |
 | `apps/cli/tests/test_studies_cli.py` | Tests for the studies CLI group (ALH-69, M2-05). |
 | `apps/cli/tests/test_summary_cli.py` | Tests for the `odi summary` report. |
+| `apps/cli/tests/test_trust_cli.py` | Tests for the trust surfaces: survey import, deltas, top and coverage. |
 | `apps/cli/tests/test_update.py` | — |
 | `apps/cli/tests/test_update_check.py` | — |
 | `apps/cli/tests/test_update_command.py` | — |
 | `apps/cli/tests/test_update_edges.py` | Edge-case tests for the self-update engine and background updater. |
 | `apps/cli/tests/test_version_flag.py` | — |
 | `apps/cli/tests/test_wizard_cli.py` | Tests for the interactive ODI entity creation wizard command. |
-| `apps/mcp-server/tests/conftest.py` | — |
+| `apps/mcp-server/tests/conftest.py` | Shared fixtures for the MCP server tests. |
 | `apps/mcp-server/tests/mcp_failures.py` | How these tests read a failing tool's answer. |
+| `apps/mcp-server/tests/test_candidates.py` | MCP coverage for the candidate extraction tools (A4). |
 | `apps/mcp-server/tests/test_context_tools.py` | — |
 | `apps/mcp-server/tests/test_customer_outcomes.py` | Tests for Customer Outcome entities. |
 | `apps/mcp-server/tests/test_graceful_shutdown.py` | Tests for the MCP server's graceful shutdown path. |
 | `apps/mcp-server/tests/test_health.py` | The store health tool reports readiness without touching ODI data. |
+| `apps/mcp-server/tests/test_import_side_effects.py` | Importing the MCP server must not build a store or touch the filesystem. |
+| `apps/mcp-server/tests/test_interviews.py` | MCP coverage for transcript import and the interview quote tools (A2). |
 | `apps/mcp-server/tests/test_odi.py` | — |
 | `apps/mcp-server/tests/test_parity.py` | — |
 | `apps/mcp-server/tests/test_port_config.py` | The MCP server port must be overridable for dev and multi-instance runs. |
 | `apps/mcp-server/tests/test_segments.py` | Stage 5 and Stage 6 round-trip through the live MCP registry. |
 | `apps/mcp-server/tests/test_server_tools.py` | — |
 | `apps/mcp-server/tests/test_signals.py` | The three signal tools round-trip through the live MCP registry. |
+| `apps/mcp-server/tests/test_spine_tools.py` | The spine and candidate tools over the MCP boundary. |
 | `apps/mcp-server/tests/test_tool_branches.py` | Branch coverage for MCP tool prompts, errors, and full updates. |
 | `apps/mcp-server/tests/test_tool_progress.py` | Long tools report progress so the Studio can stop looking hung. |
 | `apps/mcp-server/tests/test_tool_spec_validation.py` | Startup validation refuses a contract that the server cannot serve. |
@@ -90,6 +100,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_boot_integrity.py` | Boot integrity and clean-shutdown tests for the Studio sidecar (issue #598). |
 | `apps/studio-api/tests/test_capability_routes.py` | The MCP health route and the capability probe must agree on one method. |
 | `apps/studio-api/tests/test_probe_cache.py` | Tests for the LLM probe TTL cache and the ``/api/health/llm`` response. |
+| `apps/studio-api/tests/test_studio_alternatives.py` | Alternatives CRUD and the three-state solution query through the Studio API (M2-07). |
 | `apps/studio-api/tests/test_studio_api.py` | Tests for the Living Studio sidecar API (``/api/*``). |
 | `apps/studio-api/tests/test_studio_approvals.py` | The write-approval gate: it resolves once, expires, and never leaks. |
 | `apps/studio-api/tests/test_studio_auth.py` | Authentication requirements for the Living Studio sidecar API (``/api/*``). |
@@ -104,7 +115,9 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_connectors_router.py` | — |
 | `apps/studio-api/tests/test_studio_conversations.py` | Conversations keep a branch tree, and old rows still open. |
 | `apps/studio-api/tests/test_studio_csp.py` | Content-Security-Policy headers on sidecar responses. |
+| `apps/studio-api/tests/test_studio_data_status.py` | Metadata-only status for the sidecar's two SQLite stores. |
 | `apps/studio-api/tests/test_studio_diagnostics.py` | Tests for the Studio's metadata-only diagnostics endpoint. |
+| `apps/studio-api/tests/test_studio_error_status_map.py` | Status-to-error-code mapping and retryability for sidecar HTTP errors. |
 | `apps/studio-api/tests/test_studio_errors.py` | HTTP error shape, status mapping, and request-id correlation. |
 | `apps/studio-api/tests/test_studio_evidence.py` | The evidence routes: capture with a link, promote it, delete it. |
 | `apps/studio-api/tests/test_studio_focus.py` | The record a PM is looking at must reach the model — in the store's own words. |
@@ -122,6 +135,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_probes.py` | Tests for endpoint probing and LLM health classification. |
 | `apps/studio-api/tests/test_studio_proposals.py` | The proposal routes: mine evidence, review it, approve or reject it. |
 | `apps/studio-api/tests/test_studio_router.py` | Tests for successful passthrough responses from the Studio router. |
+| `apps/studio-api/tests/test_studio_secrets.py` | The model key leaves the browser for the sidecar's write-only store. |
 | `apps/studio-api/tests/test_studio_segments.py` | Stages 5 and 6 through the sidecar: the same records under both backends. |
 | `apps/studio-api/tests/test_studio_sharing.py` | The scoped share token: one artifact, read-only, expiring, revocable. |
 | `apps/studio-api/tests/test_studio_signals.py` | The four signal routes answer under both the local and the mcp backend. |
@@ -174,7 +188,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/ChangelogModal.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/FailurePanel.visual.test.tsx` | The build table would otherwise name this `FailurePanel.visual` after the |
 | `apps/studio/src/components/OdiMascot.test.tsx` | — |
-| `apps/studio/src/components/SettingsPanel.test.tsx` | A browser build has no desktop version to report, so About shows the |
+| `apps/studio/src/components/SettingsPanel.test.tsx` | The key control asks the sidecar for a key's state on mount; the panel tests |
 | `apps/studio/src/components/ShareAction.test.tsx` | — |
 | `apps/studio/src/components/ShareSheet.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/SharedArtifact.test.tsx` | An ISO timestamp `ms` from now, so the expiry wording is stable in the test. */ |
@@ -185,7 +199,11 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/canvas/JobMap.test.tsx` | A cold load: the cached canvas is on disk, the sidecar has not answered. |
 | `apps/studio/src/components/canvas/MemoryPanel.test.tsx` | — |
 | `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | Mock StudioContext |
+| `apps/studio/src/components/canvas/OpportunityLandscapeFacet.test.tsx` | — |
 | `apps/studio/src/components/canvas/OutcomeCard.test.tsx` | The card lists the records captured against its outcome, so the canvas |
+| `apps/studio/src/components/canvas/OutcomeCardAlternatives.test.tsx` | — |
+| `apps/studio/src/components/canvas/OutcomeCardBand.test.tsx` | — |
+| `apps/studio/src/components/canvas/OutcomeCardNote.test.tsx` | The note is a value, so it must never be parsed as markup. |
 | `apps/studio/src/components/canvas/OutcomeCardSample.test.tsx` | — |
 | `apps/studio/src/components/canvas/SchedulePanel.test.tsx` | — |
 | `apps/studio/src/components/canvas/ScorePopover.test.tsx` | A consistent record: 8.6 + max(8.6 − 7.2, 0) = 10.0, right on the line. |
@@ -226,7 +244,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/settings/ContextSection.test.tsx` | — |
 | `apps/studio/src/components/settings/DataSection.test.tsx` | — |
 | `apps/studio/src/components/settings/InstallSection.test.tsx` | #800: the desktop app is already its own window, so it cannot be installed. |
-| `apps/studio/src/components/settings/ModelSection.test.tsx` | — |
+| `apps/studio/src/components/settings/ModelSection.test.tsx` | The key control asks the sidecar for a key's state on mount; a unit test does |
 | `apps/studio/src/components/settings/SettingsLayout.test.tsx` | The updater's state stays in the Updates row. |
 | `apps/studio/src/components/settings/SettingsPanel.perFieldSave.test.tsx` | Typing is not saving: the request waits for the field to be left. |
 | `apps/studio/src/components/settings/UpdatesSection.test.tsx` | — |
@@ -252,6 +270,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/changelogRead.test.ts` | — |
 | `apps/studio/src/lib/commands.test.ts` | — |
 | `apps/studio/src/lib/dashboard.test.ts` | The days really held zero signals, so a flat zero line is honest here — |
+| `apps/studio/src/lib/download.test.ts` | The download helper defers blob-URL revocation (issue #1134). |
 | `apps/studio/src/lib/export.test.ts` | The list item lost its terminal punctuation, so the claim cannot be |
 | `apps/studio/src/lib/focus.test.ts` | — |
 | `apps/studio/src/lib/formula.test.ts` | The opportunity-score ratchet (issue #1087). |
@@ -272,6 +291,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/swRouting.test.ts` | A request that never settles: the timeout is the only way out. |
 | `apps/studio/src/lib/swUpdate.test.ts` | A worker whose state a test drives. */ |
 | `apps/studio/src/lib/theme.test.ts` | — |
+| `apps/studio/src/lib/themeBootstrap.test.ts` | — |
 | `apps/studio/src/lib/useReducedMotion.test.tsx` | The preference is live, not read once at mount: toggling the OS setting has |
 | `apps/studio/src/lib/version.test.ts` | The build version is the single source of truth: it is baked in from |
 | `apps/studio/src/lib/windowState.test.ts` | #962: the desktop app opens focused, not sprawling, and remembers the size |
@@ -285,6 +305,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/state/probeBreaker.test.ts` | A controllable clock, so the breaker's window is tested without waiting. */ |
 | `apps/studio/src/state/regions.test.ts` | The navigation contract from #735, proved without a renderer: |
 | `apps/studio/src/state/scheduleProbe.test.ts` | A document whose visibility the test drives, and which records its listeners. */ |
+| `apps/studio/src/state/settings/SettingsContext.test.ts` | The field is dropped, not blanked: nothing a script reads holds a key. |
 | `apps/studio/src/styles/bootShell.test.ts` | Guards for the pre-JavaScript shell in `index.html`. |
 | `apps/studio/src/styles/brief.test.ts` | Guards for the brief lens stylesheet. |
 | `apps/studio/src/styles/colors.test.ts` | The raw-colour gate (issue #543, parent #331). |
@@ -295,6 +316,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation, asserted from the stylesheet source |
 | `apps/studio/src/test/a11y.test.tsx` | The accessibility gate for every surface that ships. |
 | `apps/studio/src/test/contrast.test.ts` | The walker's own tests (issue #543, parent #331). |
+| `apps/studio/src/test/e2eQuarantine.test.ts` | The ratchet on `apps/studio/e2e/quarantine.ts` (#1118, from #1092). |
 | `apps/studio/src/test/keyboard.test.tsx` | The children keep one control each, so the tab order asserted below is the |
 | `apps/studio/src/test/renderCounts.test.tsx` | The case the budget depends on: a surface that re-renders because it reads |
 | `apps/studio/src/ui/UiRenderer.test.tsx` | A verdict never appears without the confidence behind it. |
@@ -316,68 +338,101 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_evidence_equivalence.py` | Keep the connector's transport shape equal to the record it becomes. |
 | `packages/connectors/tests/test_factory.py` | — |
 | `packages/connectors/tests/test_http_client.py` | — |
+| `packages/connectors/tests/test_http_client_lifecycle.py` | The HTTP client factory owns nothing; its callers own the client. |
 | `packages/connectors/tests/test_mapping.py` | — |
 | `packages/connectors/tests/test_marketplace.py` | Marketplace normalization, trust matching, caching, and fallback. |
 | `packages/connectors/tests/test_mcp_connector.py` | — |
+| `packages/connectors/tests/test_no_prints.py` | No library code in the connectors package prints to stdout or stderr. |
 | `packages/connectors/tests/test_rate_limit.py` | — |
 | `packages/connectors/tests/test_registry.py` | — |
 | `packages/connectors/tests/test_rest_connector.py` | — |
 | `packages/connectors/tests/test_sink.py` | — |
+| `packages/core/tests/test_alternatives.py` | What a customer uses today, recorded and asked about honestly (M2-07). |
+| `packages/core/tests/test_alternatives_presentation.py` | Presenting the alternatives inventory to a reader (M2-07.2, ALH-166). |
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
 | `packages/core/tests/test_connection.py` | MCP connection settings, read and validated in one place (issue #1084). |
 | `packages/core/tests/test_consent_pause.py` | The agent must not act on the workspace before the PM agrees. |
+| `packages/core/tests/test_default_db_path.py` | Tests for the canonical ODI database path resolution. |
+| `packages/core/tests/test_demo.py` | The demo workspace loads on purpose, and never masquerades as real data. |
 | `packages/core/tests/test_errors.py` | Tests for the ODI error hierarchy. |
 | `packages/core/tests/test_evaluation.py` | The outcome format guard: what it accepts, and what it refuses to bless. |
 | `packages/core/tests/test_evaluation_harness.py` | The evaluation harness: a service is judged by the shared fixture. |
 | `packages/core/tests/test_events.py` | Tests for the new event-store schema and migration. |
 | `packages/core/tests/test_evidence_not_found.py` | Tests for the actionable ``EvidenceNotFoundError``. |
+| `packages/core/tests/test_extraction.py` | Tests for extracting outcome candidates from a quote (A4). |
 | `packages/core/tests/test_funnel.py` | Onboarding is measurable on this machine (ALH-147): five local counters. |
 | `packages/core/tests/test_funnel_service.py` | The funnel is counted by the paths a person actually walks. |
 | `packages/core/tests/test_intent_store.py` | Tests for the append-only Intent Store. |
+| `packages/core/tests/test_interview.py` | A1 — Interview records and quotes, persisted (ALH-14). |
 | `packages/core/tests/test_job_validation.py` | — |
 | `packages/core/tests/test_logging.py` | The shared logging configuration is idempotent and level-aware. |
 | `packages/core/tests/test_messages.py` | Tests for shared assistant messages and error helpers. |
 | `packages/core/tests/test_migrations.py` | The migration ledger: numbered, recorded, and gapless. |
 | `packages/core/tests/test_models.py` | Tests for core domain models. |
+| `packages/core/tests/test_n_advisory.py` | The minimum-n advisory warns about a thin sample without overclaiming (M2-14). |
 | `packages/core/tests/test_opportunity_ranking.py` | Pin the opportunity leaderboard and its served/underserved buckets. |
 | `packages/core/tests/test_opportunity_score.py` | Regression tests for the ODI opportunity score. |
 | `packages/core/tests/test_outcome_mapping.py` | Tests for the evidence-to-outcome proposal engine (issue #80). |
+| `packages/core/tests/test_outcome_method.py` | Sample size and method travel with an outcome score. |
 | `packages/core/tests/test_outcome_trace_write.py` | Writing an outcome's V2MOM links at creation and update time (#590). |
 | `packages/core/tests/test_outcome_validation.py` | The outcome statement guard is enforced when an outcome is captured. |
 | `packages/core/tests/test_pagination.py` | Pagination on the list methods of both repositories and the service layer. |
 | `packages/core/tests/test_perf_cold_open.py` | Cold-open budget for a 1,500-outcome study. |
+| `packages/core/tests/test_persistence_parity.py` | A field added on one persistence link must exist on all of them. |
 | `packages/core/tests/test_promotion_identity.py` | One customer quote must not become three opportunities. |
 | `packages/core/tests/test_proposals.py` | Tests for proposal lifecycle (issue #80). |
 | `packages/core/tests/test_remote.py` | Tests for the shared MCP tool-result error parser. |
 | `packages/core/tests/test_repository.py` | Tests for the in-memory Repository implementation. |
 | `packages/core/tests/test_repository_factory.py` | — |
 | `packages/core/tests/test_repository_health.py` | Repository health reflects whether the store can be queried. |
+| `packages/core/tests/test_review.py` | Tests for A5 — accepting, rejecting and merging a proposed outcome. |
 | `packages/core/tests/test_router.py` | — |
 | `packages/core/tests/test_schedule.py` | — |
 | `packages/core/tests/test_scheduled_work.py` | — |
 | `packages/core/tests/test_schema.py` | — |
+| `packages/core/tests/test_schema_version.py` | ALH-53 / F1 — a schema version you can migrate. |
+| `packages/core/tests/test_score_history.py` | A score keeps its history, so "did it move?" is a subtraction. |
 | `packages/core/tests/test_segmentation.py` | Tests for Stage 5: outcome-based segmentation. |
 | `packages/core/tests/test_segments_service.py` | Tests for the Stage 5 and Stage 6 service surface. |
 | `packages/core/tests/test_segments_staleness.py` | Tests for the staleness rule on derived artifacts. |
 | `packages/core/tests/test_service.py` | Tests for the core ODIService layer. |
 | `packages/core/tests/test_signal_inbox.py` | Signals: fingerprint dedupe, emissions from real mutations, the attention budget. |
+| `packages/core/tests/test_similarity.py` | Tests for the statement normaliser and similarity score. |
+| `packages/core/tests/test_spine.py` | The spine seam refuses rather than fabricating, and reports its gaps. |
+| `packages/core/tests/test_spine_end_to_end.py` | H3 — one end-to-end test of the spine over the real code paths. |
+| `packages/core/tests/test_spine_extraction.py` | Tests for A4 — extracting candidate outcomes from one quote. |
+| `packages/core/tests/test_spine_similarity.py` | Tests for the shared statement normaliser. |
+| `packages/core/tests/test_spine_stages.py` | The real spine stages: they read and write the store, and never fabricate. |
 | `packages/core/tests/test_sqlite_integrity.py` | Tests for the boot integrity gate and clean shutdown (issue #598). |
 | `packages/core/tests/test_sqlite_repository.py` | Tests for the SQLite-backed repository and its event-sourced snapshot. |
+| `packages/core/tests/test_stats.py` | Deterministic bands (B3) pinned against hand-computed fixtures. |
+| `packages/core/tests/test_steve_jobs.py` | Tier 0 deterministic responder: branch routing, context, and the no-fabrication contract. |
 | `packages/core/tests/test_strategy.py` | Tests for Stage 6: the innovation strategy the segments imply. |
 | `packages/core/tests/test_study.py` | A Study is one named pass over a Job, and running it again makes a wave. |
+| `packages/core/tests/test_survey.py` | Survey import (B2) against a hand-computed fixture. |
+| `packages/core/tests/test_survey_input_retention.py` | B3.1: retained paired survey inputs survive a reload and reproduce a band. |
 | `packages/core/tests/test_traceability.py` | Traceability: orphans, unfunded objectives, and drift. |
+| `packages/core/tests/test_transcript.py` | A2 — transcript parsing (pure), ahead of persistence. |
+| `packages/core/tests/test_trust_pillar.py` | The Pillar-2 (ALH-7) integration contract, end to end over one store. |
+| `packages/core/tests/test_trust_seams.py` | The trust surfaces behave per their named provisional conventions. |
+| `packages/core/tests/test_trust_service.py` | The trust read/write service paths: survey import, ranking and staleness. |
 | `tests/conftest.py` | Shared test configuration for cross-package tests. |
 | `tests/contract/test_cli_contract.py` | The CLI's local backend must stay aligned with the core contract. |
+| `tests/contract/test_contract_snapshot.py` | ALH-61 / H1 — pin the contract, fail on drift. |
+| `tests/contract/test_contract_snapshot_drift.py` | ALH-61 / H1 — the snapshot gate must actually fail on each kind of drift. |
 | `tests/contract/test_mcp_contract.py` | Keep the live MCP surface in lockstep with the core contract. |
 | `tests/contract/test_no_unregistered_gitlinks.py` | Index gitlinks must be registered submodules with a url. |
 | `tests/contract/test_protected_files.py` | Protected files must never be deleted on main. |
+| `tests/e2e/__init__.py` | — |
+| `tests/e2e/test_spine.py` | End-to-end proof: one quote travels the whole spine and survives a reopen. |
 | `tests/scripts/conftest.py` | Make the standalone scripts in scripts/ importable under pytest. |
 | `tests/scripts/test_artifact_a11y.py` | The shared structural audit for artifact HTML (issue ALH-238). |
 | `tests/scripts/test_artifact_inventory.py` | The renderer inventory and the gate that keeps it true. |
 | `tests/scripts/test_assistant_ui_ledger.py` | Tests for the assistant-ui ledger check in scripts/doc_check.py (issue #429). |
 | `tests/scripts/test_audit_ignore.py` | The accepted-advisory ledger is the gate's memory (#1090). |
+| `tests/scripts/test_blind_excepts.py` | Every broad ``except`` must say what it swallowed (issue #1091). |
 | `tests/scripts/test_bundle_budget.py` | The cold-start bundle budget gate (#529). |
 | `tests/scripts/test_ci_release.py` | — |
 | `tests/scripts/test_cli_docs.py` | Assert that docs/cli.md stays synchronized with registered Typer CLI commands. |
@@ -411,6 +466,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_updater_proof_gate.py` | Where the updater's proof gets read (#613). |
 | `tests/scripts/test_vendor_policy.py` | Tests for scripts/vendor_policy.py (issue #383). |
 | `tests/scripts/test_verify.py` | — |
+| `tests/scripts/test_verify_ci_parity.py` | The pre-PR gate must account for every job the merge waits on. |
 | `tests/scripts/test_verify_hosted_first_run.py` | The hosted probe: what it must answer, and what a failure must look like. |
 | `tests/scripts/test_version_sync.py` | The released version must be the version the workspace declares. |
 | `tests/scripts/test_workflow_triggers.py` | The release workflows must be triggered by the release itself. |
@@ -419,12 +475,19 @@ isolation, and coverage rules stay in
 | `tests/test_dev_entrypoint.py` | One canonical way to run the stack locally, everywhere it is documented. |
 | `tests/test_docs_code_overview.py` | The README's Code Overview table must match the actual workspace. |
 | `tests/test_docs_method.py` | The eight-stage guide must survive being followed, not just being read. |
+| `tests/test_guide_commands.py` | The spine guides' commands are checked against the live CLI, and run. |
+| `tests/test_integration_example.py` | ALH-129 — the integration guide is executed, not just written. |
+| `tests/test_score_tolerance_parity.py` | The score-mismatch tolerance is one number, not two. |
 | `tests/test_timeout_ceiling.py` | — |
+| `tests/test_tour.py` | The ninety-second tour is generated, executed, and stays current. |
 | `tests/test_underserved_threshold_parity.py` | The boundary between "served" and "underserved" is one number, not two. |
 | `tests/test_worker_build_route.py` | `/api/build` tells a support thread which release the hosted Studio runs. |
+| `tests/test_worker_capabilities_route.py` | `/api/capabilities` states its method, like the two routes beside it. |
+| `tests/test_worker_csp_rationale.py` | The one relaxed CSP directive carries a recorded reason, and stays the only one. |
 | `tests/test_worker_deploy_route.py` | `/api/deploy` tells a probe which commit and which bundle this artifact is. |
 | `tests/test_worker_error_origin.py` | Every Worker-generated failure says so with `origin: "proxy"`. |
 | `tests/test_worker_error_shape.py` | The Worker returns the one-error-body shape, even when the sidecar is down. |
+| `tests/test_worker_header_forwarding.py` | The Worker forwards an explicit allowlist of headers to the sidecar. |
 | `tests/test_worker_security_headers.py` | The Cloudflare Worker puts security headers on every Response. |
 | `website/tests/conftest.py` | Make the website's build tools importable during collection. |
 | `website/tests/site_support.py` | Shared fixtures and helpers for the website contract tests. |
