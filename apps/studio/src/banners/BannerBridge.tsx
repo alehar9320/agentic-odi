@@ -19,8 +19,6 @@ import type { BannerActionId } from "./types";
 export function BannerBridge() {
   const { raise, resolve } = useBanner();
   const {
-    sidecarReachable,
-    dismissedSidecarNotice,
     llmHealth,
     streaming,
   } = useStudio();
@@ -50,14 +48,13 @@ export function BannerBridge() {
   }, [appUpdate.ready, appUpdate.dismissed, streaming, raise, resolve]);
 
   useEffect(() => {
-    // The offline strip is the one line while the browser has no network: this
-    // strip's Recheck and Start-the-sidecar actions could not succeed anyway.
-    if (sidecarReachable === false && !dismissedSidecarNotice && online) {
-      raise({ kind: "sidecar-down" });
+    // The offline strip is the one line while the browser has no network.
+    if (!online) {
+      raise({ kind: "offline" });
     } else {
-      resolve("sidecar-down");
+      resolve("offline");
     }
-  }, [sidecarReachable, dismissedSidecarNotice, online, raise, resolve]);
+  }, [online, raise, resolve]);
 
   useEffect(() => {
     // Same reason as the sidecar strip: the offline line says what still works.
@@ -87,7 +84,6 @@ export function useBannerActionDispatcher(): {
     recheckConnections,
     openSetup,
     openPanel,
-    dismissSidecarNotice,
     ask,
   } = useStudio();
 
@@ -118,12 +114,7 @@ export function useBannerActionDispatcher(): {
     }
   }
 
-  function onDismiss(id: string) {
-    // Dismissing the sidecar strip is a session-long choice, not just a hidden
-    // row: it must survive the next failed probe, or the strip would return.
-    if (id === "sidecar-down") {
-      dismissSidecarNotice();
-    }
+function onDismiss(id: string) {
     // The update offer is once per page: dismissing it must not bring it back on
     // the next render, and it must never loop.
     if (id === "app-update-ready") {

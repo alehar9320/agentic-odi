@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Observation } from "../../types";
+import type { CanvasData, Observation } from "../../types";
 import { MemoryPanel } from "./MemoryPanel";
 
 const mocks = vi.hoisted(() => ({
@@ -9,15 +9,18 @@ const mocks = vi.hoisted(() => ({
   updateObservation: vi.fn().mockResolvedValue({}),
   deleteObservation: vi.fn().mockResolvedValue(undefined),
   clearMemory: vi.fn().mockResolvedValue(undefined),
+  focusSubject: vi.fn(),
 }));
 
 let mockMemory: Observation[] = [];
 let mockMemoryLoading = false;
+let mockCanvas: CanvasData | null = null;
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     memory: mockMemory,
     memoryLoading: mockMemoryLoading,
+    canvas: mockCanvas,
     ...mocks,
   }),
 }));
@@ -37,10 +40,30 @@ function observation(overrides: Partial<Observation>): Observation {
   };
 }
 
+function canvas(overrides: Partial<CanvasData> = {}): CanvasData {
+  return {
+    jobs: [{ id: "JOB-1", name: "Onboarding", description: "First run" }],
+    steps: [],
+    outcomes: [
+      {
+        id: "O-12",
+        job_id: "JOB-1",
+        statement: "service onboarding time",
+        importance: 8,
+        satisfaction: 3,
+      },
+    ],
+    evidence: [],
+    source: "seed",
+    ...overrides,
+  };
+}
+
 describe("MemoryPanel", () => {
   beforeEach(() => {
     mockMemory = [];
     mockMemoryLoading = false;
+    mockCanvas = null;
     vi.clearAllMocks();
   });
 
@@ -128,5 +151,45 @@ describe("MemoryPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Forget everything" }));
     expect(mocks.clearMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the record a note is about and focuses it on click", () => {
+    mockCanvas = canvas();
+    mockMemory = [
+      observation({
+        status: "confirmed",
+        subject_type: "outcome",
+        subject_id: "O-12",
+      }),
+    ];
+    render(<MemoryPanel />);
+
+    const subject = screen.getByRole("button", {
+      name: "About Onboarding · O-12 · service onboarding time",
+    });
+    fireEvent.click(subject);
+    expect(mocks.focusSubject).toHaveBeenCalledWith("outcome", "O-12");
+  });
+
+  it("says Not attached for a note with no subject", () => {
+    mockCanvas = canvas();
+    mockMemory = [observation({ status: "confirmed" })];
+    render(<MemoryPanel />);
+
+    expect(screen.getByText("Not attached")).toBeInTheDocument();
+    expect(mocks.focusSubject).not.toHaveBeenCalled();
+  });
+
+  it("says a subject is gone instead of showing a bare id", () => {
+    mockCanvas = canvas({ outcomes: [] });
+    mockMemory = [
+      observation({ status: "confirmed", subject_type: "outcome", subject_id: "O-99" }),
+    ];
+    render(<MemoryPanel />);
+
+    expect(
+      screen.getByText("About a outcome that is no longer on this canvas · O-99"),
+    ).toBeInTheDocument();
+    expect(mocks.focusSubject).not.toHaveBeenCalled();
   });
 });

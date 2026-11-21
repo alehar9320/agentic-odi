@@ -341,10 +341,9 @@ async def test_a_refused_score_range_carries_the_range_code():
         payload = _failure_payload(res.content[0].text)
 
         assert payload["error"]["code"] == "out_of_range"
-        # The score that was out of range is named, so a client can show the
-        # message next to the field that needs it instead of on top of the form.
-        assert payload["error"]["field"] == "importance"
-        assert payload["message"] == "Error: importance must be between 1.0 and 10.0"
+        assert (
+            payload["message"] == "Error: importance and satisfaction must be between 1.0 and 10.0"
+        )
 
 
 @pytest.mark.asyncio
@@ -355,6 +354,58 @@ async def test_a_successful_tool_returns_no_envelope():
         )
 
         assert res.content[0].text.startswith("Job created successfully:")
+
+
+@pytest.mark.asyncio
+async def test_add_evidence_records_impact_and_confidence():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "interview",
+                "source_kind": "manual",
+                "name": "Customer quote",
+                "content": "It takes too long to deploy",
+                "job_id": job_id,
+                "impact": "high",
+                "confidence": "verified",
+            },
+        )
+        text = res.content[0].text
+        assert "Evidence created successfully" in text
+        match = re.search(r"({.*})", text, re.DOTALL)
+        evidence_data = json.loads(match.group(1)) if match else {}
+        assert evidence_data["impact"] == "high"
+        assert evidence_data["confidence"] == "verified"
+
+
+@pytest.mark.asyncio
+async def test_add_evidence_applies_defaults_for_impact_and_confidence():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "interview",
+                "source_kind": "manual",
+                "name": "Customer quote",
+                "content": "It takes too long to deploy",
+                "job_id": job_id,
+            },
+        )
+        text = res.content[0].text
+        assert "Evidence created successfully" in text
+        match = re.search(r"({.*})", text, re.DOTALL)
+        evidence_data = json.loads(match.group(1)) if match else {}
+        assert evidence_data["impact"] == "medium"
+        assert evidence_data["confidence"] == "claimed"
 
 
 def _is_tool_handler(node: ast.FunctionDef) -> bool:

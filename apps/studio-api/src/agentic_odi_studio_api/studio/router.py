@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from agentic_odi_connectors.catalog import UnknownPresetError
@@ -63,12 +65,16 @@ from agentic_odi_studio_api.studio.memory import (
     StudioMemory,
 )
 from agentic_odi_studio_api.studio.probes import (
+    DEFAULT_BASE_URL,
     defaults,
+    invalidate_probe_cache,
     is_endpoint_reachable,
     list_models,
     probe_llm_health,
+    save_profile,
 )
 from agentic_odi_studio_api.studio.schemas import (
+    AddAlternativeRequest,
     AddConnectorRequest,
     AddCustomerOutcomeRequest,
     AddEvidenceRequest,
@@ -88,6 +94,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ConversationTreeResponse,
     CreateJobRequest,
     LatestConversationResponse,
+    LinkAlternativeRequest,
     LinkOutcomeRequest,
     LlmHealthRequest,
     LlmHealthResponse,
@@ -96,6 +103,7 @@ from agentic_odi_studio_api.studio.schemas import (
     MarketplaceSearchResponse,
     McpHealthRequest,
     MintShareRequest,
+    ModelKeyRequest,
     ModelListRequest,
     ObservationCreateRequest,
     ObservationListResponse,
@@ -106,6 +114,7 @@ from agentic_odi_studio_api.studio.schemas import (
     ProposeOutcomeRequest,
     ProposeStrategyRequest,
     RejectProposalRequest,
+    SaveConfigRequest,
     ScheduleWorkRequest,
     SharedArtifactResponse,
     ShareMintResponse,
@@ -117,6 +126,12 @@ from agentic_odi_studio_api.studio.schemas import (
     UpdateJobRequest,
     UpdateOutcomeRequest,
     UpdateStepRequest,
+)
+from agentic_odi_studio_api.studio.secrets import (
+    SecretStoreError,
+    load_model_key,
+    model_key_status,
+    set_model_key,
 )
 from agentic_odi_studio_api.studio.sharing import (
     ShareError,
@@ -183,7 +198,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
         )
     if isinstance(exc, OutcomeStatementError):
         return StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field=exc.field),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field="statement"),
             status_code=422,
         )
     if isinstance(
@@ -212,7 +227,7 @@ def _as_http_error(exc: Exception) -> StudioHTTPError:
             StudioError(
                 code=StudioErrorCode.OUT_OF_RANGE,
                 message=str(exc),
-                field=exc.field or _outcome_field(str(exc)),
+                field=_outcome_field(str(exc)),
             ),
             status_code=422,
         )
@@ -253,7 +268,79 @@ def _approvals(request: Request) -> ApprovalRegistry:
 
 @router.get("/config")
 def get_config() -> dict:
-    return {"defaults": defaults()}
+    """Defaults for the client. The model key is reported as a state, never a value."""
+    try:
+        key_status = model_key_status()
+    except SecretStoreError:
+        key_status = {"configured": False, "set_at": None}
+    # The key is deliberately absent from the body: this route is read by any
+    # script in the page, so it may report only whether one is set.
+    safe_defaults = {**defaults(), "api_key": ""}
+    return {"defaults": safe_defaults, "model_key": key_status}
+
+
+@router.get("/settings/model-key")
+def get_model_key() -> dict:
+    """Whether a model key is set, and when -- the value is never returned."""
+    try:
+        return model_key_status()
+    except SecretStoreError:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.INTERNAL,
+                message="The secret store could not be read.",
+                suggestion="Check that your profile directory is readable, then try again.",
+            )
+        ) from None
+
+
+@router.put("/settings/model-key")
+def put_model_key(body: ModelKeyRequest) -> dict:
+    """Store a model key once. The response reports its state, not its value."""
+    value = body.value.strip()
+    if not value:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.VALIDATION,
+                message="A model key cannot be empty.",
+                suggestion="Type a key, or use the replace action to overwrite the stored one.",
+            )
+        )
+    try:
+        set_at = set_model_key(value)
+    except SecretStoreError:
+        # Fail closed: the key was not stored, so do not pretend it was.
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.INTERNAL,
+                message="The secret store is not writable, so the key was not saved.",
+                suggestion="Check permissions on your profile directory, then try again.",
+            )
+        ) from None
+    return {"configured": True, "set_at": set_at}
+
+
+@router.post("/config")
+def save_config(body: SaveConfigRequest) -> dict:
+    """Persist LLM connection settings and invalidate the probe cache.
+
+    The probe cache is keyed on (endpoint, model, key_hash), so a credential
+    rotation naturally misses the cache. This endpoint additionally clears the
+    cache for base_url or model_name changes, which do not include the key.
+    """
+    merged = save_profile(
+        {
+            "base_url": body.base_url,
+            "api_key": body.api_key,
+            "model": body.model_name,
+            "mcp_url": body.mcp_url,
+        }
+    )
+
+    # Invalidate the probe cache so subsequent probes see the new settings
+    invalidate_probe_cache()
+
+    return {"ok": True, "saved": merged}
 
 
 @router.get("/diagnostics")
@@ -309,6 +396,39 @@ def get_diagnostics(request: Request) -> dict[str, Any]:
     }
 
 
+@router.get("/data/status")
+def get_data_status(request: Request) -> dict[str, Any]:
+    """Report the resolved paths and sizes of the sidecar's two SQLite stores.
+
+    Metadata only: no entity rows, no credentials, no record counts. A store
+    whose file does not yet exist reports its resolved configuration path with
+    unavailable size and modification time rather than inventing values.
+    """
+    service = _service(request)
+    memory = _memory(request)
+
+    def store_status(path) -> dict[str, Any]:
+        p = Path(path) if path is not None else None
+        if p is None:
+            return {"path": ":memory:", "bytes": None, "lastModified": None}
+        try:
+            info = p.stat()
+            return {
+                "path": str(p),
+                "bytes": info.st_size,
+                "lastModified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(),
+            }
+        except OSError:
+            return {"path": str(p), "bytes": None, "lastModified": None}
+
+    return {
+        "stores": [
+            {"id": "odi", **store_status(getattr(service.repo, "db_path", None))},
+            {"id": "studio", **store_status(memory.db_path)},
+        ]
+    }
+
+
 @router.get("/stats")
 def get_stats(request: Request) -> dict[str, Any]:
     """The onboarding funnel, counted from this machine's own event log.
@@ -342,6 +462,48 @@ def post_mcp_health(body: McpHealthRequest) -> dict:
     return {"reachable": is_endpoint_reachable(body.mcp_url)}
 
 
+def _origin(base_url: str) -> str:
+    """Scheme + host of a base URL, used to compare provider origins."""
+    parsed = urlparse(base_url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _configured_provider_origin() -> str:
+    """Origin of the provider the sidecar is configured to talk to.
+
+    The stored key is a credential the sidecar holds, so it is only ever sent
+    back to the origin it was configured for. A custom or foreign provider URL
+    receives only a key the request itself supplies.
+    """
+    return _origin(defaults().get("base_url", DEFAULT_BASE_URL))
+
+
+def _with_stored_key(value: str, base_url: str) -> str:
+    """Fall back to the stored key only for the configured provider origin.
+
+    The browser no longer holds the key, so a request that carries an empty one
+    is answered with the key the sidecar holds: first the write-only store, then
+    the profile default an operator configured. The stored key is attached only
+    when the resolved ``base_url`` origin matches the configured provider
+    origin; otherwise only a key supplied in the request is used, so a caller
+    cannot harvest the stored key by pointing ``base_url`` at a server it
+    controls.
+    """
+    if value:
+        return value
+    # Both credentials the sidecar holds -- the key the browser wrote to the
+    # write-only store and the key an operator configured -- obey one rule, so
+    # neither can be harvested by pointing ``base_url`` at a server the caller
+    # controls. A custom or foreign origin gets only what the request supplies.
+    if _origin(base_url) != _configured_provider_origin():
+        return ""
+    try:
+        stored = load_model_key()
+    except SecretStoreError:
+        stored = None
+    return stored or defaults().get("api_key", "")
+
+
 @router.post("/health/llm", response_model=LlmHealthResponse)
 async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) -> dict:
     """Probe the configured LLM endpoint, cached per (endpoint, model).
@@ -349,7 +511,9 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
     Concurrent tabs within the TTL cause a single upstream probe. ``?fresh=true``
     bypasses the cache so a user-initiated "check now" is never stale.
     """
-    result = await probe_llm_health(body.base_url, body.api_key, body.model, fresh=fresh)
+    result = await probe_llm_health(
+        body.base_url, _with_stored_key(body.api_key, body.base_url), body.model, fresh=fresh
+    )
     return {
         "healthy": result["healthy"],
         "message": result["message"],
@@ -361,7 +525,7 @@ async def post_llm_health(body: LlmHealthRequest, fresh: bool = Query(False)) ->
 @router.post("/models")
 async def post_models(body: ModelListRequest) -> dict:
     """The model ids this backend serves, for the composer's model picker."""
-    models, error = await list_models(body.base_url, body.api_key)
+    models, error = await list_models(body.base_url, _with_stored_key(body.api_key, body.base_url))
     return {"models": models, "error": error}
 
 
@@ -715,6 +879,14 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
         arguments["satisfaction"] = body.satisfaction
     if claim_check is not None:
         arguments["claim_check"] = claim_check.model_dump(mode="json")
+    if body.importance_n is not None:
+        arguments["importance_n"] = body.importance_n
+    if body.satisfaction_n is not None:
+        arguments["satisfaction_n"] = body.satisfaction_n
+    if body.score_method is not None:
+        arguments["score_method"] = body.score_method
+    if body.note is not None:
+        arguments["note"] = body.note
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
@@ -728,6 +900,10 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
             statement=body.statement,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            importance_n=body.importance_n,
+            satisfaction_n=body.satisfaction_n,
+            score_method=body.score_method,
+            note=body.note,
             claim_check=claim_check,
         )
     except Exception as exc:  # noqa: BLE001
@@ -738,18 +914,164 @@ async def post_outcome(body: AddOutcomeRequest, request: Request) -> dict:
 @router.patch("/outcomes/{outcome_id}")
 async def patch_outcome(outcome_id: str, body: UpdateOutcomeRequest, request: Request) -> dict:
     updates = body.model_dump(exclude_none=True, exclude={"mcp_url"})
+    # ``note`` is snapshot metadata, not an Outcome field: it is recorded with
+    # the new score rather than written onto the record.
+    note = updates.pop("note", None)
     if _uses_mcp(request):
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.UPDATE_OUTCOME.value,
-            {"outcome_id": outcome_id, **updates},
+            {"outcome_id": outcome_id, "note": note, **updates},
         )
         return _payload_from_text(result)
     try:
-        outcome = _service(request).update_outcome(outcome_id, updates)
+        outcome = _service(request).update_outcome(outcome_id, updates, note=note)
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
     return outcome.model_dump(mode="json")
+
+
+@router.get("/outcomes/{outcome_id}/history")
+async def get_outcome_history(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's accepted score snapshots, oldest first.
+
+    Snapshots carry the score and its sample/method companions. The signed delta
+    is served separately at ``/outcomes/{id}/delta`` so this list shape stays
+    identical across the local and MCP backends.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_HISTORY.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        snapshots = _service(request).get_score_history(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": [snapshot.model_dump(mode="json") for snapshot in snapshots]}
+
+
+@router.get("/outcomes/{outcome_id}/delta")
+async def get_outcome_delta(
+    outcome_id: str,
+    request: Request,
+    since: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Return the signed change across an outcome's snapshots (B6.1).
+
+    ``since`` chooses the baseline (the last snapshot at or before it; the
+    earliest when omitted). ``direction`` is the product's sign rule, so a
+    consumer never invents an "improvement" from a bare number.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_DELTA.value,
+            {"outcome_id": outcome_id, **({"since": since} if since else {})},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        delta = _service(request).get_outcome_delta(outcome_id, since)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": delta.outcome_id,
+            "importance": delta.importance,
+            "satisfaction": delta.satisfaction,
+            "opportunity": delta.opportunity,
+            "direction": delta.direction,
+        },
+    }
+
+
+@router.get("/outcomes/{outcome_id}/interval")
+async def get_outcome_interval(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return an outcome's stored band and its provenance (B3.2).
+
+    ``band: null`` means the score carries no band at all — an estimate or an
+    unscored outcome — which is a distinct state from a zero-width band. A
+    stored band reports the sample, seed, confidence level, method and
+    computed-at it was recorded with, plus whether a later snapshot moved the
+    score it came from, so a consumer never presents a stale band as current.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INTERVAL.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        provenance = _service(request).get_outcome_interval(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if provenance is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "band": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": provenance.outcome_id,
+            "band": {
+                "low": provenance.low,
+                "high": provenance.high,
+                "n": provenance.n,
+                "confidence_level": provenance.confidence_level,
+                "seed": provenance.seed,
+                "method": provenance.method,
+                "computed_at": provenance.computed_at,
+                "stale": provenance.stale,
+            },
+        },
+    }
+
+
+@router.get("/outcomes/{outcome_id}/inputs")
+async def get_outcome_inputs(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    """Return the paired survey inputs a stored band was reproduced from (B3.1).
+
+    ``inputs: null`` means no input set is retained — a legacy or aggregate-only
+    outcome — which is a distinct state from a retained set and never an empty
+    list that would read as zero responses. Each input carries only an opaque
+    per-pair token and the two numbers, so the read shape is de-identified.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_INPUTS.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        inputs = _service(request).get_outcome_inputs(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    if inputs is None:
+        return {"ok": True, "result": {"outcome_id": outcome_id, "inputs": None}}
+    return {
+        "ok": True,
+        "result": {
+            "outcome_id": outcome_id,
+            "inputs": [
+                {
+                    "respondent_id": item.respondent_id,
+                    "importance": item.importance,
+                    "satisfaction": item.satisfaction,
+                }
+                for item in inputs
+            ],
+        },
+    }
 
 
 @router.delete("/outcomes/{outcome_id}")
@@ -936,86 +1258,6 @@ async def post_strategy_propose(
     return strategy.model_dump(mode="json")
 
 
-@router.get("/traceability", response_model=TraceabilityReportResponse)
-async def get_traceability(
-    request: Request,
-    mcp_url: str | None = Query(None),
-) -> dict[str, Any]:
-    """Orphans, unfunded objectives, and links the vision dropped.
-
-    Read-only. With no objectives defined the report carries
-    ``objectives_defined: false`` and a message, not three empty sections that
-    would read as a clean bill of health.
-    """
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""), ToolName.GET_TRACEABILITY_REPORT.value, {}
-        )
-        return _payload_from_text(result)
-    return _service(request).traceability_report().as_dict()
-
-
-@router.get("/alignments", response_model=list[dict[str, Any]])
-async def get_alignments(
-    request: Request,
-    outcome_id: str | None = Query(None),
-    mcp_url: str | None = Query(None),
-) -> list[dict[str, Any]]:
-    """The V2MOM links recorded on outcomes, optionally for one outcome."""
-    if _uses_mcp(request):
-        arguments: dict[str, Any] = {}
-        if outcome_id:
-            arguments["outcome_id"] = outcome_id
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""), ToolName.GET_OUTCOME_ALIGNMENTS.value, arguments
-        )
-        parsed = _json_or_raw(result)
-        return parsed if isinstance(parsed, list) else []
-    return _service(request).list_alignments(outcome_id)
-
-
-@router.post("/outcomes/{outcome_id}/alignments", response_model=dict[str, Any])
-async def post_outcome_alignment(
-    outcome_id: str, body: LinkOutcomeRequest, request: Request
-) -> dict[str, Any]:
-    """Link an outcome to one method or measure the vision currently holds."""
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(body.mcp_url),
-            ToolName.LINK_OUTCOME.value,
-            {"outcome_id": outcome_id, "field": body.field, "text": body.text},
-        )
-        return _payload_from_text(result)
-    try:
-        outcome = _service(request).link_outcome(outcome_id, body.field, body.text)
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return outcome.model_dump(mode="json")
-
-
-@router.delete("/outcomes/{outcome_id}/alignments/{field}/{key}", response_model=dict[str, Any])
-async def delete_outcome_alignment(
-    outcome_id: str,
-    field: str,
-    key: str,
-    request: Request,
-    mcp_url: str | None = Query(None),
-) -> dict[str, Any]:
-    """Remove one recorded link. Removing a link that is not there is a no-op."""
-    if _uses_mcp(request):
-        result = await call_mcp_tool(
-            _require_mcp_url(mcp_url or ""),
-            ToolName.UNLINK_OUTCOME.value,
-            {"outcome_id": outcome_id, "field": field, "key": key},
-        )
-        return _payload_from_text(result)
-    try:
-        outcome = _service(request).unlink_outcome(outcome_id, field, key)
-    except Exception as exc:  # noqa: BLE001
-        raise _as_http_error(exc) from exc
-    return outcome.model_dump(mode="json")
-
-
 def _customer_outcome_args(body: AddCustomerOutcomeRequest) -> dict[str, Any]:
     return {
         "job_id": body.job_id,
@@ -1117,6 +1359,201 @@ async def delete_customer_outcome(
     return {"ok": True}
 
 
+@router.get("/alternatives")
+async def get_alternatives(
+    request: Request,
+    job_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if job_id:
+            arguments["job_id"] = job_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.LIST_ALTERNATIVES.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    alternatives = _service(request).list_alternatives(job_id)
+    return {"ok": True, "result": [item.model_dump(mode="json") for item in alternatives]}
+
+
+@router.get("/alternatives/{alternative_id}")
+async def get_alternative(
+    alternative_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_ALTERNATIVE.value,
+            {"alternative_id": alternative_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        alternative = _service(request).get_alternative(alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": alternative.model_dump(mode="json")}
+
+
+@router.post("/alternatives")
+async def post_alternative(body: AddAlternativeRequest, request: Request) -> dict:
+    arguments = body.model_dump(exclude={"mcp_url"})
+    if _uses_mcp(request):
+        result = await call_mcp_tool(body.mcp_url, ToolName.ADD_ALTERNATIVE.value, arguments)
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        alternative = _service(request).add_alternative(
+            job_id=body.job_id,
+            name=body.name,
+            kind=body.kind,
+            notes=body.notes,
+            source_kind=body.source_kind,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": alternative.model_dump(mode="json")}
+
+
+@router.delete("/alternatives/{alternative_id}")
+async def delete_alternative(
+    alternative_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.DELETE_ALTERNATIVE.value,
+            {"alternative_id": alternative_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).delete_alternative(alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.post("/outcomes/{outcome_id}/alternatives")
+async def link_alternative(outcome_id: str, body: LinkAlternativeRequest, request: Request) -> dict:
+    arguments = {"outcome_id": outcome_id, **body.model_dump(exclude={"mcp_url"})}
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url), ToolName.LINK_ALTERNATIVE.value, arguments
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        link = _service(request).link_alternative(
+            outcome_id=outcome_id,
+            alternative_id=body.alternative_id,
+            adequacy=body.adequacy,
+            usage_n=body.usage_n,
+            note=body.note,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": link.model_dump(mode="json")}
+
+
+@router.delete("/outcomes/{outcome_id}/alternatives/{alternative_id}")
+async def unlink_alternative(
+    outcome_id: str,
+    alternative_id: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict:
+    if _uses_mcp(request):
+        await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_ALTERNATIVE.value,
+            {"outcome_id": outcome_id, "alternative_id": alternative_id},
+        )
+        return {"ok": True}
+    try:
+        _service(request).unlink_alternative(outcome_id, alternative_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True}
+
+
+@router.get("/outcomes/{outcome_id}/alternatives")
+async def get_outcome_alternatives(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_OUTCOME_ALTERNATIVES.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        pairs = _service(request).outcome_alternatives(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [
+            {
+                "alternative": alternative.model_dump(mode="json"),
+                "link": link.model_dump(mode="json"),
+            }
+            for alternative, link in pairs
+        ],
+    }
+
+
+@router.get("/outcomes/{outcome_id}/existing-solution")
+async def get_has_existing_solution(
+    outcome_id: str, request: Request, mcp_url: str | None = Query(None)
+) -> dict:
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.GET_HAS_EXISTING_SOLUTION.value,
+            {"outcome_id": outcome_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        verdict = _service(request).has_existing_solution(outcome_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {"ok": True, "result": {"outcome_id": outcome_id, "existing_solution": verdict}}
+
+
+@router.get("/alternative-links")
+async def get_alternative_links(
+    request: Request,
+    job_id: str = Query(...),
+    mcp_url: str | None = Query(None),
+) -> dict:
+    """Every recorded alternative for one Job, with its outcome and link (M2-07.2).
+
+    One read for the whole Job so the landscape facet can compute a solution
+    state per outcome without a request per row.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.LIST_ALTERNATIVE_LINKS.value,
+            {"job_id": job_id},
+        )
+        return {"ok": True, "result": _json_or_raw(result)}
+    try:
+        triples = _service(request).job_outcome_alternatives(job_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return {
+        "ok": True,
+        "result": [
+            {
+                "outcome_id": outcome_id,
+                "alternative": alternative.model_dump(mode="json"),
+                "link": link.model_dump(mode="json"),
+            }
+            for outcome_id, alternative, link in triples
+        ],
+    }
+
+
 @router.get("/evidence")
 async def get_evidence_records(
     request: Request,
@@ -1161,8 +1598,19 @@ async def get_evidence(
 
 
 @router.get("/memory/observations", response_model=ObservationListResponse)
-def list_observations(request: Request) -> ObservationListResponse:
-    observations = _memory(request).list_observations()
+def list_observations(
+    request: Request,
+    subject_type: str | None = None,
+    subject_id: str | None = None,
+) -> ObservationListResponse:
+    try:
+        observations = _memory(request).list_observations(
+            subject_type=subject_type, subject_id=subject_id
+        )
+    except ValueError as exc:
+        raise StudioHTTPError(
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc))
+        ) from exc
     return ObservationListResponse(
         observations=[observation.to_dict() for observation in observations]
     )
@@ -1177,6 +1625,8 @@ def create_observation(body: ObservationCreateRequest, request: Request) -> Obse
             data=body.data,
             status="confirmed" if body.confirmed else "suggested",
             confidence=body.confidence,
+            subject_type=body.subject_type,
+            subject_id=body.subject_id,
         )
     except ValueError as exc:
         raise StudioHTTPError(
@@ -1297,6 +1747,22 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
     )
 
 
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, request: Request) -> dict:
+    """Remove one thread and its turns; an unknown id is a 404, not a no-op."""
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+                suggestion="Refresh the history and try again.",
+            )
+        ) from exc
+    return {"ok": True}
+
+
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
 def patch_conversation(
     conversation_id: str, body: UpdateConversationRequest, request: Request
@@ -1351,6 +1817,9 @@ async def post_chat(request: Request, body: ChatRequest) -> StreamingResponse:
     # server minted), never one the body claims, so the id in the frames, the
     # header, and the log line are always the same one.
     request_id = request_id_for(request)
+    # The browser no longer holds the model key, so an empty one is filled from
+    # the sidecar's write-only store before the turn is streamed.
+    body = body.model_copy(update={"api_key": _with_stored_key(body.api_key, body.base_url)})
     return StreamingResponse(
         stream_chat(
             body,
@@ -1444,8 +1913,9 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
-        if body.api_key:
-            headers["Authorization"] = f"Bearer {body.api_key}"
+        stored_key = _with_stored_key(body.api_key, body.base_url)
+        if stored_key:
+            headers["Authorization"] = f"Bearer {stored_key}"
         payload: dict[str, Any] = {
             "model": body.model,
             "messages": [message.model_dump() for message in body.messages],
@@ -1458,18 +1928,34 @@ async def proxy_llm_chat(body: LlmProxyRequest) -> StreamingResponse:
             try:
                 async with client.stream("POST", url, headers=headers, json=payload) as response:
                     if response.status_code >= 400:
-                        text = (await response.aread()).decode("utf-8", "replace")
+                        # Never echo the upstream body: a provider could reflect a
+                        # credential back in its error text, and the stored key is
+                        # the only secret this sidecar holds. Report the status,
+                        # never the body.
                         yield (
                             "event: error\n"
-                            + f"data: {json.dumps({'error': {'code': 'provider_error', 'message': text or f'HTTP {response.status_code}'}})}\n\n"
+                            + "data: "
+                            + json.dumps(
+                                {
+                                    "error": {
+                                        "code": "provider_error",
+                                        "message": f"Provider error (HTTP {response.status_code})",
+                                    }
+                                }
+                            )
+                            + "\n\n"
                         )
                         return
                     async for chunk in response.aiter_bytes():
                         yield chunk.decode("utf-8", "replace")
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 yield (
                     "event: error\n"
-                    + f"data: {json.dumps({'error': {'code': 'provider_error', 'message': str(exc)}})}\n\n"
+                    + "data: "
+                    + json.dumps(
+                        {"error": {"code": "provider_error", "message": "Provider request failed"}}
+                    )
+                    + "\n\n"
                 )
 
     return StreamingResponse(
@@ -1634,6 +2120,8 @@ async def promote_evidence(
             args["importance"] = body.importance
         if body.satisfaction is not None:
             args["satisfaction"] = body.satisfaction
+        if body.force:
+            args["force"] = True
         result = await call_mcp_tool(
             _require_mcp_url(body.mcp_url),
             ToolName.PROMOTE_EVIDENCE.value,
@@ -1649,6 +2137,7 @@ async def promote_evidence(
             name=body.name,
             importance=body.importance,
             satisfaction=body.satisfaction,
+            force=body.force,
         )
     except Exception as exc:  # noqa: BLE001
         raise _as_http_error(exc) from exc
@@ -1753,7 +2242,7 @@ async def approve_proposal_api(
         )
     except InvalidOutcomeStatementError as exc:
         raise StudioHTTPError(
-            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc), field=exc.field),
+            StudioError(code=StudioErrorCode.VALIDATION, message=str(exc)),
             status_code=422,
         ) from exc
     except Exception as exc:  # noqa: BLE001
@@ -1851,3 +2340,83 @@ def read_shared(token: str, request: Request) -> SharedArtifactResponse:
     except ShareNotFoundError as exc:
         raise _share_not_found() from exc
     return SharedArtifactResponse(**payload)
+
+
+@router.get("/traceability", response_model=TraceabilityReportResponse)
+async def get_traceability(
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Orphans, unfunded objectives, and links the vision dropped.
+
+    Read-only. With no objectives defined the report carries
+    ``objectives_defined: false`` and a message, not three empty sections that
+    would read as a clean bill of health.
+    """
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_TRACEABILITY_REPORT.value, {}
+        )
+        return _payload_from_text(result)
+    return _service(request).traceability_report().as_dict()
+
+
+@router.get("/alignments", response_model=list[dict[str, Any]])
+async def get_alignments(
+    request: Request,
+    outcome_id: str | None = Query(None),
+    mcp_url: str | None = Query(None),
+) -> list[dict[str, Any]]:
+    """The V2MOM links recorded on outcomes, optionally for one outcome."""
+    if _uses_mcp(request):
+        arguments: dict[str, Any] = {}
+        if outcome_id:
+            arguments["outcome_id"] = outcome_id
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""), ToolName.GET_OUTCOME_ALIGNMENTS.value, arguments
+        )
+        parsed = _json_or_raw(result)
+        return parsed if isinstance(parsed, list) else []
+    return _service(request).list_alignments(outcome_id)
+
+
+@router.post("/outcomes/{outcome_id}/alignments", response_model=dict[str, Any])
+async def post_outcome_alignment(
+    outcome_id: str, body: LinkOutcomeRequest, request: Request
+) -> dict[str, Any]:
+    """Link an outcome to one method or measure the vision currently holds."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(body.mcp_url),
+            ToolName.LINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": body.field, "text": body.text},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).link_outcome(outcome_id, body.field, body.text)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")
+
+
+@router.delete("/outcomes/{outcome_id}/alignments/{field}/{key}", response_model=dict[str, Any])
+async def delete_outcome_alignment(
+    outcome_id: str,
+    field: str,
+    key: str,
+    request: Request,
+    mcp_url: str | None = Query(None),
+) -> dict[str, Any]:
+    """Remove one recorded link. Removing a link that is not there is a no-op."""
+    if _uses_mcp(request):
+        result = await call_mcp_tool(
+            _require_mcp_url(mcp_url or ""),
+            ToolName.UNLINK_OUTCOME.value,
+            {"outcome_id": outcome_id, "field": field, "key": key},
+        )
+        return _payload_from_text(result)
+    try:
+        outcome = _service(request).unlink_outcome(outcome_id, field, key)
+    except Exception as exc:  # noqa: BLE001
+        raise _as_http_error(exc) from exc
+    return outcome.model_dump(mode="json")

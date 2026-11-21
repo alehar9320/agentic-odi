@@ -30,9 +30,13 @@ gh pr view <n> --comments
 gh api "repos/{owner}/{repo}/pulls/<n>/files?per_page=100" --paginate --jq '.[].filename'
 ```
 
-Find the spec: the issue linked in the body, a `docs/superpowers/plans/` or
-`specs/` entry, or the `docs/roadmap.md` *In flight* line. No spec anywhere is
-itself the first defect — state that in the body instead of inventing one.
+Find the spec: the issue linked in the body, or a `docs/superpowers/plans/` or
+`specs/` entry. No spec anywhere is itself the first defect — state that in the
+body instead of inventing one.
+
+Review comments are claims to verify, not gates to clear: turn each into a
+defect — file, line, expected, actual — fix the still-valid ones, and account
+for every one as fixed in this commit or deferred with a reason.
 
 ## Step 2 — make it mergeable
 
@@ -42,6 +46,7 @@ Never work on the PR author's checkout:
 git fetch origin
 git worktree add ".worktrees/pr-<n>" "<headRefName>"
 cd ".worktrees/pr-<n>" && git rebase "origin/<base>"
+uv sync --all-packages --locked
 ```
 
 Resolve a conflict by understanding both intents. A conflict you cannot resolve
@@ -59,8 +64,8 @@ Then check the gates a spec in this repo usually implies:
 - **Contract sync** — a new or changed MCP tool needs `ToolName` / `TOOL_SPECS`
   in `packages/core/src/agentic_odi_core/contract.py` and the `get_capabilities`
   text, in the same PR.
-- **Docs** — `README.md` and `docs/` reflect the change, and `docs/roadmap.md`
-  gains a *Shipped* or *In flight* line for the capability.
+- **Docs** — `README.md` and `docs/` reflect the change; a shipped capability
+  lands in `CHANGELOG.md` and the release, not in a hand-maintained roadmap list.
 - **Tests** — `uv run pytest` in the owning workspace; `npm --prefix apps/studio test -- --run`
   for the frontend.
 - **Reuse** — a PR that adds a source file carries the `Reuses:` block from
@@ -78,7 +83,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy apps brand packages
 uv run python scripts/doc_check.py
 uv run bandit -c pyproject.toml -r apps packages
-uv run pytest
+uv run pytest --cov   # --cov applies the 89% floor in pyproject.toml
 npm --prefix apps/studio run lint
 npm --prefix apps/studio run typecheck
 ```
