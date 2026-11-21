@@ -1,0 +1,36 @@
+# actionlint configuration for .github/workflows and .github/actions.
+#
+# Entries below are accepted findings with a documented rationale. They are
+# scoped to the affected file and error message only; no advisory mode is used
+# and no check is disabled repo-wide.
+
+paths:
+  .github/workflows/release-please.yml:
+    ignore:
+      # actions/create-github-app-token@v3's real action.yml accepts `client-id`
+      # (preferred) and treats `app-id` as deprecated and optional, but
+      # actionlint's bundled action metadata predates that change. Passing
+      # `client-id` + `private-key` is valid for the real action, so these are
+      # stale-metadata false positives, not configuration errors. Do not "fix"
+      # them by switching to `app-id`: that input is deprecated.
+      - 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'
+      - 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
+  .github/workflows/label-merge-conflicts.yml:
+    ignore:
+      # The `attempt` loop variable is intentionally unused: the loop is a bounded
+      # poll (`for attempt in $(seq 1 10)`) whose body breaks once the merge state
+      # is decided. Suppressing SC2034 here avoids churning the loop into a less
+      # readable form just to satisfy shellcheck.
+      - 'attempt appears unused'
+  .github/workflows/pr-sweep.yml:
+    ignore:
+      # `REPORT=$(cat ...)` is assigned then the value is inlined into `$BODY` via
+      # `$TABLE` instead; the capture is a historical artifact. Suppressing the
+      # SC2034 keeps the diff minimal and the weekly sweep report intact.
+      - 'REPORT appears unused'
+  .github/workflows/pr-screenshots.yml:
+    ignore:
+      # `ls ... | wc -l` counts PNG screenshots in a directory we control, so
+      # non-alphanumeric filenames are not a concern. `find` would add noise for
+      # no safety gain here; the SC2012 info is scoped out.
+      - 'Use find instead of ls'

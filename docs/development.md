@@ -58,6 +58,29 @@ rather than the diff, and its result does not depend on which files a pull
 request touched. See
 [ADR 0008](architecture/adr/0008-dependency-advisories-are-a-gate.md).
 
+## Workflow analysis
+
+CI runs pinned `actionlint` and `zizmor` against `.github/workflows/` and
+`.github/actions/` in the `workflow-analysis` job, and `CI green` requires it.
+Analyzer versions are pinned and installed with integrity checks, and no
+advisory mode is used:
+
+```bash
+# actionlint: binary release, sha256-verified against the release checksums
+curl -fsSL -o /tmp/actionlint.tar.gz \
+  https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+printf '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  /tmp/actionlint.tar.gz\n' | sha256sum -c -
+tar -xzf /tmp/actionlint.tar.gz -C /tmp && export PATH="/tmp:$PATH"
+actionlint
+
+# zizmor: PyPI wheel, hash-verified by pip
+uv pip install zizmor==1.32.0
+zizmor .github/workflows/ .github/actions/
+```
+
+Accepted findings are scoped suppressions in `.github/actionlint.yaml`, each
+with a documented rationale.
+
 ## Documentation Checks
 
 `scripts/doc_check.py` keeps the living docs honest against the code:

@@ -62,6 +62,7 @@ CI_JOB_COVERAGE: dict[str, tuple[str, ...]] = {
     "tauri-build": (),
     "e2e": (),
     "e2e-smoke": (),
+    "workflow-analysis": (),
 }
 
 CI_ONLY_REASONS: dict[str, str] = {
@@ -85,6 +86,10 @@ CI_ONLY_REASONS: dict[str, str] = {
     "e2e-smoke": (
         "drives Chromium against a built Studio and both services; a real boot, and the "
         "one browser lane that blocks a merge, so CI owns it"
+    ),
+    "workflow-analysis": (
+        "downloads and runs pinned actionlint/zizmor binaries against the workflows; "
+        "needs the network and is not a function of the local diff"
     ),
 }
 
