@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { fetchConfig, healthLlm } from "./api/studioApi";
+import { fetchConfig, healthLlm, saveModelKey } from "./api/studioApi";
 import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
@@ -27,6 +27,10 @@ vi.mock("./api/studioApi", () => ({
     ],
     source: "local" as const,
   })),
+  saveModelKey: vi.fn(async () => ({
+    configured: true,
+    set_at: "2026-11-21T00:00:00+00:00",
+  })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),
@@ -39,6 +43,11 @@ vi.mock("./api/studioApi", () => ({
   updateOutcome: vi.fn(async () => ({ ok: true })),
   deleteOutcome: vi.fn(async () => ({ ok: true })),
   fetchMemory: vi.fn(async () => []),
+  fetchOutcomeHistory: vi.fn(async () => []),
+  fetchOutcomeInterval: vi.fn(async () => ({ outcome_id: "O-1", band: null })),
+  fetchOutcomeAlternatives: vi.fn(async () => []),
+  fetchExistingSolution: vi.fn(async () => "no_link_at_all"),
+  fetchAlternativeLinks: vi.fn(async () => []),
   fetchSignals: vi.fn(async () => [
     {
       id: "sig-1",
@@ -228,6 +237,8 @@ describe("studio shell", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^landscape/i }));
     fireEvent.click(await screen.findByRole("button", { name: /adjust scores/i }));
+    // The panel saves only a change: nudge an assumption before pressing Save.
+    fireEvent.change(screen.getByLabelText("Importance"), { target: { value: "9.5" } });
     fireEvent.click(screen.getByRole("button", { name: /save scores/i }));
 
     await waitFor(() => {
@@ -364,9 +375,10 @@ describe("studio shell", () => {
     }
   });
 
-  it("does say so when a sidecar it had been reaching stops answering", async () => {
-    // The control for the two tests above: the strips are deferred, never missing. A
-    // studio that was talking to a sidecar and then was not has a real outage to name.
+  it("stays quiet when a sidecar it had been reaching stops answering", async () => {
+    // #511: the assistant answers from the built-in fallback when the sidecar is
+    // unreachable, so a sidecar that goes away is no longer an outage to name.
+    // The reply carries the "Built-in assistant" tag instead of a banner.
     vi.useFakeTimers();
     try {
       render(<App />);
@@ -382,9 +394,7 @@ describe("studio shell", () => {
         await vi.advanceTimersByTimeAsync(PROBE_BASE_MS * (1 + PROBE_JITTER) + 5_000);
       });
 
-      const banners = document.querySelectorAll(".banner");
-      expect(banners.length).toBeGreaterThan(0);
-      expect(banners[0].textContent).toMatch(/sidecar/i);
+      expect(document.querySelectorAll(".banner")).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
@@ -742,7 +752,7 @@ describe("boot failure", () => {
           code: "store_corrupt",
           message:
             "Your database failed its integrity check: /home/me/.odi.db. " +
-            "Last backup: 06:14 (odi-20260102T061400Z.db).",
+            "Last backup: 06:14 local (odi-20260102T061400Z.db).",
           detail: "database disk image is malformed",
           suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
           retryable: false,
@@ -757,7 +767,7 @@ describe("boot failure", () => {
         name: "Your database failed its integrity check.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14");
+    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14 local");
     expect(screen.getByRole("button", { name: "Recheck the database" })).toBeInTheDocument();
     // The conversation is not offered: there is nothing to show from a store
     // that failed its check.
@@ -823,15 +833,16 @@ describe("composer shortcuts (#692)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /open what's new changelog/i }));
     const dialog = await screen.findByRole("dialog");
 
-    expect(document.querySelector(".studio-app")).toHaveAttribute("inert");
-    // The dialog is not inside the inert shell, so it stays reachable.
+    // The shared Dialog is modal: it announces itself as such, which is what
+    // the shell's `dialogOpen` gate reads to keep its shortcuts out of reach.
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    // It portals to the document root, so it stays reachable while the page
+    // behind it is hidden.
     expect(document.querySelector(".studio-app")?.contains(dialog)).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
 
-    await waitFor(() => {
-      expect(document.querySelector(".studio-app")).not.toHaveAttribute("inert");
-    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("returns focus to the What's New control after the changelog closes", async () => {
@@ -869,8 +880,10 @@ describe("composer shortcuts (#692)", () => {
     fireEvent.click(screen.getByRole("button", { name: /open what's new changelog/i }));
     await screen.findByRole("dialog");
 
-    // One Escape closes the changelog; the reply keeps streaming.
-    fireEvent.keyDown(window, { key: "Escape" });
+    // One Escape closes the changelog; the reply keeps streaming. The Escape is
+    // dispatched on the document, which is where the shared Dialog listens for
+    // it, before it bubbles on to the shell's window handler.
+    fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByRole("button", { name: /stop generating/i })).toBeInTheDocument();
 
@@ -936,5 +949,26 @@ describe("the bar's new thread can be undone (#319)", () => {
     await waitFor(() => {
       expect(screen.getByText("Where do I start?")).toBeInTheDocument();
     });
+  });
+});
+
+describe("a model key that cannot be migrated", () => {
+  it("warns on the banner strip and leaves the studio usable", async () => {
+    window.localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+    vi.mocked(saveModelKey).mockRejectedValueOnce(new Error("The sidecar is unreachable."));
+
+    render(<App />);
+
+    // The key is still on the device, so the failure is a warning: the studio
+    // renders and the person can keep working while the sidecar is down.
+    expect(await screen.findByText(/could not be moved to the sidecar/i)).toBeInTheDocument();
+    expect(screen.getByRole("main")).toBeInTheDocument();
   });
 });

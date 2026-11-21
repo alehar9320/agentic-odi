@@ -83,13 +83,13 @@ export function savedCopyCaption(
     return "Saved just now";
   }
   if (elapsed < HOUR) {
-    const minutes = Math.round(elapsed / MINUTE);
+    const minutes = Math.floor(elapsed / MINUTE);
     return `Saved ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
   }
   if (elapsed < DAY) {
-    const hours = Math.round(elapsed / HOUR);
+    const hours = Math.floor(elapsed / HOUR);
     return `Saved ${hours} hour${hours === 1 ? "" : "s"} ago`;
   }
-  const days = Math.round(elapsed / DAY);
+  const days = Math.floor(elapsed / DAY);
   return `Saved ${days} day${days === 1 ? "" : "s"} ago`;
 }

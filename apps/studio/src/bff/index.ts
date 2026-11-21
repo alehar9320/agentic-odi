@@ -335,6 +335,8 @@ export class StudioBff {
         data: observation.data ?? {},
         confidence: observation.confidence ?? 0.5,
         confirmed: observation.status === "confirmed",
+        subject_type: observation.subject_type ?? null,
+        subject_id: observation.subject_id ?? null,
       });
     }
 

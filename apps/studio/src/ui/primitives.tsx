@@ -39,6 +39,11 @@ export function ActionRow({ actions }: { actions: UiAction[] }) {
           }
         >
           {action.label}
+          {action.kind === "detail" && action.tone === "primary" ? (
+            // The mock's arrow: a primary detail action is the one way right.
+            // Hidden from the accessible name, which stays the action's label.
+            <span aria-hidden="true">{" →"}</span>
+          ) : null}
         </button>
       ))}
     </div>
@@ -142,17 +147,36 @@ export function ListBlock({ node }: NodeProps) {
   );
 }
 
-export function Stat({ node }: NodeProps) {
-  const label = str(node.props, "label");
-  const value = str(node.props, "value");
-  const delta = str(node.props, "delta");
-  const statTone = tone(node.props);
+export interface StatValueProps {
+  label: string;
+  value: string;
+  delta?: string;
+  tone?: Tone;
+}
+
+/**
+ * The stat's anatomy, shared by the `stat` node and the cards that carry one.
+ * One implementation, so a headline number looks the same wherever it lands.
+ */
+export function StatValue({ label, value, delta, tone: statTone = "neutral" }: StatValueProps) {
   return (
     <div className={`ui-stat ui-tone--${statTone}`}>
       <div className="ui-stat__label">{label}</div>
       <div className="ui-stat__value">{value}</div>
       {delta ? <div className="ui-stat__delta">{delta}</div> : null}
     </div>
+  );
+}
+
+export function Stat({ node }: NodeProps) {
+  const delta = str(node.props, "delta");
+  return (
+    <StatValue
+      label={str(node.props, "label")}
+      value={str(node.props, "value")}
+      {...(delta ? { delta } : {})}
+      tone={tone(node.props)}
+    />
   );
 }
 

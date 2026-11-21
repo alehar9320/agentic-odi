@@ -38,12 +38,36 @@ class LlmHealthResponse(BaseModel):
     cached: bool  # whether the answer was served from the TTL cache
 
 
+class SaveConfigRequest(BaseModel):
+    """Persist LLM connection settings so the sidecar reads them on restart.
+
+    The same fields the GET /config endpoint returns as ``defaults``.
+    """
+
+    base_url: str
+    api_key: str = ""
+    model_name: str
+    mcp_url: str = ""
+
+
 class ModelListRequest(BaseModel):
     """Which backend to ask for its model ids. The key travels in the body, not
     the query string, so it never lands in a URL or an access log."""
 
     base_url: str
     api_key: str = ""
+
+
+class ModelKeyRequest(BaseModel):
+    """A model key on its way to the sidecar's write-only store.
+
+    The value travels in the body and is never echoed back: the response to a
+    write reports only whether a key is set and when it was set.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(min_length=1)
 
 
 class AddStepRequest(BaseModel):
@@ -62,8 +86,13 @@ class AddOutcomeRequest(BaseModel):
     importance: float | None = Field(default=None, ge=1.0, le=10.0)
     satisfaction: float | None = Field(default=None, ge=1.0, le=10.0)
     #: The questions behind the score. Required when either score is set; a
-    #: score without it is refused by the MCP tool.
+    #: score without it is refused by the MCP tool, and the by-hand HTTP path
+    #: records it as an unverified check rather than an interrogated one.
     claim_check: ClaimCheck | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] = "estimate"
+    note: str | None = Field(default=None, max_length=500)
 
 
 class CreateJobRequest(BaseModel):
@@ -90,6 +119,10 @@ class UpdateOutcomeRequest(BaseModel):
     statement: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    importance_n: int | None = Field(default=None, ge=1)
+    satisfaction_n: int | None = Field(default=None, ge=1)
+    score_method: Literal["estimate", "survey", "import"] | None = None
+    note: str | None = Field(default=None, max_length=500)
     mcp_url: str = ""
 
 
@@ -162,6 +195,23 @@ class UpdateCustomerOutcomeRequest(BaseModel):
     customer_value: CustomerValue | None = None
     business_value: BusinessValue | None = None
     step_id: str | None = None
+
+
+class AddAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    job_id: str
+    name: str
+    kind: str
+    notes: str | None = None
+    source_kind: str = "manual"
+
+
+class LinkAlternativeRequest(BaseModel):
+    mcp_url: str = ""
+    alternative_id: str
+    adequacy: float
+    usage_n: int | None = None
+    note: str | None = None
 
 
 class StudioBrief(BaseModel):
@@ -307,6 +357,7 @@ ObservationKind = Literal[
     "preference",
 ]
 ObservationStatus = Literal["suggested", "confirmed", "dismissed"]
+ObservationSubjectType = Literal["job", "step", "outcome", "evidence"]
 
 
 class ObservationModel(BaseModel):
@@ -317,6 +368,8 @@ class ObservationModel(BaseModel):
     status: str
     confidence: float
     source_turn: int | None = None
+    subject_type: str | None = None
+    subject_id: str | None = None
     created_at: str
     updated_at: str
 
@@ -335,6 +388,8 @@ class ObservationCreateRequest(BaseModel):
     data: dict[str, Any] | None = None
     confidence: float = Field(default=0.6, ge=0, le=1)
     confirmed: bool = False
+    subject_type: ObservationSubjectType | None = None
+    subject_id: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ObservationUpdateRequest(BaseModel):
@@ -482,6 +537,7 @@ class PromoteEvidenceRequest(BaseModel):
     name: str | None = None
     importance: float | None = None
     satisfaction: float | None = None
+    force: bool = False
     mcp_url: str = ""
 
 
@@ -545,6 +601,7 @@ class ShareMintResponse(BaseModel):
     token: str
     url: str
     expires_at: str
+    shareable: bool
 
 
 class SharedArtifactResponse(BaseModel):

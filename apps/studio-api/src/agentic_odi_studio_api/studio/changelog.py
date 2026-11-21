@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 VERSION_HEADER_RE = re.compile(
     r"^##\s+\[?v?([0-9]+\.[0-9]+\.[0-9]+(?:\-[a-zA-Z0-9\.]+)?)\]?.*?\(([0-9]{4}-[0-9]{2}-[0-9]{2})\)"
@@ -92,7 +95,8 @@ def get_changelog() -> dict:
             releases = parse_changelog_markdown(content)
             if releases:
                 return {"releases": releases}
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - an unparseable changelog falls back
+            log.warning("changelog could not be parsed (error=%s)", type(exc).__name__)
             releases = []
 
     # Fallback if CHANGELOG.md is missing or unparseable

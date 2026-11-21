@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CanvasData, ConnectorPreset, StudioBrief, Thesis } from "../types";
 import { briefFilename, briefToMarkdown } from "./export";
 import { buildDecisionBrief, EXCERPT_LIMIT } from "./brief";
+import { opportunityScore } from "./odi";
 
 /**
  * The decision brief is the document a review reads, so these tests hold it to
@@ -32,7 +33,7 @@ function outcome(
 ) {
   const score =
     importance != null && satisfaction != null
-      ? importance + Math.max(importance - satisfaction, 0)
+      ? opportunityScore(importance, satisfaction)
       : null;
   return { id, statement, importance, satisfaction, opportunity_score: score, ...overrides };
 }
@@ -420,7 +421,15 @@ describe("briefToMarkdown", () => {
   });
 
   it("dates the document from its own timestamp", () => {
-    expect(markdown).toContain("3 November 2026");
+    // Prose dates follow the reader's locale, so the expectation is computed the
+    // same way instead of pinning one locale's word order.
+    const printed = new Intl.DateTimeFormat(undefined, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(built.generated_at));
+
+    expect(markdown).toContain(`_Decision brief — ${printed}_`);
   });
 
   it("names the decision, its score, and the reasoning saved against it", () => {

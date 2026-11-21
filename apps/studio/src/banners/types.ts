@@ -25,6 +25,7 @@ export type BannerKind =
   | "update-available"
   | "update-ready"
   | "write-rejected"
+  | "model-key-unsaved"
   | "info"
   | "success"
   | "error";

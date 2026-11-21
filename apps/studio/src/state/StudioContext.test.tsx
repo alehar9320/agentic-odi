@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
-import { SESSION_KEY } from "../lib/session";
+import { SESSION_KEY, SESSION_SCHEMA_VERSION } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
 import { getStudioBff } from "../bff/index";
 import {
@@ -15,6 +15,7 @@ import {
   typeIntoComposer,
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
+import { SETTINGS_KEY } from "./settings/SettingsContext";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
@@ -45,8 +46,47 @@ function json(body: unknown): Response {
   });
 }
 
+
+/**
+ * A reply of `count` deltas whose terminal frame carries no content, so what is
+ * rendered is exactly what the deltas accumulated. A delta the frame batching
+ * dropped would show up here as a short string.
+ */
+function streamOfProse(count: number): string {
+  const deltas = Array.from(
+    { length: count },
+    (_unused, index) => `event: delta\ndata: {"text":"w${index} "}\n\n`,
+  ).join("");
+  return deltas + "event: message\ndata: {}\n\n";
+}
+
 function sse(body: string): Response {
   return new Response(body, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+/** The same bytes, released one event per macrotask: what a network delivers. */
+function chunkedSse(body: string): Response {
+  const encoder = new TextEncoder();
+  const blocks = body.split("\n\n").filter((block) => block.trim().length > 0);
+  let index = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const push = () => {
+        if (index >= blocks.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(encoder.encode(`${blocks[index]}\n\n`));
+        index += 1;
+        setTimeout(push, 0);
+      };
+      setTimeout(push, 0);
+    },
+  });
+  return new Response(stream, {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   });
@@ -62,6 +102,8 @@ const DEFAULT_CHAT_STREAM =
   'event: message\ndata: {"content":"Hi"}\n\n';
 
 let chatStream: string | null = null;
+/** Deliver the stream one event per macrotask, as a real network does. */
+let chatChunked = false;
 let canvasFails = false;
 /** Extra records the canvas route serves; empty keeps every other test as-is. */
 let canvasRecords: Record<string, unknown> = {};
@@ -77,11 +119,17 @@ let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
+/** A write-only-store write the sidecar refuses, as an unreachable or unwritable
+ *  sidecar would. The migration must keep the browser copy when this is set. */
+let modelKeySaveFails = false;
 let catalogFetches = 0;
 let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let renamePatches: Record<string, unknown>[] = [];
+/** When true, the conversation PATCH route answers 503 so a rename fails. */
+let renameFails = false;
 let conversationCreates = 0;
 /** When true, the canvas/evidence write routes answer 503 with no structured error. */
 let writeFails = false;
@@ -93,6 +141,8 @@ type GatedTurn = {
   body: Record<string, unknown>;
   aborted: boolean;
   respond: (events: string) => void;
+  /** Release part of the stream without closing it: a reply mid-flight. */
+  emit: (events: string) => void;
   abort: () => void;
 };
 let gateChats = false;
@@ -110,6 +160,9 @@ function gatedChatResponse(
     respond: (events) => {
       streamController?.enqueue(encoder.encode(events));
       streamController?.close();
+    },
+    emit: (events) => {
+      streamController?.enqueue(encoder.encode(events));
     },
     abort: () => {
       turn.aborted = true;
@@ -182,7 +235,28 @@ function route(
     if (gateChats) {
       return gatedChatResponse(chatBody as Record<string, unknown>, init?.signal);
     }
+    if (chatChunked) {
+      return chunkedSse(chatStream ?? DEFAULT_CHAT_STREAM);
+    }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
+  }
+  if (url === "/api/settings/model-key") {
+    if (init?.method === "PUT") {
+      if (modelKeySaveFails) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "internal",
+              message: "The secret store is not writable, so the key was not saved.",
+              retryable: true,
+            },
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return json({ configured: true, set_at: "2026-11-21T00:00:00+00:00" });
+    }
+    return json({ configured: false, set_at: null });
   }
   if (url === "/api/config") {
     if (configHangs) {
@@ -206,7 +280,7 @@ function route(
             code: "store_corrupt",
             message:
               "Your database failed its integrity check: /home/me/.odi.db. " +
-              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+              "Last backup: 06:14 local (odi-20260102T061400Z.db).",
             detail: "database disk image is malformed",
             suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
             retryable: false,
@@ -288,7 +362,19 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    if ("title" in body) {
+      if (renameFails) {
+        return new Response(JSON.stringify({ detail: "nope" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      renamePatches.push({ url, ...body });
+    }
+    if ("head_id" in body) {
+      headPatches.push(body);
+    }
     return json({ conversation: CONVERSATION });
   }
   if (url === "/api/conversations/c-1/tree") {
@@ -390,6 +476,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -400,7 +488,12 @@ describe("StudioContext memory and resume", () => {
   it("restores the focused subject from the previous session", () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
+      JSON.stringify({
+        schema_version: SESSION_SCHEMA_VERSION,
+        job_id: null,
+        step_id: null,
+        outcome_id: "O-9",
+      }),
     );
 
     const { result } = renderHook(
@@ -431,6 +524,7 @@ describe("StudioContext memory and resume", () => {
 
     expect(result.current.focusedSubject).toEqual({ kind: "job", id: "JOB-7" });
     expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
+      schema_version: SESSION_SCHEMA_VERSION,
       job_id: "JOB-7",
       step_id: null,
       outcome_id: null,
@@ -757,6 +851,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -808,6 +904,70 @@ describe("StudioContext failures", () => {
     const messages = result.current.messages;
     expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
     expect(messages.at(-1)?.error?.code).toBe("internal");
+  });
+
+  it("drops a failed send and its question when the row is dismissed (#405)", async () => {
+    chatFailure = new Error("network down");
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const before = result.current.messages;
+    const failed = before.at(-1);
+    const question = before.at(-2);
+    expect(question?.role).toBe("user");
+    expect(question?.content).toBe("list the jobs");
+    expect(failed?.role).toBe("assistant");
+    expect(failed?.error).toBeDefined();
+
+    await act(async () => {
+      result.current.dismissFailedTurn(failed?.id ?? null);
+    });
+
+    // Both the question and the dead reply leave together: the pair is one send.
+    // The earlier, answered turns stay.
+    const after = result.current.messages;
+    expect(after.map((message) => message.id)).not.toContain(failed?.id);
+    expect(after.map((message) => message.id)).not.toContain(question?.id);
+    expect(after).toHaveLength(before.length - 2);
+  });
+
+  it("never dismisses a turn that did not fail (#405)", async () => {
+    chatStream = 'event: message\ndata: {"content":"Here you go."}\n\n';
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const answered = result.current.messages.at(-1);
+    expect(answered?.role).toBe("assistant");
+    expect(answered?.error).toBeUndefined();
+    const before = result.current.messages.length;
+
+    await act(async () => {
+      result.current.dismissFailedTurn(answered?.id ?? null);
+    });
+
+    expect(result.current.messages).toHaveLength(before);
   });
 
   it("reports a stream that ends without a message as an internal failure", async () => {
@@ -975,6 +1135,47 @@ describe("StudioContext first run in a browser with no server", () => {
     // The reply says where it came from, on the reply — not in a strip above.
     expect(result.current.offlineReplyFor).toBe(last?.id);
     expect(result.current.messages.some((message) => message.role === "notice")).toBe(false);
+  });
+
+  it("surfaces a real application error instead of falling back", async () => {
+    // A 401 from the sidecar is an application error, not a transport failure:
+    // the local assistant must not answer for it.
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/chat") {
+        chatAttempts += 1;
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "Bad token.", retryable: false } }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return route(input, init);
+    });
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvas).not.toBeNull());
+
+    await act(async () => {
+      await result.current.sendMessage("what should I work on first?");
+    });
+
+    // The error surfaces on the assistant message; no local-served marker.
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last?.role).toBe("assistant");
+      expect(last?.error).toBeDefined();
+    });
+    const last = result.current.messages.at(-1);
+    expect(last?.error).toBeDefined();
+    expect(result.current.offlineReplyFor).toBeNull();
+    // Only one attempt at /api/chat — no fall-through to the browser BFF.
+    expect(chatAttempts).toBe(1);
   });
 
   it("calls nothing broken until the person asks", async () => {
@@ -1561,9 +1762,11 @@ describe("StudioContext probe scheduling", () => {
     });
     expect(llmHealthFetches).toBe(afterBoot);
 
-    // ...and one has fired by the longest.
+    // ...and one has fired by the longest. The margin covers the boot settle:
+    // the timer can be armed after the mount (a boot report re-arms it), so the
+    // wait is anchored on the longest delay plus the boot's own 2.5 s.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(longest - shortest + 2_000);
+      await vi.advanceTimersByTimeAsync(longest - shortest + 5_000);
     });
     expect(llmHealthFetches).toBeGreaterThan(afterBoot);
   });
@@ -1879,6 +2082,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1931,6 +2136,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -1974,6 +2181,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2144,6 +2353,8 @@ describe("StudioContext startNewThread (#319)", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -2546,6 +2757,8 @@ describe("StudioContext agent focus", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -2614,6 +2827,79 @@ describe("StudioContext agent focus", () => {
     });
 
     expect(chatBody?.focus ?? null).toBeNull();
+  });
+
+  it("opens a detail on the lens that holds its subject, not the panel it named", async () => {
+    canvasRecords = {
+      jobs: [{ id: "J-1", name: "Reconcile invoices" }],
+      steps: [{ id: "S-2", job_id: "J-1", name: "Match each line", order: 2 }],
+    };
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.canvasState.data?.steps).toHaveLength(1));
+
+    act(() => {
+      result.current.openDetail("landscape", { kind: "step", id: "S-2" });
+    });
+
+    // The subject decides the lens: a step lives in the job map (#739).
+    expect(result.current.activePanel).toBe("jobmap");
+    expect(result.current.detail).toEqual({
+      panel: "jobmap",
+      subject: { kind: "step", id: "S-2" },
+    });
+    expect(result.current.focusedSubject).toEqual({ kind: "step", id: "S-2" });
+    expect(result.current.focusedJobId).toBe("J-1");
+  });
+
+  it("keeps the panel a detail named when its subject names no lens", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("evidence", { kind: "finding", id: "F-1" });
+    });
+
+    // An unwired subject is not guessed at: the panel the action named stands,
+    // and no focus is recorded for a kind the lenses do not know.
+    expect(result.current.activePanel).toBe("evidence");
+    expect(result.current.detail).toEqual({
+      panel: "evidence",
+      subject: { kind: "finding", id: "F-1" },
+    });
+    expect(result.current.focusedSubject).toBeNull();
+  });
+
+  it("opens the panel a detail named when it has no subject", async () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    act(() => {
+      result.current.openDetail("catchup");
+    });
+
+    expect(result.current.activePanel).toBe("catchup");
+    expect(result.current.detail).toEqual({ panel: "catchup" });
   });
 
   it("stops pointing at the screen once the person clears the focus", async () => {
@@ -2787,6 +3073,131 @@ describe("Studio render budget (#502)", () => {
     expectRenderBudget(STREAM_BUDGET);
   });
 
+  it("batches a chunked reply into a frame's worth of renders, not one per delta", async () => {
+    // The network delivers one event per macrotask. Forty deltas that each
+    // published their own render would land as roughly forty renders of every
+    // surface; batching to one frame brings the transcript-only surfaces back
+    // to their quiet baseline.
+    chatChunked = true;
+    chatStream = streamOfDeltas(40);
+    const studio = await countedStudio();
+
+    await act(async () => {
+      await studio.sendMessage("hello");
+    });
+
+    const counts = getCounts();
+    expect(counts.landscape ?? 0, "the landscape rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.rail ?? 0, "the rail rendered per delta").toBeLessThanOrEqual(3);
+    expect(counts.banners ?? 0, "the banners rendered per delta").toBeLessThanOrEqual(3);
+    chatChunked = false;
+  });
+
+  it("renders the streamed prose exactly as the deltas arrived", async () => {
+    // A turn held open on the wire, then released with forty deltas and the
+    // frame that closes it: the accumulated text must be every delta, in order,
+    // even though the frames batched them.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(streamOfProse(40));
+    });
+
+    const expected = Array.from({ length: 40 }, (_unused, index) => `w${index} `).join("");
+    await waitFor(() => expect(live.current!.messages.at(-1)?.content).toBe(expected));
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("keeps the settled messages identical while the reply streams", async () => {
+    // The assistant message is replaced on every flush; every message before it
+    // keeps its identity, so a reader of the settled transcript is not asked to
+    // render again.
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+    const settled = live.current!.messages.slice();
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+
+    settled.forEach((message, index) => {
+      expect(live.current!.messages[index]).toBe(message);
+    });
+  });
+
+  it("keeps the text that arrived before a cancel, and drops only the placeholder", async () => {
+    // A stop mid-reply: the deltas already received are flushed before the
+    // empty placeholder is removed, so the person keeps what they had read.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("hello");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].emit('event: delta\ndata: {"text":"half an "}\n\nevent: delta\ndata: {"text":"answer"}\n\n');
+    });
+
+    await act(async () => {
+      live.current!.stopStreaming();
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    expect(live.current!.messages.at(-1)?.content).toBe("half an answer");
+    gateChats = false;
+    gatedTurns = [];
+  });
+
+  it("lands a mid-stream approval after the prose that preceded it", async () => {
+    // Batching prose must not reorder a surface: a tool row that arrives
+    // between two deltas stays between them, not above or below the flush.
+    gateChats = true;
+    gatedTurns = [];
+    const live: { current: StudioContextValue | null } = { current: null };
+    render(<CountedStudio onStudio={(value) => { live.current = value; }} />);
+    await waitFor(() => expect(live.current).not.toBeNull());
+
+    await act(async () => {
+      await live.current!.sendMessage("add a job");
+    });
+    await waitFor(() => expect(gatedTurns).toHaveLength(1));
+
+    await act(async () => {
+      gatedTurns[0].respond(
+        'event: delta\ndata: {"text":"Let me add "}\n\n' +
+          'event: approval\ndata: {"id":"apv_9","tool_call_id":"call-9","name":"add_job","prompt":"Allow the assistant to add job?"}\n\n' +
+          'event: delta\ndata: {"text":"it now."}\n\n' +
+          'event: message\ndata: {"content":"Let me add it now."}\n\n',
+      );
+    });
+    await waitFor(() => expect(live.current!.streaming).toBe(false));
+
+    const parts = live.current!.messages.at(-1)?.parts ?? [];
+    const kinds = parts.map((part) => part.kind);
+    const approvalAt = kinds.indexOf("tool");
+    const lastTextAt = kinds.lastIndexOf("text");
+    expect(approvalAt).toBeGreaterThan(-1);
+    expect(approvalAt).toBeLessThan(lastTextAt);
+    gateChats = false;
+    gatedTurns = [];
+  });
+
   it("takes twenty keystrokes within its budget", async () => {
     await countedStudio();
     const input = screen.getByRole("textbox", { name: "Message the studio" });
@@ -2807,5 +3218,115 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext rename conversation (#642)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmTransportFails = false;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    renamePatches = [];
+    renameFails = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function booted() {
+    const harness = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(harness.result.current.conversations).toHaveLength(2));
+    return harness;
+  }
+
+  it("renames a thread and re-reads the history", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(renamePatches).toEqual([{ url: "/api/conversations/c-1", title: "Renamed thread" }]);
+    // The list is re-read from the store, not patched by hand.
+    expect(result.current.conversations).toHaveLength(2);
+  });
+
+  it("reports a failed rename and leaves the history as it was", async () => {
+    const { result } = await booted();
+    renameFails = true;
+    const before = result.current.conversations;
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.conversations).toEqual(before);
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "I couldn't rename that conversation.",
+    );
+  });
+});
+
+describe("legacy model-key migration", () => {
+  beforeEach(() => {
+    localStorage.removeItem(SETTINGS_KEY);
+    modelKeySaveFails = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    modelKeySaveFails = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the browser copy when the sidecar refuses the key, then retries", async () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // The sidecar is unreachable or its store is unwritable: the key is not
+    // saved, so it must not be deleted from the browser either.
+    await waitFor(() => expect(result.current.migrationError).not.toBeNull());
+    expect(localStorage.getItem(SETTINGS_KEY)).toContain("sk-legacy-DO-NOT-LOSE");
+
+    // The sidecar comes back; the retry saves the key and only then drops it.
+    modelKeySaveFails = false;
+    await act(async () => {
+      await result.current.retryLegacyMigration();
+    });
+
+    expect(result.current.migrationError).toBeNull();
+    expect(localStorage.getItem(SETTINGS_KEY)).not.toContain("sk-legacy-DO-NOT-LOSE");
   });
 });

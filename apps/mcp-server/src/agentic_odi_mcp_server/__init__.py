@@ -2,26 +2,16 @@
 
 from agentic_odi_mcp_server.mcp_server import (
     compute_opportunity,
-    customer_outcomes_db,
-    evidence_db,
-    jobs_db,
+    configure,
+    get_repository,
+    get_service,
     mcp,
-    outcomes_db,
-    segments_db,
-    signals_db,
-    steps_db,
-    strategies_db,
 )
 
 __all__ = [
     "compute_opportunity",
-    "customer_outcomes_db",
-    "evidence_db",
-    "jobs_db",
+    "configure",
+    "get_repository",
+    "get_service",
     "mcp",
-    "outcomes_db",
-    "segments_db",
-    "signals_db",
-    "steps_db",
-    "strategies_db",
 ]
