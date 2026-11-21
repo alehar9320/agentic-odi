@@ -339,7 +339,7 @@ a {
   border-radius: 999px;
   background: transparent;
   color: var(--faint);
-  font-size: 0.72rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -1241,7 +1241,7 @@ a {
   gap: 12px;
   margin: 0 8px;
   color: var(--faint);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
 }
 
 .composer__hint kbd {
@@ -1322,7 +1322,7 @@ a {
 
 .attach__meta {
   color: var(--faint);
-  font-size: 0.66rem;
+  font-size: var(--text-sm);
 }
 
 .attach__remove {
@@ -1335,7 +1335,7 @@ a {
   border-radius: 50%;
   background: transparent;
   color: var(--faint);
-  font-size: 0.68rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -1609,7 +1609,7 @@ a {
   background: transparent;
   color: var(--faint);
   font-family: inherit;
-  font-size: 0.66rem;
+  font-size: var(--text-sm);
   text-overflow: ellipsis;
   cursor: pointer;
   appearance: none;
@@ -1632,9 +1632,9 @@ a {
 
 .composer__model-caret {
   position: absolute;
-  right: 2px;
+  right: 3px;
   color: var(--faint);
-  font-size: 0.62rem;
+  font-size: var(--text-sm);
   pointer-events: none;
 }
 
@@ -1759,7 +1759,7 @@ a {
   align-self: center;
   margin-right: 2px;
   color: var(--faint);
-  font-size: 0.72rem;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   opacity: 0;
   transition: opacity var(--motion-fast) ease;
@@ -1801,7 +1801,7 @@ a {
   border-radius: 6px;
   background: transparent;
   color: var(--faint);
-  font-size: 0.74rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 

@@ -37,6 +37,12 @@ describe("type and scalar tokens", () => {
     expect(sizes.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("keeps the functional type step at or above 12px", () => {
+    const step = root.match(/--text-sm:\s*([\d.]+)rem/);
+    expect(step, "missing --text-sm").not.toBeNull();
+    expect(Number(step![1]) * 16).toBeGreaterThanOrEqual(12);
+  });
+
   it("defines at least five steps of a spacing scale", () => {
     const spaces = root.match(/--space-\d+:\s*\d+px/g) ?? [];
     expect(spaces.length).toBeGreaterThanOrEqual(5);
