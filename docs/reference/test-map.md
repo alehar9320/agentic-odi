@@ -239,6 +239,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | Point the mocked store at a feed; `unread` defaults to what the feed shows. */ |
 | `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | The signal inbox is evidence-first: every card is a change the store |
 | `apps/studio/src/components/records/RecordDetail.test.tsx` | The detail as the lens renders it: a real row out of the real builder, so a field the |
+| `apps/studio/src/components/records/RecordsPanel.test.tsx` | The file a person opens in a spreadsheet, asserted from the bytes the button hands over. |
 | `apps/studio/src/components/records/RecordsTable.test.tsx` | — |
 | `apps/studio/src/components/settings/AboutSection.test.tsx` | The transport is supported, so the provider syncs currentVersion from the |
 | `apps/studio/src/components/settings/ConnectionsSection.test.tsx` | The failure-isolation contract: both sections are composed from props, |
@@ -282,7 +283,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/odi.test.ts` | The fixture is the contract between the Python service and the TypeScript |
 | `apps/studio/src/lib/offlinePage.test.ts` | #546: the offline shell is a page, not a React route, so the only way to keep |
 | `apps/studio/src/lib/onlineStatus.test.tsx` | jsdom's `navigator.onLine` is a plain property; redefine it per test and put |
-| `apps/studio/src/lib/records.test.ts` | — |
+| `apps/studio/src/lib/records.test.ts` | The shape the person opening the file in a spreadsheet sees: one header, then each |
 | `apps/studio/src/lib/relativeTime.test.ts` | — |
 | `apps/studio/src/lib/sampleLoop.test.ts` | Bundled sample data, never the person's live canvas. |
 | `apps/studio/src/lib/scoreVocabulary.test.ts` | — |
@@ -312,7 +313,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/styles/colors.test.ts` | The raw-colour gate (issue #543, parent #331). |
 | `apps/studio/src/styles/mainstage.test.ts` | Guards for the mainstage stylesheet (#737). |
 | `apps/studio/src/styles/motion.test.ts` | The motion budget, asserted against the stylesheet itself. |
-| `apps/studio/src/styles/print.test.ts` | The brief sheet marks the body while the print dialog is open, so the page |
+| `apps/studio/src/styles/print.test.ts` | The records lens is the surface a person takes to a meeting: its headings and tables |
 | `apps/studio/src/styles/theme.test.ts` | Colour and token guards for the theme. |
 | `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation, asserted from the stylesheet source |
 | `apps/studio/src/test/a11y.test.tsx` | The accessibility gate for every surface that ships. |
