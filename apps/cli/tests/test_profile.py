@@ -18,7 +18,7 @@ def test_config_dir_uses_xdg_config_home(monkeypatch, tmp_path):
 def test_config_dir_defaults_to_home(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert profile.config_dir() == Path(tmp_path) / "agentic-odi"
+    assert profile.config_dir() == Path(tmp_path) / ".config" / "agentic-odi"
 
 
 def test_baseline_file_location(monkeypatch, tmp_path):
@@ -29,7 +29,7 @@ def test_baseline_file_location(monkeypatch, tmp_path):
 def test_baseline_file_defaults_to_home(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert profile.baseline_file() == Path(tmp_path) / "agentic-odi" / "baseline.json"
+    assert profile.baseline_file() == Path(tmp_path) / ".config" / "agentic-odi" / "baseline.json"
 
 
 def test_baseline_exists_returns_false_when_no_file(monkeypatch, tmp_path):

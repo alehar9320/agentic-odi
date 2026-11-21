@@ -94,13 +94,12 @@ _CLEARABLE_PROFILE_FIELDS = (
 def config_dir() -> Path:
     """Return the XDG config dir for agentic-odi.
 
-    Uses XDG_CONFIG_HOME if set; otherwise falls back to HOME/agentic-odi.
+    Delegates to agentic_odi_cli.paths.config_dir so every component agrees
+    on a single config directory.
     """
-    xdg = os.getenv("XDG_CONFIG_HOME")
-    if xdg:
-        return Path(xdg) / "agentic-odi"
-    home = Path(os.getenv("HOME", ""))
-    return home / "agentic-odi"
+    from agentic_odi_cli.paths import config_dir as _config_dir
+
+    return _config_dir()
 
 
 def baseline_file() -> Path:
