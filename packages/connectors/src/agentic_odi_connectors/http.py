@@ -5,6 +5,12 @@ carries a configured connection pool, timeout, and retry budget instead of
 inheriting httpx defaults that may be too small for concurrent ingest or too
 large for a constrained deployment.
 
+The retry budget is split on purpose. ``httpx.AsyncHTTPTransport(retries=...)``
+retries *connection* failures below the client, while :meth:`_request` retries
+*HTTP statuses* (429/502/503/504) on top of it. Remove neither half: a connect
+failure is cleared by the transport, a rate-limit or bad-gateway status by the
+loop.
+
 ``new_http_client()`` is a factory, not a singleton: every call builds a new
 client, and the caller owns its lifetime. Use it as an async context manager
 so the pool is closed when the ingest run ends::
@@ -19,7 +25,10 @@ process-wide client and nothing closes a client the caller forgot.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import random
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
@@ -27,6 +36,15 @@ import httpx
 DEFAULT_POOL_SIZE = 10
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_RETRIES = 3
+
+# Statuses worth another attempt: the upstream is momentarily unavailable, not
+# answering "no". Everything else (a 400/401/404/500) is a real answer.
+RETRY_STATUSES = frozenset({429, 502, 503, 504})
+BACKOFF_BASE = 0.25
+BACKOFF_CAP = 4.0
+# A server may ask for a long pause in ``Retry-After``; never wait longer than
+# this before trying again.
+MAX_RETRY_AFTER = 10.0
 
 POOL_SIZE_ENV = "AGENTIC_ODI_HTTP_POOL_SIZE"
 TIMEOUT_ENV = "AGENTIC_ODI_HTTP_TIMEOUT"
@@ -74,10 +92,12 @@ class ConnectorHTTPClient:
         pool_size: int = DEFAULT_POOL_SIZE,
         timeout: float = DEFAULT_TIMEOUT,
         retries: int = DEFAULT_RETRIES,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self.pool_size = pool_size
         self.timeout = timeout
         self.retries = retries
+        self._sleep = sleep
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout),
             transport=httpx.AsyncHTTPTransport(
@@ -89,11 +109,51 @@ class ConnectorHTTPClient:
             ),
         )
 
+    def _backoff(self, attempt: int) -> float:
+        """A capped exponential delay with jitter, so retries do not sync up."""
+        ceiling = min(BACKOFF_CAP, BACKOFF_BASE * 2**attempt)
+        return ceiling * (0.5 + random.random() / 2)  # nosec B311 - backoff jitter, not a secret
+
+    def _retry_delay(self, attempt: int, response: httpx.Response) -> float:
+        """Honour a numeric ``Retry-After``, else fall back to the backoff ladder."""
+        retry_after = response.headers.get("Retry-After")
+        if retry_after is not None:
+            try:
+                return min(MAX_RETRY_AFTER, float(retry_after))
+            except ValueError:
+                # ``Retry-After`` can be an HTTP-date; that is not a delay we
+                # can sleep, so use the backoff ladder instead.
+                pass
+        return self._backoff(attempt)
+
+    async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        for attempt in range(self.retries + 1):
+            try:
+                response = await self.client.request(method, url, **kwargs)
+            except httpx.TransportError:
+                # A connection-level failure the transport could not clear. Back
+                # off and retry while the budget lasts, then let it propagate.
+                if attempt >= self.retries:
+                    raise
+                await self._sleep(self._backoff(attempt))
+                continue
+            if response.status_code in RETRY_STATUSES and attempt < self.retries:
+                await self._sleep(self._retry_delay(attempt, response))
+                continue
+            # A retryable status on the last attempt is returned, not raised:
+            # callers already handle non-2xx, so raising would change behaviour
+            # at every call site.
+            return response
+        # The loop always returns or raises; this is unreachable.
+        raise RuntimeError("retry loop exhausted without a response")
+
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:
-        return await self.client.get(url, **kwargs)
+        return await self._request("GET", url, **kwargs)
 
     async def post(self, url: str, **kwargs: Any) -> httpx.Response:
-        return await self.client.post(url, **kwargs)
+        # Connector ingestion POSTs are record-scoped, so repeating one at the
+        # transport level is safe; this is why POST shares the GET retry loop.
+        return await self._request("POST", url, **kwargs)
 
     async def aclose(self) -> None:
         await self.client.aclose()
