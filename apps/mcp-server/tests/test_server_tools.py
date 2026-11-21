@@ -445,17 +445,17 @@ async def test_links_add_then_list_returns_the_created_link():
         add_res = await client.call_tool(
             "links_add",
             {
-                "source_type": "outcome",
-                "source_id": "out-1",
-                "target_type": "evidence",
-                "target_id": "ev-1",
-                "relationship_type": "references",
+                "source_type": "evidence",
+                "source_id": "ev-1",
+                "target_type": "outcome",
+                "target_id": "out-1",
+                "relationship_type": "evidence_for",
             },
         )
         link = json.loads(add_res.content[0].text)
-        assert link["source_id"] == "out-1"
-        assert link["target_id"] == "ev-1"
-        assert link["relationship_type"] == "references"
+        assert link["source_id"] == "ev-1"
+        assert link["target_id"] == "out-1"
+        assert link["relationship_type"] == "evidence_for"
 
         list_res = await client.call_tool("links_list", {})
         links = json.loads(list_res.content[0].text)
@@ -466,11 +466,11 @@ async def test_links_add_then_list_returns_the_created_link():
 async def test_links_add_duplicate_pair_returns_conflict_and_keeps_one():
     async with Client(mcp) as client:
         args = {
-            "source_type": "outcome",
-            "source_id": "out-1",
-            "target_type": "evidence",
-            "target_id": "ev-1",
-            "relationship_type": "references",
+            "source_type": "evidence",
+            "source_id": "ev-1",
+            "target_type": "outcome",
+            "target_id": "out-1",
+            "relationship_type": "evidence_for",
         }
         first = await client.call_tool("links_add", args)
         assert "error" not in json.loads(first.content[0].text)
@@ -490,11 +490,11 @@ async def test_links_remove_then_list_is_empty():
         add_res = await client.call_tool(
             "links_add",
             {
-                "source_type": "outcome",
-                "source_id": "out-1",
-                "target_type": "evidence",
-                "target_id": "ev-1",
-                "relationship_type": "references",
+                "source_type": "evidence",
+                "source_id": "ev-1",
+                "target_type": "outcome",
+                "target_id": "out-1",
+                "relationship_type": "evidence_for",
             },
         )
         link_id = json.loads(add_res.content[0].text)["id"]
@@ -519,27 +519,27 @@ async def test_links_list_filters_by_relationship_type():
         await client.call_tool(
             "links_add",
             {
-                "source_type": "outcome",
-                "source_id": "out-1",
-                "target_type": "evidence",
-                "target_id": "ev-1",
-                "relationship_type": "references",
+                "source_type": "evidence",
+                "source_id": "ev-1",
+                "target_type": "outcome",
+                "target_id": "out-1",
+                "relationship_type": "evidence_for",
             },
         )
         await client.call_tool(
             "links_add",
             {
-                "source_type": "outcome",
-                "source_id": "out-2",
-                "target_type": "evidence",
-                "target_id": "ev-2",
+                "source_type": "evidence",
+                "source_id": "ev-2",
+                "target_type": "outcome",
+                "target_id": "out-2",
                 "relationship_type": "relates_to",
             },
         )
 
         res = await client.call_tool("links_list", {"relationship_type": "relates_to"})
         links = json.loads(res.content[0].text)
-        assert [link["source_id"] for link in links] == ["out-2"]
+        assert [link["source_id"] for link in links] == ["ev-2"]
 
 
 def test_links_list_is_a_read_tool():
