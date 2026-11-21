@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { fetchConfig, healthLlm } from "./api/studioApi";
+import { fetchConfig, healthLlm, saveModelKey } from "./api/studioApi";
 import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
@@ -26,6 +26,10 @@ vi.mock("./api/studioApi", () => ({
       },
     ],
     source: "local" as const,
+  })),
+  saveModelKey: vi.fn(async () => ({
+    configured: true,
+    set_at: "2026-11-21T00:00:00+00:00",
   })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
@@ -940,5 +944,26 @@ describe("the bar's new thread can be undone (#319)", () => {
     await waitFor(() => {
       expect(screen.getByText("Where do I start?")).toBeInTheDocument();
     });
+  });
+});
+
+describe("a model key that cannot be migrated", () => {
+  it("warns on the banner strip and leaves the studio usable", async () => {
+    window.localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+    vi.mocked(saveModelKey).mockRejectedValueOnce(new Error("The sidecar is unreachable."));
+
+    render(<App />);
+
+    // The key is still on the device, so the failure is a warning: the studio
+    // renders and the person can keep working while the sidecar is down.
+    expect(await screen.findByText(/could not be moved to the sidecar/i)).toBeInTheDocument();
+    expect(screen.getByRole("main")).toBeInTheDocument();
   });
 });

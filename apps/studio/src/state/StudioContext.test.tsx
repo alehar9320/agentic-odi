@@ -15,6 +15,7 @@ import {
   typeIntoComposer,
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
+import { SETTINGS_KEY } from "./settings/SettingsContext";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
@@ -118,6 +119,9 @@ let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
+/** A write-only-store write the sidecar refuses, as an unreachable or unwritable
+ *  sidecar would. The migration must keep the browser copy when this is set. */
+let modelKeySaveFails = false;
 let catalogFetches = 0;
 let featuredFetches = 0;
 let capabilityProbes = 0;
@@ -235,6 +239,24 @@ function route(
       return chunkedSse(chatStream ?? DEFAULT_CHAT_STREAM);
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
+  }
+  if (url === "/api/settings/model-key") {
+    if (init?.method === "PUT") {
+      if (modelKeySaveFails) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "internal",
+              message: "The secret store is not writable, so the key was not saved.",
+              retryable: true,
+            },
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return json({ configured: true, set_at: "2026-11-21T00:00:00+00:00" });
+    }
+    return json({ configured: false, set_at: null });
   }
   if (url === "/api/config") {
     if (configHangs) {
@@ -3263,5 +3285,48 @@ describe("StudioContext rename conversation (#642)", () => {
     expect(result.current.toasts.map((toast) => toast.message)).toContain(
       "I couldn't rename that conversation.",
     );
+  });
+});
+
+describe("legacy model-key migration", () => {
+  beforeEach(() => {
+    localStorage.removeItem(SETTINGS_KEY);
+    modelKeySaveFails = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    modelKeySaveFails = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the browser copy when the sidecar refuses the key, then retries", async () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // The sidecar is unreachable or its store is unwritable: the key is not
+    // saved, so it must not be deleted from the browser either.
+    await waitFor(() => expect(result.current.migrationError).not.toBeNull());
+    expect(localStorage.getItem(SETTINGS_KEY)).toContain("sk-legacy-DO-NOT-LOSE");
+
+    // The sidecar comes back; the retry saves the key and only then drops it.
+    modelKeySaveFails = false;
+    await act(async () => {
+      await result.current.retryLegacyMigration();
+    });
+
+    expect(result.current.migrationError).toBeNull();
+    expect(localStorage.getItem(SETTINGS_KEY)).not.toContain("sk-legacy-DO-NOT-LOSE");
   });
 });

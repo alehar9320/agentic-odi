@@ -50,7 +50,7 @@ function StudioShell() {
     migrationError,
     retryLegacyMigration,
   } = useStudio();
-  const { view } = useBanner();
+  const { view, raise, resolve } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
 
@@ -163,32 +163,36 @@ function StudioShell() {
     };
   }, []);
 
+  // A legacy key that could not be moved to the sidecar's write-only store is
+  // a warning, not a wall. The browser copy is kept, so nothing is lost, and
+  // the Studio stays usable: an unreachable sidecar is exactly the state that
+  // fails the migration, and taking the shell away there would lock the person
+  // out of work that never depended on the key.
+  useEffect(() => {
+    if (!migrationError) {
+      return;
+    }
+    raise({
+      kind: "model-key-unsaved",
+      body: [migrationError.message, migrationError.suggestion].filter(Boolean).join(" "),
+      actions: [
+        {
+          label: "Retry",
+          run: () => {
+            void retryLegacyMigration();
+          },
+          tone: "primary",
+        },
+      ],
+    });
+    return () => resolve("model-key-unsaved");
+  }, [migrationError, raise, resolve, retryLegacyMigration]);
+
   // A damaged database is not a broken screen: the file is intact on disk and
   // the only honest thing to show is that failure, not a zeroed-out studio.
   // This return sits after every hook so the hook order never changes.
   if (bootError) {
     return <BootFailurePage error={bootError} onRecheck={() => void recheckBoot()} />;
-  }
-
-  // A legacy key could not be migrated to the sidecar's write-only store. The
-  // browser copy is kept so it is never lost; the person can retry once the
-  // sidecar is reachable again.
-  if (migrationError) {
-    return (
-      <div className="error-page">
-        <div className="error-page__card" role="alert">
-          <p className="hero__eyebrow">API key migration failed</p>
-          <h1 className="error-page__title">Your API key could not be saved.</h1>
-          <p className="hero__sub">{migrationError.message}</p>
-          {migrationError.suggestion ? (
-            <p className="hero__sub error-page__suggestion">{migrationError.suggestion}</p>
-          ) : null}
-          <button type="button" className="button" onClick={() => void retryLegacyMigration()}>
-            Retry migration
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (
