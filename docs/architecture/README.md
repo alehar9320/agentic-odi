@@ -145,10 +145,10 @@ persistence group, which may not call the service door":
 
 | Group | Modules | Rule |
 |---|---|---|
-| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `schedule.py`, `traceability.py`, `freshness.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `freshness.py` says whether a derived verdict was computed from the store's current revision, so a stale one never reads as today's answer. `traceability.py` reads the links an outcome carries and reports the three failures — orphans, unfunded objectives, drift. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
-| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `factory.py`, `integrity.py`, `recovery.py`, `migrations.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `migrations.py` is the numbered schema ledger both SQLite files run, `funnel.py` appends the five onboarding counters to the same log and reads them back. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
+| **domain** | `models.py`, `evaluation.py`, `mapping.py`, `corpus.py`, `transcript.py`, `extraction.py`, `similarity.py`, `schedule.py`, `traceability.py`, `freshness.py` | The vocabulary: what a job, an outcome, a segment, a score *is*. `freshness.py` says whether a derived verdict was computed from the store's current revision, so a stale one never reads as today's answer. `extraction.py` proposes outcome candidates from one quote through a swappable extractor, and `similarity.py` is the normaliser both sides of that comparison use. `traceability.py` reads the links an outcome carries and reports the three failures — orphans, unfunded objectives, drift. May import domain and `errors.py`; must not import persistence, methodology, or the rest of contract. |
+| **persistence** | `repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`, `funnel.py`, `factory.py`, `integrity.py`, `recovery.py`, `migrations.py`, `paths.py` | Stores what the other groups decide, and keeps the file it stores in readable — `integrity.py` gates a boot on a damaged store, `recovery.py` names the backup to restore, `migrations.py` is the numbered schema ledger both SQLite files run, `funnel.py` appends the five onboarding counters to the same log and reads them back, `paths.py` is the one place the two database files are resolved, so the CLI, the Studio sidecar, and the recovery helpers all agree on where they live. May import domain and `errors.py`; **must not import methodology** — the one rule a test enforces (`test_persistence_imports_no_methodology` in `tests/test_architecture.py`). |
 | **methodology** | `services.py`, `segmentation.py`, `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py` | The ODI stages and the LLM path. `services.py` owns the service door every caller enters through; may import domain, persistence, and contract. |
-| **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. |
+| **contract** | `contract.py`, `errors.py`, `remote.py`, `schema.py`, `connection.py`, `consent.py`, `logging.py`, `settings.py` | The MCP wire protocol, enforced against the live registry by `tests/contract/test_mcp_contract.py`. May be imported by anything; imports no persistence and no methodology. `logging.py` is the one logging configuration every entrypoint calls; it is here because anything may import it and it imports nothing from the package. `settings.py` declares every `AGENTIC_ODI_*` variable once, as a field with an alias, and fails fast on a value it cannot parse; `docs/reference/configuration.md` is its register. |
 
 `errors.py` is the exception hierarchy the whole package raises, so it is the one
 module any group may import.
@@ -215,10 +215,13 @@ Repository rulesets `main-requires-ci-green` (id `25356329`) and `protect-main`
 (id `25656413`) both target `~DEFAULT_BRANCH`, are `active`, and set
 `current_user_can_bypass: never`. The first requires the `CI green` and
 `PR guardrails` status checks, and the merge to `main` waits for a branch that is
-current: [ADR 0008](adr/0009-require-current-branches-and-queue-merges.md) records
+current: [ADR 0011](adr/0011-require-current-branches-and-queue-merges.md) records
 the decision to set `strict_required_status_checks_policy: true` and to enable the
 `merge_queue` rule on that ruleset, both of which the owner applies with `gh api`
-because they are repository settings, not files. The second ruleset adds
+because they are repository settings, not files. The queue has a prerequisite:
+neither `ci.yml` nor `pr-guardrails.yml` declares the `merge_group` trigger yet, so
+a queued commit would report neither required check until both workflows run on
+that event. The second ruleset adds
 `deletion`, `non_fast_forward`, and `pull_request` with
 `required_approving_review_count: 0` and
 `require_extra_approval_for_unattributed_changes: true`. A ruleset cannot
@@ -230,7 +233,7 @@ The checkout half of the freshness decision is the guardrail threshold:
 Rulesets are repository settings, not files; change them with `gh api` and record
 the decision in
 [ADR 0007](adr/0007-branch-protection-enforces-checks-not-labels.md) and
-[ADR 0008](adr/0009-require-current-branches-and-queue-merges.md). The names
+[ADR 0011](adr/0011-require-current-branches-and-queue-merges.md). The names
 these documents claim are checked against the workflow job names by
 `tests/test_adr_index.py`.
 

@@ -558,3 +558,67 @@ def test_check_names_the_stale_test_map(tmp_path: Path) -> None:
 
 def test_the_committed_test_map_matches_a_fresh_render() -> None:
     assert docs_index.check(ROOT) == []
+
+
+# --- assistant-ui ledger blocks (issue #1046) ---
+
+_LEDGER = """# The assistant-ui ledger
+
+### Runtime
+
+| Capability | Status | File | Delivered | Where / why |
+|---|---|---|---|---|
+| `aThing` | Adopted | `pkg/a.ts` | #7 | Does A. |
+| `bThing` | Partial | — | — | Does B. |
+| `cThing` | Planned | — | #9 | Later. |
+"""
+
+
+def _write_ledger(root: Path, text: str) -> None:
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / docs_index.LEDGER_REL).write_text(text, encoding="utf-8")
+
+
+def test_count_block_is_generated_from_the_rows(tmp_path: Path) -> None:
+    _write_ledger(tmp_path, _LEDGER)
+    rendered = docs_index.render_assistant_ui_count(tmp_path)
+    assert "| Adopted | 1 |" in rendered
+    assert "| Partial | 1 |" in rendered
+    assert "| Planned | 1 |" in rendered
+    assert "| Total | 3 |" in rendered
+    assert "Read it as: **2** of the library's 3 relevant capabilities" in rendered
+
+
+def test_projection_block_lists_adopted_and_partial_only(tmp_path: Path) -> None:
+    _write_ledger(tmp_path, _LEDGER)
+    rendered = docs_index.render_living_studio_projection(tmp_path)
+    assert "| `aThing` | Adopted | Does A. | #7 |" in rendered
+    assert "| `bThing` | Partial | Does B. | — |" in rendered
+    assert "`cThing`" not in rendered
+
+
+def test_stale_count_block_is_detected(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        _LEDGER + "<!-- BEGIN GENERATED: assistant-ui-count -->\n"
+        "| Adopted | 99 |\n"
+        "<!-- END GENERATED: assistant-ui-count -->\n",
+    )
+    path = tmp_path / docs_index.LEDGER_REL
+    stale = path.read_text(encoding="utf-8")
+    filled = docs_index.replace_block(
+        stale, "assistant-ui-count", docs_index.render_assistant_ui_count(tmp_path)
+    )
+    assert filled != stale
+    assert "| Adopted | 1 |" in filled
+    assert "| Adopted | 99 |" not in filled
+
+
+def test_generated_blocks_are_byte_stable(tmp_path: Path) -> None:
+    _write_ledger(tmp_path, _LEDGER)
+    assert docs_index.render_assistant_ui_count(tmp_path) == docs_index.render_assistant_ui_count(
+        tmp_path
+    )
+    assert docs_index.render_living_studio_projection(
+        tmp_path
+    ) == docs_index.render_living_studio_projection(tmp_path)

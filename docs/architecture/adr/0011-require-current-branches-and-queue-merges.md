@@ -1,4 +1,4 @@
-# 0009 — Require current branches and queue merges
+# 0011 — Require current branches and queue merges
 
 - **Status:** accepted
 - **Date:** 2026-11-17
@@ -18,9 +18,10 @@ sitting behind `main` is the normal case, not the exception. And
 `.github/pr-guardrails/config.yml` sets `max_behind: 50`, read by `load_config()`
 ([`scripts/pr_guards.py`](../../../scripts/pr_guards.py)) with the same value as
 `GuardConfig`'s default; `check_freshness` returns a *warning* when
-`behind > max_behind`, never an error. A branch up to fifty commits behind is
-therefore only told about the staleness, and a pull request whose checks passed
-against a tree that no longer exists still merges.
+`behind > max_behind`, never an error. A branch fifty commits behind or fewer
+therefore hears nothing at all — the limit is a silence threshold, not a warning
+threshold — and a pull request whose checks passed against a tree that no longer
+exists still merges.
 
 The conflict then surfaces at merge time, in front of whoever merges, with no
 record of which side won. The guardrail measures the wrong thing: it warns about a
@@ -37,7 +38,8 @@ the settings a ruleset *can* hold: up-to-date branches and the merge queue.
 1. **Tighten the guardrail's freshness threshold.** `.github/pr-guardrails/config.yml`
    sets `max_behind: 10`, down from `50`. `check_freshness` keeps its existing
    behaviour — a branch is stale when `behind > max_behind` — so the warning now
-   fires ten commits behind `main` rather than fifty, which is the point at which a
+   fires once a branch is more than ten commits behind `main` (the eleventh commit
+   behind and beyond) instead of more than fifty, which is the point at which a
    rebase is still cheap. `GuardConfig`'s dataclass default stays `50`; only the
    committed config file and the test that pins it change, so an unconfigured
    checkout keeps the historical default.
@@ -49,7 +51,12 @@ the settings a ruleset *can* hold: up-to-date branches and the merge queue.
 3. **Queue merges (owner-applied).** Enable the `merge_queue` rule on the same
    ruleset, so a pull request merges against the current `main` and its checks run
    on the queued tree rather than on a snapshot. Also a repository setting, and
-   also owner-applied.
+   also owner-applied. **Prerequisite:** neither required workflow
+   (`.github/workflows/ci.yml`, `.github/workflows/pr-guardrails.yml`) declares the
+   `merge_group` trigger today, so a queued commit would report neither `CI green`
+   nor `PR guardrails` and could never leave the queue. The owner enables the queue
+   only after both workflows run on `merge_group`; that workflow change is not part
+   of this record.
 4. **Record the two settings as owner-applied, not as done.** The documents that
    describe the ruleset state the post-change intent and name these two settings
    as applied by the owner, so a reader can tell what the checkout enforces from
@@ -57,9 +64,9 @@ the settings a ruleset *can* hold: up-to-date branches and the merge queue.
 
 ## Consequences
 
-- Easier: a stale branch is caught by the guardrail at ten commits behind instead
-  of fifty, while a rebase is still a rebase rather than a merge-resolution
-  exercise.
+- Easier: a stale branch is caught by the guardrail once it is more than ten
+  commits behind instead of more than fifty, while a rebase is still a rebase
+  rather than a merge-resolution exercise.
 - Easier: with strict checks and the merge queue on, the checks a merge waits for
   describe the tree that lands, so the "green but stale" merge stops being possible
   rather than being found by whoever merges.
@@ -70,6 +77,14 @@ the settings a ruleset *can* hold: up-to-date branches and the merge queue.
   the repository can only record the intent and rely on the owner to apply it; the
   freshness threshold is the half the checkout can enforce, and it is the half
   this change makes.
+- Maintained: the fresh half is measured on the commit the guardrail checks out.
+  `pr-guardrails.yml` runs on the `pull_request` event, where `actions/checkout`
+  checks out GitHub's test merge commit — which already contains the base branch —
+  and `_diff_shape` counts `rev-list HEAD..origin/main`. That count reports how far
+  `main` moved after the merge commit was built, not how far the contributor's
+  branch sits behind, so in CI the warning does not fire on a stale branch. Making
+  the CI measurement read the pull-request head (`refs/pull/N/head`) is a workflow
+  change and the follow-up this threshold needs before it can bind there.
 - Maintained: `tests/scripts/test_pr_guards.py` pins the committed `max_behind` at
   `10`, so a future edit to the threshold must change the test deliberately, and
   `tests/test_adr_index.py` keeps this record's heading, status, date, and sections

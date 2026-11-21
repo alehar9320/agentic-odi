@@ -9,6 +9,7 @@ with the CLI via ``agentic_odi_connectors.paths.config_path``.
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -21,6 +22,8 @@ from agentic_odi_connectors.factory import build_connector
 from agentic_odi_connectors.models import ConnectorConfig, HealthStatus
 from agentic_odi_connectors.paths import config_path
 from agentic_odi_connectors.registry import ConnectorRegistry
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from agentic_odi_studio_api.studio.marketplace import StudioMarketplace
@@ -83,7 +86,10 @@ class ConnectorService:
         connector = build_connector(self._registry().get(name))
         try:
             return asyncio.run(asyncio.wait_for(connector.health(), timeout=self._timeout))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - a health check never raises to the caller
+            log.warning(
+                "connector health check failed (name=%s, error=%s)", name, type(exc).__name__
+            )
             return HealthStatus(ok=False, message=f"unhealthy: {exc}", details={})
 
     __all__ = ["ConnectorService"]

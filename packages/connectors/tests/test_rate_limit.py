@@ -37,11 +37,42 @@ def test_rate_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     assert limiter.burst == 25
 
 
-@pytest.mark.parametrize("raw", ["", "fast", "0", "-5"])
-def test_invalid_rate_falls_back_to_the_default(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
+@pytest.mark.parametrize("raw", ["0", "-1", "-5"])
+def test_a_non_positive_rate_is_refused(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
     monkeypatch.setenv(INGEST_RATE_ENV, raw)
 
+    with pytest.raises(ValueError, match=INGEST_RATE_ENV):
+        RateLimiter.from_env()
+
+
+def test_a_typo_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(INGEST_RATE_ENV, "1OO")
+
+    with pytest.raises(ValueError, match=INGEST_RATE_ENV):
+        RateLimiter.from_env()
+
+
+def test_an_absent_variable_uses_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(INGEST_RATE_ENV, raising=False)
+
     assert RateLimiter.from_env().rate == DEFAULT_INGEST_RATE
+
+
+def test_an_empty_variable_uses_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(INGEST_RATE_ENV, "")
+
+    assert RateLimiter.from_env().rate == DEFAULT_INGEST_RATE
+
+
+def test_a_valid_value_still_builds_a_limiter(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(INGEST_RATE_ENV, "25")
+
+    assert RateLimiter.from_env().rate == 25
+
+
+def test_the_constructor_still_refuses_a_non_positive_rate() -> None:
+    with pytest.raises(ValueError):
+        RateLimiter(rate=0)
 
 
 def test_acquire_allows_a_burst_up_to_the_bucket() -> None:

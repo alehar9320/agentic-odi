@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
-import { CONVERSATION, openStudio, resetRepository } from "./helpers";
+import { CONVERSATION, openStudio } from "./helpers";
 
 /**
  * The starter cards are the Studio's first sentence (#316). These tests cover
@@ -14,14 +14,10 @@ const STARTERS = [
 ];
 
 test.describe("the starters", () => {
-  test.beforeEach(async ({ request }) => {
-    await resetRepository(request);
-  });
-
   test("offers three concrete situations, in order, on an empty canvas", async ({ page }) => {
     await openStudio(page);
 
-    const starters = page.locator(".composer__starters");
+    const starters = page.getByRole("list", { name: "Suggested next steps" });
     for (const title of STARTERS) {
       await expect(starters.getByRole("button", { name: title })).toBeVisible();
     }
@@ -37,7 +33,7 @@ test.describe("the starters", () => {
     await openStudio(page);
 
     await page
-      .locator(".composer__starters")
+      .getByRole("list", { name: "Suggested next steps" })
       .getByRole("button", { name: STARTERS[0] })
       .click();
 

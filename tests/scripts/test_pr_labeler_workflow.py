@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 RISK = ROOT / ".github" / "workflows" / "pr-risk.yml"
 
@@ -145,3 +147,34 @@ def test_the_triage_job_creates_its_own_gate_labels():
 def test_the_triage_job_never_executes_pr_code():
     text = RISK.read_text(encoding="utf-8")
     assert "pull_request_target" not in text
+
+
+def _checkout_steps(workflow: dict, job: str) -> list[dict]:
+    return [
+        step
+        for step in workflow["jobs"][job]["steps"]
+        if (step.get("uses") or "").startswith("actions/checkout")
+    ]
+
+
+def test_the_labels_job_checkout_pins_the_base_ref():
+    """The labels job reads only repo scripts, so it must not check out the head.
+
+    The default ref for a ``pull_request`` event is the merge commit. When a
+    branch carries a stray gitlink (mode 160000, no ``.gitmodules`` url),
+    ``actions/checkout`` runs ``git submodule foreach`` while it strips its auth
+    header and git exits 128, failing the step before any command runs.
+    """
+    workflow = yaml.safe_load(RISK.read_text(encoding="utf-8"))
+    checkouts = _checkout_steps(workflow, "labels")
+    assert checkouts, "the labels job runs scripts/pr_labels.py and needs a tree"
+    for step in checkouts:
+        assert step["with"]["ref"] == "${{ github.event.pull_request.base.ref || github.ref }}"
+
+
+def test_the_triage_job_checkout_pins_the_base_ref():
+    workflow = yaml.safe_load(RISK.read_text(encoding="utf-8"))
+    checkouts = _checkout_steps(workflow, "triage")
+    assert checkouts, "the triage job runs scripts/pr_triage.py and needs a tree"
+    for step in checkouts:
+        assert step["with"]["ref"] == "${{ github.event.pull_request.base.ref || github.ref }}"

@@ -12,7 +12,6 @@ The store is deliberately small and boring: stdlib ``sqlite3``, one file under
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
 import uuid
@@ -24,6 +23,7 @@ from typing import Any
 from agentic_odi_core.errors import StoreCorrupt
 from agentic_odi_core.integrity import ensure_intact
 from agentic_odi_core.migrations import Migration, migrate
+from agentic_odi_core.paths import default_studio_db_path
 
 from agentic_odi_studio_api.studio.claims import (
     Claim,
@@ -88,10 +88,12 @@ def _json_values(raw: Any) -> list[str]:
 
 
 def default_db_path() -> Path:
-    configured = os.environ.get("AGENTIC_ODI_STUDIO_DB")
-    if configured:
-        return Path(configured)
-    return Path.home() / ".agentic-odi" / "studio.db"
+    """Resolve the default path for the Studio memory database.
+
+    Honors ``AGENTIC_ODI_STUDIO_DB`` and falls back to the canonical
+    ``~/.agentic-odi/studio.db`` from :mod:`agentic_odi_core.paths`.
+    """
+    return default_studio_db_path()
 
 
 @dataclass

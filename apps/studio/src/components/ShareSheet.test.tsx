@@ -12,6 +12,7 @@ function link(overrides: Partial<ShareLink> = {}): ShareLink {
     token: "odi_sh_abc123",
     url: "http://127.0.0.1:8100/s/odi_sh_abc123",
     expires_at: new Date(Date.now() + 7 * DAY).toISOString(),
+    shareable: true,
     ...overrides,
   };
 }
@@ -89,6 +90,20 @@ describe("ShareSheet", () => {
 
     await waitFor(() => expect(onRevoke).toHaveBeenCalledWith("share-1"));
     expect(await screen.findByText(/no longer works/i)).toBeInTheDocument();
+  });
+
+  it("says the link only opens on this machine when it is not shareable, and keeps the copy button", async () => {
+    const onCreate = vi.fn(async () => link({ shareable: false }));
+    render(<ShareSheet isOpen onClose={() => undefined} onCreate={onCreate} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create link/i }));
+
+    expect(
+      await screen.findByText(/This link only opens on this machine/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /copy link/i }),
+    ).toBeInTheDocument();
   });
 
   it("reports a failure instead of promising a link it did not mint", async () => {

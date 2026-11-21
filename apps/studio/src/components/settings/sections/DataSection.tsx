@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 
 import { useStudio } from "../../../state/StudioContext";
-import { getStorageFacts, exportWorkspace, importWorkspace } from "../../../api/studioApi";
+import { getDataStatus, getStorageFacts, exportWorkspace, importWorkspace } from "../../../api/studioApi";
 import { exportFilename } from "../../../lib/export";
+import type { DataStoreStatus } from "../../../api/studioApi";
 
 interface DataSectionProps {
   sidecarReachable: boolean | null;
 }
 
-function formatBytes(bytes?: number): string {
-  if (bytes === undefined) {
+function formatBytes(bytes?: number | null): string {
+  if (bytes === undefined || bytes === null) {
     return "—";
   }
   if (bytes < 1024) {
@@ -21,7 +22,7 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatRelativeTime(dateString?: string): string {
+function formatRelativeTime(dateString?: string | null): string {
   if (!dateString) {
     return "—";
   }
@@ -52,8 +53,10 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
     bytes?: number;
     lastWrittenAt?: string;
   } | null>(null);
+  const [sidecarStores, setSidecarStores] = useState<DataStoreStatus[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sidecarError, setSidecarError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -70,10 +73,28 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load storage facts");
         }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
+      }
+
+      if (sidecarReachable === true) {
+        try {
+          const status = await getDataStatus();
+          if (!cancelled) {
+            setSidecarStores(status.stores);
+            setSidecarError(null);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setSidecarStores([]);
+            setSidecarError(err instanceof Error ? err.message : "Failed to load sidecar data");
+          }
         }
+      } else if (!cancelled) {
+        setSidecarStores([]);
+        setSidecarError(null);
+      }
+
+      if (!cancelled) {
+        setLoading(false);
       }
     }
     loadFacts();
@@ -129,6 +150,20 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
   const storeSize = ` · ${formatBytes(facts?.bytes)}`;
   const storeRecency = ` · last written ${formatRelativeTime(facts?.lastWrittenAt)}`;
 
+  const sidecarConnected = sidecarReachable === true;
+
+  function storeRow(store: DataStoreStatus) {
+    const unavailable = store.bytes === null || store.lastModified === null;
+    return (
+      <p key={store.id} className="settings__storage-summary">
+        {store.id === "odi" ? "ODI store" : "Studio store"}{" "}
+        {unavailable
+          ? ` · ${store.path} · not connected`
+          : ` · ${store.path} · ${formatBytes(store.bytes)} · last modified ${formatRelativeTime(store.lastModified)}`}
+      </p>
+    );
+  }
+
   return (
     <div className="settings__section">
       <h2 className="settings__section-title">Data</h2>
@@ -147,6 +182,19 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
           <p className="settings__storage-exclusions">
             This file does not contain uploads, connector tokens, or provider API keys.
           </p>
+
+          <h3 className="settings__storage-subtitle">Sidecar databases</h3>
+          {sidecarConnected && sidecarStores ? (
+            <>
+              {sidecarStores.map(storeRow)}
+              {sidecarError && <p className="settings__error" role="alert">{sidecarError}</p>}
+            </>
+          ) : (
+            <>
+              <p className="settings__storage-summary">ODI store · not connected</p>
+              <p className="settings__storage-summary">Studio store · not connected</p>
+            </>
+          )}
         </div>
       )}
 

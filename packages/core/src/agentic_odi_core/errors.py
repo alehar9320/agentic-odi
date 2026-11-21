@@ -73,6 +73,18 @@ class ConsentRequired(OdiError):
     """The agent tried to act on the workspace before the PM agreed to it."""
 
 
+class ConfigurationError(OdiError):
+    """An environment variable could not be turned into a setting.
+
+    Raised while reading the process environment, so a mistyped or malformed
+    value stops the process with the variable's name and the form it accepts
+    instead of quietly becoming the default. It is deliberately *not* a
+    :class:`ValueError`: a ``ValueError`` raised inside a Pydantic validator is
+    swallowed into a generic ``ValidationError``, which would hide the variable
+    the message is about.
+    """
+
+
 class StoreError(OdiError):
     """The persistence layer could not complete the operation."""
 

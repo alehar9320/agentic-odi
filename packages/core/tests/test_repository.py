@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
+from agentic_odi_core.errors import ConflictError
 from agentic_odi_core.models import (
     BusinessImpactCategory,
     BusinessValue,
+    CandidateSolution,
+    CandidateStatus,
     CustomerOutcome,
     CustomerValue,
     Direction,
@@ -17,8 +22,28 @@ from agentic_odi_core.models import (
     Signal,
     SignalKind,
     Step,
+    StrategyKind,
 )
-from agentic_odi_core.repository import InMemoryRepository
+from agentic_odi_core.repository import InMemoryRepository, rank_outcomes
+
+
+def _link(
+    link_id: str | None = None,
+    *,
+    source_type: str = "outcome",
+    source_id: str = "outcome-1",
+    target_type: str = "evidence",
+    target_id: str = "evidence-1",
+    relationship: RelationshipType = RelationshipType.evidence_for,
+) -> Link:
+    return Link(
+        id=link_id or str(uuid.uuid4()),
+        source_type=source_type,
+        source_id=source_id,
+        target_type=target_type,
+        target_id=target_id,
+        relationship_type=relationship,
+    )
 
 
 def _customer_outcome(outcome_id: str, job_id: str = "job-1") -> CustomerOutcome:
@@ -284,6 +309,40 @@ def test_reload_is_safe_on_an_empty_repository() -> None:
     assert repo.list_jobs() == []
 
 
+def test_rank_outcomes_puts_unscored_last_not_at_zero() -> None:
+    """An unscored outcome is unknown, not a zero.
+
+    Sorting an absent score as 0.0 would place it below a genuinely low
+    opportunity and present a gap as a measurement, so the rank must keep
+    unknown scores after every scored one.
+    """
+    scored_low = Outcome(
+        id="o-low",
+        job_id="job-1",
+        statement="Minimize the wait when a build fails",
+        importance=1.0,
+        satisfaction=1.0,
+        opportunity_score=1.0,
+    )
+    scored_high = Outcome(
+        id="o-high",
+        job_id="job-1",
+        statement="Minimize the time to onboard when joining",
+        importance=9.0,
+        satisfaction=1.0,
+        opportunity_score=17.0,
+    )
+    unscored = Outcome(
+        id="o-none",
+        job_id="job-1",
+        statement="Minimize the noise when a deploy breaks",
+    )
+
+    ranked = rank_outcomes([unscored, scored_low, scored_high])
+
+    assert [outcome.id for outcome in ranked] == ["o-high", "o-low", "o-none"]
+
+
 def test_last_event_id_is_zero_before_any_write() -> None:
     assert InMemoryRepository().last_event_id() == 0
 
@@ -337,22 +396,6 @@ def test_stamping_the_same_signal_twice_spends_one_event_id() -> None:
     assert repo.last_event_id() == after_add + 1
 
 
-def _link(
-    source_type="job",
-    source_id="s1",
-    target_type="outcome",
-    target_id="o1",
-    relationship_type="references",
-) -> Link:
-    return Link(
-        source_type=source_type,
-        source_id=source_id,
-        target_type=target_type,
-        target_id=target_id,
-        relationship_type=RelationshipType(relationship_type),
-    )
-
-
 def test_add_and_get_link() -> None:
     repo = InMemoryRepository()
     link = _link()
@@ -385,3 +428,69 @@ def test_remove_link_returns_true() -> None:
 
 def test_remove_link_unknown_returns_false() -> None:
     assert InMemoryRepository().remove_link("missing") is False
+
+
+def test_adding_the_same_link_twice_raises_conflict() -> None:
+    repo = InMemoryRepository()
+    repo.add_link(_link())
+
+    with pytest.raises(ConflictError):
+        repo.add_link(_link())
+
+
+def _candidate(id: str = "cand-1") -> CandidateSolution:
+    return CandidateSolution(
+        id=id,
+        title="Guided setup checklist",
+        hypothesis="A checklist will reduce the time to first value.",
+        outcome_ids=["o-1", "o-2"],
+        strategy_path=StrategyKind.DIFFERENTIATED,
+        evidence_ids=["e-1"],
+    )
+
+
+def test_candidate_solution_round_trips_through_the_in_memory_repository() -> None:
+    repo = InMemoryRepository()
+    repo.add_candidate(_candidate())
+
+    fetched = repo.get_candidate("cand-1")
+    assert fetched is not None
+    assert fetched.title == "Guided setup checklist"
+    assert fetched.hypothesis == "A checklist will reduce the time to first value."
+    assert fetched.outcome_ids == ["o-1", "o-2"]
+    assert fetched.status is CandidateStatus.PROPOSED
+    assert fetched.strategy_path is StrategyKind.DIFFERENTIATED
+    assert fetched.evidence_ids == ["e-1"]
+    assert [candidate.id for candidate in repo.list_candidates()] == ["cand-1"]
+
+
+def test_candidate_status_can_be_updated_in_place() -> None:
+    repo = InMemoryRepository()
+    repo.add_candidate(_candidate())
+
+    updated = repo.update_candidate("cand-1", {"status": "accepted"})
+
+    assert updated is not None
+    assert updated.status is CandidateStatus.ACCEPTED
+    stored = repo.get_candidate("cand-1")
+    assert stored is not None
+    assert stored.status is CandidateStatus.ACCEPTED
+
+
+def test_updating_a_missing_candidate_returns_none() -> None:
+    repo = InMemoryRepository()
+    assert repo.update_candidate("missing", {"status": "accepted"}) is None
+    assert repo.get_candidate("missing") is None
+
+
+def test_updating_a_candidate_keeps_its_id_and_creation_time() -> None:
+    repo = InMemoryRepository()
+    created = repo.add_candidate(CandidateSolution(title="Guided setup", hypothesis="Faster"))
+    original_created_at = created.created_at
+
+    updated = repo.update_candidate(created.id, {"status": "accepted"})
+
+    assert updated is not None
+    assert updated.id == created.id
+    assert updated.created_at == original_created_at
+    assert repo.get_candidate(updated.id) is updated

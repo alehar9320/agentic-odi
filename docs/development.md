@@ -66,9 +66,10 @@ request touched. See
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is a pointer page; its three lists point at the sources that
-own the facts (the changelog, the open pull-request list, and the ready-for-dev
-issue filter). No check requires a new capability to edit it.
+`docs/roadmap.md` is a pointer page, not a register. It keeps no shipped,
+in-flight, or queued lists of its own — those facts live in `CHANGELOG.md` and
+Releases, the open-pull-request list, and the `ready-for-dev` issue filter — so
+no capability change has to edit a roadmap file to land.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -408,9 +409,17 @@ python3 scripts/pr_ai_merge.py --managed            # list owned labels
 
 The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
 applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
-combined status of the head commit is `success` (CI green), `ready-for-merge`
-is present (no merge conflicts), and hygiene passes (open, non-draft, targets
-`main`). It is removed when any gate fails.
+head commit's check suite is complete and green, `ready-for-merge` is present
+(no merge conflicts), and hygiene passes (open, non-draft, targets `main`). It
+is removed when any gate fails.
+
+"Green" is `compute_ci_state()` in `scripts/pr_ai_authorize.py`: `CI green` and
+`PR guardrails` must be successful, and every other GitHub Actions check run on
+the head commit must be green except the advisory browser suite (`End-to-end`),
+which `AGENTIC_ODI_E2E_BLOCKING=true` turns into a gate. The legacy combined
+commit status is deliberately not consulted — it carries only third-party
+statuses, so it reads `success` while CI is still queued. See
+[ADR 0009](architecture/adr/0009-ai-merge-gate-reads-the-check-suite.md).
 
 ```bash
 python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
@@ -420,9 +429,17 @@ python3 scripts/pr_ai_authorize.py --managed            # list owned labels
 ### Auto-merge (Phase 2)
 
 The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
-`gh pr merge --auto --squash` on any open PR carrying `ai-merge-authorized`,
-re-verifying CI green immediately before arming. Human override: `do-not-merge`
-or `needs human review` cancels auto-merge and a comment explains why.
+`gh pr merge --auto --squash` only on an open PR that carries
+`ai-merge-authorized`, `ai-merge-safe` and `ready-for-merge`, whose head commit
+passes the check-suite gate, and whose labels it has just re-read. The trigger
+is narrowed to the labels that can change the decision, so an unrelated label
+cannot arm a merge.
+
+Arming is a request, not a decision: every run can disarm. If a gate stops
+holding — the authorization or trust label is removed, a new push resets the
+checks, a human adds `do-not-merge` or `needs human review`, or the suite goes
+red — the workflow calls `gh pr merge --disable-auto` and says why in an
+idempotent `## AI merge act` comment that names the head commit it judged.
 
 ### Branch protection (enforced on `main`)
 
@@ -443,7 +460,11 @@ The two required checks are strict: the ruleset sets
 request merges against the current `main` rather than a snapshot. Both are
 repository settings the owner applies with `gh api`; they are recorded, not
 enforced from the checkout, in
-[ADR 0008](architecture/adr/0009-require-current-branches-and-queue-merges.md).
+[ADR 0011](architecture/adr/0011-require-current-branches-and-queue-merges.md).
+Enabling the queue has one prerequisite: neither `ci.yml` nor `pr-guardrails.yml`
+declares the `merge_group` trigger yet, so a queued commit would report neither
+required check and could never leave the queue. Enable it only once both
+workflows run on that event; the workflow change is separate from this record.
 The half the checkout owns is the guardrail threshold:
 `.github/pr-guardrails/config.yml` sets `max_behind: 10`, so `scripts/pr_guards.py`
 warns once a branch is more than ten commits behind `main`.
@@ -462,7 +483,7 @@ the job names in `.github/workflows/ci.yml` and
 `.github/workflows/pr-guardrails.yml`, so a renamed job fails on the pull request
 that renamed it. See [ADR 0007](architecture/adr/0007-branch-protection-enforces-checks-not-labels.md)
 for the decision and the deferred `label gate` check, and
-[ADR 0008](architecture/adr/0009-require-current-branches-and-queue-merges.md) for
+[ADR 0011](architecture/adr/0011-require-current-branches-and-queue-merges.md) for
 strict checks, the merge queue, and the tightened freshness threshold.
 
 ## Testing
@@ -470,13 +491,15 @@ strict checks, the merge queue, and the tightened freshness threshold.
 See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
 
 ```bash
-uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
-uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
-uv run python scripts/verify.py --full      # full matrix (CI's job)
+uv run python scripts/verify.py --changed   # required CI checks the diff can drive (PR bar)
+uv run python scripts/verify.py --default   # adds repo-wide mypy, studio build, site build
+uv run python scripts/verify.py --full      # local matrix; e2e/Tauri/audit stay CI-only
 ```
 
 Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
-`--full`. The PR body must list the tiers run and skipped.
+`--full`. The gate prints which tier covers each required CI job and why the
+rest are CI-only; `tests/scripts/test_verify_ci_parity.py` keeps that table
+equal to `ci-green.needs`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
@@ -530,9 +553,11 @@ response shapes, the sidecar's hydration of the canvas, and the first-run
 wizard's ordering relative to the rest of the app.
 
 ```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
-npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
+npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e         # the product suite
+npm --prefix apps/studio run test:e2e:smoke   # the blocking @smoke subset
+npm --prefix apps/studio run test:e2e:visual  # the opt-in screenshot contract
+npm --prefix apps/studio run test:e2e:ui      # the Playwright UI
 ```
 
 The first run needs the browser once:
@@ -542,9 +567,9 @@ npx --prefix apps/studio playwright install chromium
 ```
 
 Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
+a second sidecar on the MCP passthrough backend. `chromium` (the local
+backend, the product default) and `mcp-backend` (the passthrough) make up
+`test:e2e`; a spec is collected by exactly one of them.
 
 A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
 It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
@@ -556,13 +581,30 @@ true` and no membership in `ci-green`'s `needs` — so a screenshot failure
 cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none. When a test
-needs data behind it, it seeds through the API rather than through the UI, so
-the test stays about the view it is actually checking.
+never to a `data-testid`, of which the application has none, and never to a CSS
+class. When a test needs data behind it, it seeds through the API rather than
+through the UI, so the test stays about the view it is actually checking.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+Every spec imports `test` and `expect` from `e2e/fixtures.ts`. Its automatic
+fixture resets the shared studio — jobs, conversation memory, unread signals —
+before each test, so no spec inherits another's writes and the result does not
+depend on the order Playwright chose. A spec that imports from
+`@playwright/test` directly gets the shared state back.
+
+CI runs two browser jobs. `e2e-smoke` is **required** and runs the `@smoke`
+tagged subset with `--retries=0`. `e2e` runs the whole suite and stays advisory:
+set the repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
+`AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. Its summary lists every
+failure with its locator and call site, plus every test that passed only on
+retry.
+
+`test:e2e:visual` is opt-in because the repository has committed no screenshot
+baselines yet; running it in the product lane made that lane permanently red.
+
+A flaky spec is fixed or parked, never left to retry: `e2e/quarantine.ts` +
+`// quarantined: #<issue> <YYYY-MM-DD>` in the spec, with
+`src/test/e2eQuarantine.test.ts` failing the entry after thirty days. See
+[Testing](architecture/testing.md#a-flaky-spec-is-fixed-or-parked-never-retried-indefinitely).
 
 ## Cold-open budget
 
@@ -693,8 +735,8 @@ uv run pytest \
   `scripts/`).
 - Every async test is decorated with `@pytest.mark.asyncio`.
 - Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
-- The MCP server's `reset_db` autouse fixture clears in-memory state before
-  each test.
+- The MCP server's `configured_server` autouse fixture names a fresh
+  `InMemoryRepository` before each test.
 
 ### Test Coverage Map
 
@@ -715,6 +757,61 @@ uv run pytest \
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
 > results automatically.
+
+## Store schema version
+
+The SQLite event store stamps its own file-format version in a `schema_meta`
+table on open. The constants live in
+`packages/core/src/agentic_odi_core/intent_store.py`:
+
+- `CURRENT_SCHEMA_VERSION` — the format this build writes. It starts at `1`.
+- `MIGRATIONS` — a `dict[int, Callable]` keyed by the version it produces;
+  `MIGRATIONS[n]` upgrades a store from `n - 1` to `n`.
+
+`IntentStore.ensure_version()` runs on every open:
+
+- A current-version store is left untouched (no migration, no version write).
+- An unstamped (legacy) store is stamped `v1` once, then migrated forward.
+- Migrations run **in order inside one transaction**. A step that raises rolls
+  back its data *and* schema changes together with the version stamp, so a
+  half-migrated event log can never be left behind.
+- A store written by a newer build is refused with both versions named and the
+  `odi update` upgrade command, and the file is left byte-for-byte unchanged.
+
+Bump `CURRENT_SCHEMA_VERSION` **only** when you register a migration. An
+additive field that needs no data change must not bump it.
+
+## Contract drift snapshot
+
+`tests/contract/test_contract_snapshot.py` pins three surfaces together so an
+accidental change fails CI instead of a customer: `contract.TOOL_SPECS`, the
+live FastMCP registry's input schemas, and `schema.odi_schema()`.
+
+When you make a **deliberate** change to any of those, regenerate the snapshot
+locally, then review the diff like code before committing:
+
+```bash
+uv run pytest tests/contract/test_contract_snapshot.py --inline-snapshot=fix
+```
+
+CI never accepts a snapshot automatically; drift fails the build. A newly
+accepted snapshot is not proof of backward compatibility — an intentional
+breaking change needs its own compatibility decision.
+
+## The ninety-second tour
+
+`docs/tour/README.md` and `docs/tour/tour.cast` are generated, never hand-edited.
+Regenerate them in one command after a change that affects the walkthrough:
+
+```bash
+uv run python scripts/tour.py
+```
+
+`scripts/tour.py` executes every command in `docs/tour/script.md` against a
+disposable store, so a command that no longer runs fails the build rather than
+rotting in prose. `tests/test_tour.py` fails if the committed artifacts differ
+from a fresh run, if the walkthrough exceeds the ninety-second budget, or if a
+documented command cannot be executed.
 
 ## Agent Session Tracking
 
