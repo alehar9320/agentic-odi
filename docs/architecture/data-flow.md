@@ -296,7 +296,7 @@ The generated types are load-bearing, not decorative.
 `apps/studio/src/types.ts` satisfy the server's declared models
 (`Observation`, `Conversation`, `ConversationSummary`). A required field the
 server renames or removes fails `npm run typecheck`, which the `studio` CI job
-runs; `contract.ts` emits no JavaScript. The remaining gap is the 60 operations
+runs; `contract.ts` emits no JavaScript. The remaining gap is the 77 of 97 operations
 that still answer with an open object (no `response_model`); the ceiling for
 that count lives in `apps/studio-api/tests/test_openapi_contract.py` and may only
 go down.

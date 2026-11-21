@@ -24,10 +24,15 @@ import json
 
 from agentic_odi_studio_api.openapi import CONTRACT, build_contract, normalise
 
-# 60 of the 80 operations still answer with an open object — the two SSE routes
+# 77 of the 97 operations still answer with an open object — the two SSE routes
 # (`/api/chat`, `/api/llm/chat`) are among them, because a stream has no JSON
-# model. This is the number to reduce, one route at a time. See issue #1088.
-OPEN_RESPONSE_MODEL_CEILING = 60
+# model. It was 60 of 80 when this check landed; `main` has since added 17
+# operations (alternatives, outcome delta/history/inputs/interval,
+# existing-solution, data status, the model-key settings pair), none of which
+# declares a `response_model`. The baseline is re-measured against the merged
+# route surface. From here it may only go down: typing a route lowers this
+# number in the same change. See issue #1088.
+OPEN_RESPONSE_MODEL_CEILING = 77
 
 _SUCCESS_CODES = ("200", "201", "202", "204")
 _METHODS = ("get", "post", "patch", "put", "delete")

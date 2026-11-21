@@ -10,31 +10,39 @@ when the committed copy is stale::
     uv run python -m agentic_odi_studio_api.openapi --write   # refresh the file
 
 The SPA fallback (``/{full_path:path}``) is registered only when the built
-Studio is on disk, so it is deliberately left out of the generated contract:
+Studio is on disk, so it is dropped from the generated contract by name:
 otherwise the same checkout would produce a different file on a machine that had
-run ``npm run build``. The contract is the deterministic API surface.
+run ``npm run build``. Every other route is kept, so a new route the API does not
+intend to publish still shows up as drift. The contract is the deterministic API
+surface.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]
 CONTRACT = ROOT / "apps" / "studio" / "openapi.json"
 
+#: The catch-all that serves the built SPA; it is a deployment detail, not a route
+#: the client compiles against.
+SPA_FALLBACK_PATH = "/{full_path:path}"
+
 
 def build_contract() -> dict:
-    """The OpenAPI document the running app serves, with the SPA fallback off."""
-    os.environ["AGENTIC_ODI_DISABLE_SPA"] = "1"
+    """The OpenAPI document the running app serves, without the SPA fallback."""
     from agentic_odi_core.repository import InMemoryRepository
 
     from agentic_odi_studio_api.app import create_app
 
-    return create_app(InMemoryRepository()).openapi()
+    document = create_app(InMemoryRepository()).openapi()
+    document["paths"] = {
+        path: item for path, item in document.get("paths", {}).items() if path != SPA_FALLBACK_PATH
+    }
+    return document
 
 
 def normalise(document: dict) -> str:

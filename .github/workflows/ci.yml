@@ -975,6 +975,7 @@ jobs:
             echo "| --- | --- | --- |"
             printf '| %s | %s | %s |\n' lint "$LINT" required
             printf '| %s | %s | %s |\n' typecheck "$TYPECHECK" required
+            printf '| %s | %s | %s |\n' docs "$DOCS" required
             printf '| %s | %s | %s |\n' security "$SECURITY" required
             printf '| %s | %s | %s |\n' "test (3.10-3.12)" "$TEST" required
             printf '| %s | %s | %s |\n' smoke "$SMOKE" required
