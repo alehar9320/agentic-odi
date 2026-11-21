@@ -19,9 +19,17 @@ from agentic_odi_core.errors import (
     ValidationError,
 )
 from agentic_odi_core.remote import StudioErrorCode, error_envelope, parse_tool_result
+from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.services import ValueOutOfRangeError
+from agentic_odi_mcp_server import mcp_server
 from agentic_odi_mcp_server.mcp_server import mcp
 from fastmcp import Client
+
+
+@pytest.fixture(autouse=True)
+def _configured() -> None:
+    """Name a store explicitly; the module no longer builds one at import."""
+    mcp_server.configure(InMemoryRepository())
 
 
 @pytest.mark.asyncio
@@ -41,6 +49,18 @@ async def test_mcp_argument_names_match_the_contract() -> None:
         schema = tools[name].input_schema
         assert set(schema.get("properties", {})) == set(spec.arguments), name
         assert set(schema.get("required", [])) == set(spec.required), name
+
+
+def test_add_outcome_exposes_sample_metadata() -> None:
+    assert {"importance_n", "satisfaction_n", "score_method"} <= set(
+        TOOL_SPECS["add_outcome"].arguments
+    )
+
+
+def test_update_outcome_exposes_sample_metadata() -> None:
+    assert {"importance_n", "satisfaction_n", "score_method"} <= set(
+        TOOL_SPECS["update_outcome"].arguments
+    )
 
 
 def _envelope_text(exc: BaseException) -> str:

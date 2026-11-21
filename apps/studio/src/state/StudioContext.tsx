@@ -55,7 +55,9 @@ import {
   markSignalRead as apiMarkSignalRead,
   promoteEvidence as apiPromoteEvidence,
   resolveApproval as apiResolveApproval,
+  renameConversation as apiRenameConversation,
   setConversationHead as apiSetConversationHead,
+  saveModelKey as apiSaveModelKey,
   streamChat,
   updateJob as apiUpdateJob,
   updateObservation as apiUpdateObservation,
@@ -84,7 +86,7 @@ import {
   type ProbeBreaker,
   type ProbeOutcome,
 } from "./probeBreaker";
-import { clearSession, loadSession, saveSession, type StudioSession } from "../lib/session";
+import { clearSession, loadSession, saveSession, SESSION_SCHEMA_VERSION, type StudioSession } from "../lib/session";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -106,6 +108,7 @@ import type {
   MarketplaceListing,
   MarketplaceSearch,
   Observation,
+  Outcome,
   Segment,
   Signal,
   SignalSubjectKind,
@@ -121,7 +124,13 @@ import type {
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec } from "../ui/protocol";
 import { recordStream, recordStudioError } from "../diagnostics/bundle";
-import { SettingsProvider, useSettings, SETTINGS_KEY } from "./settings/SettingsContext";
+import {
+  SettingsProvider,
+  useSettings,
+  SETTINGS_KEY,
+  readLegacyApiKey,
+  clearLegacyApiKey,
+} from "./settings/SettingsContext";
 import {
   NoticesProvider,
   useNoticesActions,
@@ -375,6 +384,11 @@ export interface StudioContextValue {
   bootError: StudioError | null;
   /** Re-probe after a backup is restored; clears `bootError` on a clean answer. */
   recheckBoot: () => Promise<void>;
+  /** A failure while migrating a legacy key to the sidecar's write-only store.
+   *  The browser copy is kept and `retryLegacyMigration` can be called again. */
+  migrationError: StudioError | null;
+  /** Retry migrating the captured legacy key to the sidecar's write-only store. */
+  retryLegacyMigration: () => Promise<void>;
   /** Whether the user has dismissed this session's sidecar-down notice. */
   dismissedSidecarNotice: boolean;
   /** Probe again now, e.g. after the user started the sidecar. */
@@ -398,6 +412,13 @@ export interface StudioContextValue {
   regenerateFrom: (messageId: string | null) => Promise<void>;
   /** Replace the user turn before `messageId`, as a sibling branch. */
   editFrom: (messageId: string | null, text: string, attachments?: ChatAttachment[]) => Promise<void>;
+  /**
+   * Forget a failed send (#405). `messageId` is the failed reply; the question
+   * it answered and any notices that hung off it go with it, so the row leaves
+   * the transcript instead of sitting there unretryable forever. The text is
+   * the caller's to restore to the composer.
+   */
+  dismissFailedTurn: (messageId: string | null) => void;
   /** Take the branch the runtime switched to as the visible conversation. */
   switchBranch: (messages: ChatMessage[]) => void;
   /** Answer a paused write. The turn resumes on its own stream. */
@@ -428,6 +449,11 @@ export interface StudioContextValue {
    * to the empty state; a failure leaves the history untouched.
    */
   deleteConversation: (conversationId: string) => Promise<boolean>;
+  /**
+   * Give one thread a new name. The row is renamed in place, and the list is
+   * re-read so ordering follows the touch; a failure leaves the old name.
+   */
+  renameConversation: (conversationId: string, title: string) => Promise<boolean>;
   memory: Observation[];
   memoryLoading: boolean;
   refreshMemory: () => Promise<void>;
@@ -451,10 +477,13 @@ export interface StudioContextValue {
   deleteJob: (jobId: string) => Promise<void>;
   updateStep: (stepId: string, payload: { name?: string; order?: number }) => Promise<void>;
   deleteStep: (stepId: string) => Promise<void>;
+  /** Resolves with the outcome the server returned, or `null` when the write
+   * failed — the failure is already surfaced as a toast, and the caller may keep
+   * the editor open on the values it holds. */
   updateOutcome: (
     outcomeId: string,
     payload: { statement?: string; importance?: number; satisfaction?: number },
-  ) => Promise<void>;
+  ) => Promise<Outcome | null>;
   deleteOutcome: (outcomeId: string) => Promise<void>;
   deleteEvidence: (evidenceId: string) => Promise<void>;
   promoteEvidence: (
@@ -633,6 +662,7 @@ function loadFocusedSubject(): FocusSubject | null {
 
 function sessionForSubject(kind: SignalSubjectKind, id: string): StudioSession {
   return {
+    schema_version: SESSION_SCHEMA_VERSION,
     job_id: kind === "job" ? id : null,
     step_id: kind === "step" ? id : null,
     outcome_id: kind === "outcome" ? id : null,
@@ -736,6 +766,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
+  /** The legacy key captured at startup, held in memory for retry until the
+   *  sidecar has accepted it. Never cleared from the browser on failure. */
+  const [migrationKey, setMigrationKey] = useState<string | null>(() =>
+    readLegacyApiKey(),
+  );
+  const [migrationError, setMigrationError] = useState<StudioError | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -1590,7 +1626,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     async (
       outcomeId: string,
       payload: { statement?: string; importance?: number; satisfaction?: number },
-    ) => {
+    ): Promise<Outcome | null> => {
       try {
         const outcome = await apiUpdateOutcome(outcomeId, {
           ...payload,
@@ -1598,8 +1634,10 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         });
         pushToast("success", writeReceipt(outcome, "Outcome updated."));
         await refreshCanvas();
+        return outcome;
       } catch (error) {
         pushToast("error", `Could not update the outcome: ${(error as Error).message}`);
+        return null;
       }
     },
     [settings.mcp_url, pushToast, refreshCanvas],
@@ -2428,6 +2466,47 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [messages, runTurn, streaming],
   );
 
+  /**
+   * Drop a failed send from the transcript (#405).
+   *
+   * A failed reply is a row the person can retry; it is also a row they should
+   * be able to put down. Today the only way out is to send something new, so the
+   * dead row and its question stay on screen forever. This removes the failed
+   * reply and the user turn it answered together — the pair is one send — plus
+   * any notice that hung off the reply, so the thread reads as though the send
+   * never left. It never touches a turn that did not fail, and it never touches
+   * the composer: the caller decides whether to offer the text back.
+   */
+  const dismissFailedTurn = useCallback(
+    (messageId: string | null) => {
+      if (!messageId) {
+        return;
+      }
+      setMessages((prev) => {
+        const failed = prev.find((message) => message.id === messageId);
+        if (!failed || failed.role !== "assistant" || !failed.error) {
+          return prev;
+        }
+        const doomed = new Set<string>([messageId]);
+        // The question this reply answered is part of the same send.
+        if (failed.parentId) {
+          const question = prev.find((message) => message.id === failed.parentId);
+          if (question?.role === "user") {
+            doomed.add(question.id);
+          }
+        }
+        // Notices the reply produced are commentary on it, not history.
+        for (const message of prev) {
+          if (message.role === "notice" && message.parentId && doomed.has(message.parentId)) {
+            doomed.add(message.id);
+          }
+        }
+        return prev.filter((message) => !doomed.has(message.id));
+      });
+    },
+    [],
+  );
+
   const switchBranch = useCallback(
     (next: ChatMessage[]) => {
       setMessages(next);
@@ -2601,6 +2680,29 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [conversationId, pushToast, refreshConversations],
   );
 
+  /**
+   * Give one thread a new name, and re-read the history.
+   *
+   * The list is re-read rather than patched in place so the renamed thread
+   * moves to the top — its `updated_at` was just touched — exactly as a reload
+   * would show it. A failed rename changes nothing the person can see.
+   */
+  const renameConversation = useCallback(
+    async (targetId: string, title: string) => {
+      try {
+        await apiRenameConversation(targetId, title);
+      } catch (error) {
+        const problem = asStudioError(error);
+        recordStudioError(problem, `/api/conversations/${targetId}`);
+        pushToast("error", "I couldn't rename that conversation.");
+        return false;
+      }
+      await refreshConversations();
+      return true;
+    },
+    [pushToast, refreshConversations],
+  );
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -2633,6 +2735,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   //      the tour, not the stage, so they wait for idle.
   useEffect(() => {
     let cancelled = false;
+
+    // Capture a legacy key a previous version left in the browser *before*
+    // anything else: it must survive a config failure and must not be raced by
+    // saveSettings. It is captured lazily in state above and handed to the
+    // sidecar's write-only store by the migration effect below, which runs
+    // independently of config.
 
     // (1) The board and the thread are local data: they read from IndexedDB and never
     // wait on a server that may not exist. They land one tick after mount, so the
@@ -2714,6 +2822,66 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Migrate a key a previous version left in the browser to the sidecar's
+  // write-only store. This runs independently of config: if the sidecar is
+  // down or the store is unwritable, the browser copy is kept and the captured
+  // key is retained so migration can be retried. The key is deleted from the
+  // browser only after the sidecar has accepted it.
+  useEffect(() => {
+    let cancelled = false;
+    let settled = false;
+
+    const legacyKey = migrationKey;
+    if (!legacyKey) {
+      // Nothing to migrate: make sure the browser copy is gone.
+      clearLegacyApiKey();
+      return;
+    }
+
+    async function run(key: string) {
+      try {
+        await apiSaveModelKey(key);
+        if (cancelled || settled) {
+          return;
+        }
+        settled = true;
+        // The sidecar accepted the key: it is now safe to drop the browser copy.
+        clearLegacyApiKey();
+        setMigrationKey(null);
+        setMigrationError(null);
+      } catch (caught) {
+        if (cancelled || settled) {
+          return;
+        }
+        settled = true;
+        setMigrationError(asStudioError(caught));
+        // Keep the browser copy and the captured key so the person can retry
+        // once the sidecar is reachable again. The key is not lost.
+      }
+    }
+
+    void run(legacyKey);
+    return () => {
+      cancelled = true;
+      settled = true;
+    };
+  }, [migrationKey]);
+
+  const retryLegacyMigration = useCallback(async () => {
+    if (!migrationKey) {
+      return;
+    }
+    setMigrationError(null);
+    try {
+      await apiSaveModelKey(migrationKey);
+      clearLegacyApiKey();
+      setMigrationKey(null);
+      setMigrationError(null);
+    } catch (caught) {
+      setMigrationError(asStudioError(caught));
+    }
+  }, [migrationKey]);
 
   // Probing on a schedule that respects the person (#535). One scheduler owns
   // the timer: 30 s while the tab is visible, doubling to a five-minute cap on
@@ -2918,7 +3086,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       mcpReachable,
       sidecarReachable,
       bootError,
+      migrationError,
       recheckBoot,
+      retryLegacyMigration,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
@@ -2931,6 +3101,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -2942,6 +3113,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,
@@ -3034,7 +3206,9 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       mcpReachable,
       sidecarReachable,
       bootError,
+      migrationError,
       recheckBoot,
+      retryLegacyMigration,
       dismissedSidecarNotice,
       dismissSidecarNotice,
       recheckConnections,
@@ -3047,6 +3221,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       sendMessage,
       regenerateFrom,
       editFrom,
+      dismissFailedTurn,
       switchBranch,
       respondToApproval,
       stopStreaming,
@@ -3058,6 +3233,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshConversations,
       openConversation,
       deleteConversation,
+      renameConversation,
       memory,
       memoryLoading,
       refreshMemory,

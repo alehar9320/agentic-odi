@@ -9,6 +9,7 @@ from agentic_odi_core import Link as RootLink
 from agentic_odi_core import RelationshipType as RootRelationshipType
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import (
+    LINK_RELATIONSHIP_TYPES,
     BusinessImpactCategory,
     BusinessValue,
     CustomerOutcome,
@@ -146,6 +147,22 @@ def test_relationship_type_is_closed_to_five_values() -> None:
         "duplicates",
         "relates_to",
     }
+
+
+def test_link_relationship_type_constant_matches_enum() -> None:
+    assert LINK_RELATIONSHIP_TYPES == [member.value for member in RelationshipType]
+
+
+def test_link_relationship_type_accepts_a_string_value() -> None:
+    link = Link(
+        source_type="job",
+        source_id="job-1",
+        target_type="job",
+        target_id="job-2",
+        relationship_type="duplicates",
+    )
+
+    assert link.relationship_type is RelationshipType.DUPLICATES
 
 
 def test_entity_type_has_no_candidate_member() -> None:

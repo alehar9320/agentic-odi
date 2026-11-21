@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 
+import { MCP_BACKED_ORIGIN, MCP_URL, STUDIO_ORIGIN } from "./e2e/origins";
+
 /**
  * End-to-end configuration for the Living Studio.
  *
@@ -15,11 +17,23 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * The Studio is served by the sidecar from `apps/studio/dist`, so the browser
  * and the API share one origin. Build the SPA before running this suite.
+ *
+ * Four rules keep this suite trustworthy (#1118):
+ *
+ *   1. **One spec, one project.** A spec is collected by exactly one project,
+ *      so a test never runs twice under two names and its result is not
+ *      double-counted.
+ *   2. **`test:e2e` is the product suite.** The pixel-diff project is opt-in
+ *      until it has committed baselines; a contract with no baseline cannot
+ *      pass, and a lane that can never pass teaches everyone to ignore it.
+ *   3. **Every test starts from the same state.** `e2e/fixtures.ts` resets the
+ *      shared sidecar before each test, so the result does not depend on the
+ *      order Playwright happened to choose.
+ *   4. **A retry is recorded, not concealed.** `retries` stays at 1 in CI so a
+ *      trace is kept for the first attempt, and the job summary names every
+ *      test that passed only on retry.
  */
 const REPO_ROOT = "../..";
-const STUDIO_ORIGIN = "http://127.0.0.1:8100";
-const MCP_BACKED_ORIGIN = "http://127.0.0.1:8101";
-const MCP_URL = "http://127.0.0.1:8000/mcp";
 // Both the repository and the Studio's memory are SQLite files. Give each run
 // a private directory so a test never sees another run's canvas, conversations,
 // or a schema left behind by an older build.
@@ -43,7 +57,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   timeout: 30_000,
-  expect: { timeout: 10_000 },
+  expect: {
+    timeout: 10_000,
+    // Screenshots are compared only by the opt-in `visual` project. Disabling
+    // animation and hiding the caret keeps a comparison about layout and colour
+    // rather than about which frame the capture landed on.
+    toHaveScreenshot: { animations: "disabled", caret: "hide", scale: "css" },
+  },
 
   use: {
     baseURL: STUDIO_ORIGIN,
@@ -65,19 +85,33 @@ export default defineConfig({
 
   projects: [
     {
+      // The product suite: everything that drives the shipped app in a browser.
       name: "chromium",
-      // The screenshot spec is for human review, not a gate. Ignoring it here
-      // keeps `npm run test:e2e` with exactly the coverage it had before; the
-      // `pr-screenshots` workflow runs it through the project below.
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/],
+      testIgnore: [/mcp-backend\.spec\.ts/, /pr-screenshots\.spec\.ts/, /visual\.spec\.ts/],
+    },
+    {
+      // The same Studio against its MCP passthrough backend, which talks to
+      // the FastMCP server over HTTP instead of reading the local
+      // repository. This is the path where the tool results have to be
+      // parsed rather than taken at face value.
+      name: "mcp-backend",
+      use: { ...devices["Desktop Chrome"], baseURL: MCP_BACKED_ORIGIN },
+      testMatch: /mcp-backend\.spec\.ts/,
     },
     {
       // The visual harness: deterministic screens at two sizes, in both themes,
-      // with fonts and animation disabled. It is a screenshot contract, so it
-      // takes a screenshot for every test and keeps them under version control.
+      // with animation disabled. It is a screenshot contract, so it compares
+      // every test and keeps the images under version control.
+      //
+      // It is deliberately NOT part of `npm run test:e2e`. A comparison needs a
+      // committed baseline rendered on the same browser build, and this
+      // repository has none yet; running it in the product lane made the lane
+      // red on every push for a reason no test could fix. It runs when asked
+      // for (`npm run test:e2e:visual`), and joins the product lane once its
+      // baselines are committed and reviewed.
       name: "visual",
-use: {
+      use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
         // The spec sets the theme per test; this is the baseline the browser
@@ -89,19 +123,10 @@ use: {
       },
       testMatch: /visual\.spec\.ts/,
     },
-    {
-      // The same Studio against its MCP passthrough backend, which talks to
-      // the FastMCP server over HTTP instead of reading the local
-      // repository. This is the path where the tool results have to be
-      // parsed rather than taken at face value.
-      name: "mcp-backend",
-      use: { ...devices["Desktop Chrome"], baseURL: MCP_BACKED_ORIGIN },
-      testMatch: /mcp-backend\.spec\.ts/,
-    },
     // Product screenshots for human review, not a gate. The project is added
-    // only when `PR_SCREENSHOTS=1`, so `npm run test:e2e` keeps its current
-    // coverage; the `pr-screenshots` workflow sets the variable and runs the
-    // `screenshots` project explicitly.
+    // only when `PR_SCREENSHOTS=1`, so the default run never sees it; the
+    // `pr-screenshots` workflow sets the variable and runs the `screenshots`
+    // project explicitly.
     ...(process.env.PR_SCREENSHOTS === "1"
       ? [
           {

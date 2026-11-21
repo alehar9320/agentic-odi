@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -10,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from agentic_odi_cli.profile import config_dir
+
+log = logging.getLogger(__name__)
 
 FLAGS_FILE_NAME = "feature_flags.json"
 
@@ -98,7 +101,10 @@ def load_flags() -> FeatureFlags:
         with open(target, encoding="utf-8") as f:
             data = json.load(f)
         return FeatureFlags.from_dict(data)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a bad flags file falls back to defaults
+        log.warning(
+            "feature flags could not be read (path=%s, error=%s)", target, type(exc).__name__
+        )
         return FeatureFlags()
 
 

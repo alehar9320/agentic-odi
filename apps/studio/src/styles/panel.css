@@ -1,0 +1,49 @@
+/*
+ * The lens framing (#740).
+ *
+ * The docked lens keeps its shell in `theme.css`; what a detail adds — its
+ * place-in-the-job line, its header controls, and the labelled block stack its
+ * body reads as — lives here so the framing can change without touching the
+ * tokens.
+ */
+
+/* The detail's place in the job: a quiet line above the title, present only
+   when a real step backs it (#740). */
+.lens__context {
+  margin: 0 0 3px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lens__controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+/* The body of a detail reads as a stack of labelled blocks (#740). */
+.detail-block {
+  margin: 0 0 22px;
+}
+
+.detail-block:last-child {
+  margin-bottom: 0;
+}
+
+.detail-block__eyebrow {
+  margin: 0 0 8px;
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detail-block__prose {
+  font-size: 0.86rem;
+  line-height: 1.55;
+}

@@ -5,11 +5,21 @@ name: Label merge conflicts
 # reports `UNKNOWN` for a moment after every push, so the state is polled until
 # it settles; reading it once labelled nothing, which is why the label had never
 # been applied to a single pull request.
+#
+# It also runs when `CI` or `PR guardrails` completes: `clean` (the state that
+# earns `ready-for-merge`) only becomes true once the required checks have
+# passed, and the six-hourly sweep used to be the only thing that looked again.
+# The merge path waits on this label, so a green pull request could sit
+# unauthorized for hours while the fast path was a bug (ADR 0009). `check_suite`
+# cannot be that trigger: GitHub does not fire it for suites Actions created.
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["CI", "PR guardrails"]
+    types: [completed]
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
@@ -20,7 +30,11 @@ permissions:
   issues: write # gh label create lives under the issues API
 
 concurrency:
-  group: label-merge-conflicts-${{ github.ref }}
+  # `github.ref` is `refs/heads/main` for every `workflow_run` completion, so a
+  # group keyed on it put every pull request's finished CI run in one group and
+  # `cancel-in-progress` killed all but one of them. Key on the commit for a
+  # workflow_run, the PR for a pull request, and the ref only for the sweep.
+  group: label-merge-conflicts-${{ github.event.workflow_run.head_sha || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,15 +42,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # A write-permission workflow must not run pull request code. Checking out
-      # the base ref (and not persisting credentials, which `gh` does not use)
-      # keeps the checkout to the tree the labels describe.
-      - name: Checkout base branch
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.base.ref || github.ref }}
-          persist-credentials: false
-
+      # No checkout. A write-permission workflow must not run pull request code,
+      # and running no tree at all is the strongest form of that: every step
+      # below talks to the API through `gh` with an explicit --repo. The base-ref
+      # checkout this used to do added only a failure mode — actions/checkout
+      # runs `git submodule foreach` while removing its auth header, which exits
+      # 128 on a base tree carrying an unregistered gitlink, so the job went red
+      # over a tree it never read.
       - name: Ensure labels exist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,9 +66,16 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            head_sha="${{ github.event.workflow_run.head_sha }}"
+            # `gh pr list` caps at 30 rows before a local filter runs; ask the
+            # commit which pull requests contain it instead.
+            gh api "repos/$GITHUB_REPOSITORY/commits/$head_sha/pulls" --paginate \
+              --jq '.[] | select(.state == "open") | .number' \
+              > "$RUNNER_TEMP/pr-numbers.txt" || true
           else
-            gh pr list --repo "$GITHUB_REPOSITORY" --base main \
-              --state open --json number -q '.[].number' \
+            gh pr list --repo "$GITHUB_REPOSITORY" --base main --state open \
+              --limit 1000 --json number -q '.[].number' \
               > "$RUNNER_TEMP/pr-numbers.txt"
           fi
 

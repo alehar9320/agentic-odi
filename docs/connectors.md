@@ -233,6 +233,23 @@ Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
 or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
+## Item previews
+
+`Connector.preview(external_id)` returns a `LinkPreviewData` summary for one
+external item, or `None` when the connector cannot describe it. The default
+protocol implementation returns `None`, so connectors opt in without breaking
+existing kinds. A preview carries `title`, optional `status`, optional `url`,
+and the UTC `fetched_at` timestamp; it is a read-only summary ready to store on
+a `Link.preview`.
+
+`RestConnector` implements previews with a `GET` to the configured collection
+URL plus the URL-encoded item id. Query parameters on the collection URL are
+preserved. The response must be a JSON object; `title`, `name`, or `id` supplies
+the title, `status` or `state` supplies the status, and `url`, `html_url`, or
+`web_url` supplies the link. Non-success responses, non-JSON bodies, non-object
+payloads, and fetch errors return `None` rather than raising. Tests inject the
+fetcher, so preview coverage does not touch the network.
+
 Every evidence draft is an `EvidenceDraft` model, so construction raises before
 a record that crossed a process boundary can reach the ODI store with a missing
 or mistyped field. `validate_evidence_draft()` applies the same check to a draft
@@ -253,19 +270,47 @@ not consume tokens.
 | Records admitted per second | `AGENTIC_ODI_INGEST_RATE` | `100` |
 | Burst (max tokens held) | one second's worth | `100` for the default rate |
 
-Invalid or non-positive values fall back to 100. The limiter never blocks: a
-burst is shed with a typed error instead of being queued in memory, which is the
-failure mode this guard exists to prevent. Construct `IngestSink` with an
-explicit `RateLimiter` to override the rate or the burst in-process.
+An unset or empty `AGENTIC_ODI_INGEST_RATE` uses the default of 100. A value
+that is present but not a positive integer — `0`, `-1`, or a typo such as
+`1OO` — raises `ValueError` naming the variable, so the process does not run at
+a rate the operator did not choose. The limiter never blocks: a burst is shed
+with a typed error instead of being queued in memory, which is the failure mode
+this guard exists to prevent. Construct `IngestSink` with an explicit
+`RateLimiter` to override the rate or the burst in-process.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
 
+### Optional previews
+
+`Connector.preview(external_id)` is a concrete method that returns
+`LinkPreviewData | None`; the default returns `None`, meaning "this connector
+cannot describe the item". It is not abstract, so a connector without preview
+support inherits the default and cannot break. `LinkPreviewData` carries
+`title`, `status`, `url`, and `fetched_at`, and serializes to the keys
+`Link.preview` already holds. `RestConnector` overrides it: one request to the
+item's URL, mapped from `title`/`name`/`id`, `status`/`state`, and
+`url`/`html_url`/`web_url`. A non-2xx response, a non-object body, or a
+transport error returns `None` rather than raising.
+
 ## HTTP client configuration
 
-Connector HTTP traffic goes through one configurable client,
-`agentic_odi_connectors.get_http_client()`, so pool size, timeout, and retry
-behavior are predictable. Tune it with environment variables:
+Connector HTTP traffic goes through one configurable factory,
+`agentic_odi_connectors.new_http_client()`, so pool size, timeout, and retry
+behavior are predictable. Each call builds a new client with its own connection
+pool, and the caller owns it: enter it as an async context manager so the pool
+is closed when the ingest run ends.
+
+```python
+from agentic_odi_connectors import new_http_client
+
+async with new_http_client() as client:
+    response = await client.get(url)
+```
+
+Nothing closes a client the caller forgot, so a loop that calls the factory per
+record without closing opens one pool per record. Tune it with environment
+variables:
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -273,6 +318,9 @@ behavior are predictable. Tune it with environment variables:
 | `AGENTIC_ODI_HTTP_TIMEOUT` | `30.0` | Per-request timeout in seconds |
 | `AGENTIC_ODI_HTTP_RETRIES` | `3` | Retries for connection-level failures |
 
-Invalid or out-of-range values fall back to the default instead of failing the
-process.
+An unset or empty variable uses its default. A present but invalid value — a
+typo, or a number below the minimum (1 for the pool size, 0.001 for the
+timeout, 0 for retries) — raises `ValueError` naming the variable, so a
+mistyped configuration fails loudly instead of silently behaving like the
+default.
 

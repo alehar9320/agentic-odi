@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-from agentic_odi_connectors import ConnectorHTTPClient, get_http_client
+from agentic_odi_connectors import ConnectorHTTPClient, new_http_client
 
 
 @pytest.fixture(autouse=True)
@@ -17,66 +17,84 @@ def _clear_http_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_http_client_uses_defaults() -> None:
-    client = get_http_client()
-    try:
+async def test_absent_values_use_defaults() -> None:
+    async with new_http_client() as client:
         assert client.pool_size == 10
         assert client.timeout == 30.0
         assert client.retries == 3
         assert client.client.timeout.read == 30.0
-    finally:
-        await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_pool_size_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "20")
 
-    client = get_http_client()
-    try:
+    async with new_http_client() as client:
         assert client.pool_size == 20
         pool = cast(Any, client.client._transport)._pool
         assert pool._max_connections == 20
-    finally:
-        await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_timeout_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "60")
 
-    client = get_http_client()
-    try:
+    async with new_http_client() as client:
         assert client.timeout == 60.0
         assert client.client.timeout.read == 60.0
-    finally:
-        await client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_retries_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_RETRIES", "0")
 
-    client = get_http_client()
-    try:
+    async with new_http_client() as client:
         assert client.retries == 0
-    finally:
-        await client.aclose()
 
 
 @pytest.mark.asyncio
-async def test_invalid_environment_values_fall_back_to_defaults(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_invalid_environment_values_raise(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "not-a-number")
     monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "-5")
 
-    client = get_http_client()
-    try:
-        assert client.pool_size == 10
-        assert client.timeout == 30.0
-    finally:
-        await client.aclose()
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        new_http_client()
+
+
+def test_a_typo_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "not-a-number")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        new_http_client()
+
+
+def test_a_zero_timeout_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "0")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_TIMEOUT"):
+        new_http_client()
+
+
+def test_a_nan_timeout_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "nan")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_TIMEOUT"):
+        new_http_client()
+
+
+def test_a_negative_pool_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_POOL_SIZE", "-1")
+
+    with pytest.raises(ValueError, match="AGENTIC_ODI_HTTP_POOL_SIZE"):
+        new_http_client()
+
+
+@pytest.mark.asyncio
+async def test_a_valid_value_is_used(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_HTTP_TIMEOUT", "2.5")
+
+    async with new_http_client() as client:
+        assert client.timeout == 2.5
 
 
 @pytest.mark.asyncio

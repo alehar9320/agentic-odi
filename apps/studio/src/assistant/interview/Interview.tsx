@@ -29,6 +29,25 @@ import {
   type InterviewPorts,
   type InterviewState,
 } from "./conductor";
+import {
+  createDraftWriter,
+  latestDraft,
+  type DraftStore,
+  type DraftWriter,
+} from "./persistence";
+
+/** The draft store a host hands the interview so a reload resumes it (#402). */
+export interface InterviewDraftOptions {
+  store: DraftStore;
+  /** The job the draft belongs to; a draft for another job is never restored. */
+  jobId: string;
+  /** The interview's identity in the store. Defaults to the job id. */
+  interviewId?: string;
+  /** The debounce window; a test narrows it. */
+  debounceMs?: number;
+  /** The clock for `updatedAt`; a test pins it. */
+  now?: () => string;
+}
 
 export interface InterviewProps {
   /** The store actions the conductor may call; stable for one interview. */
@@ -44,6 +63,11 @@ export interface InterviewProps {
    * action. The card offers one link per created outcome.
    */
   onOpenRecord?: (id: string) => void;
+  /**
+   * Persist and restore the draft. Absent when the host keeps no draft, in
+   * which case the interview behaves exactly as before (#402 is opt-in).
+   */
+  draft?: InterviewDraftOptions;
 }
 
 export function Interview({
@@ -53,6 +77,7 @@ export function Interview({
   onComplete,
   onFailure,
   onOpenRecord,
+  draft,
 }: InterviewProps) {
   const [state, setState] = useState<InterviewState>(() =>
     createConductor({ ports, plan }).getState(),
@@ -68,10 +93,59 @@ export function Interview({
     notify.current = { onComplete, onFailure };
   });
 
+  // One writer for the mounted interview. A ref, not state: the writer is not
+  // rendered, and creating it in the initialiser would need the store open at
+  // first paint.
+  const writer = useRef<DraftWriter | null>(null);
+  // The restore effect depends on the draft's identity, not on the options
+  // object: a host that rebuilds that object each render must not re-read the
+  // store and reopen an already-answered question.
+  const draftStore = draft?.store ?? null;
+  const draftJobId = draft?.jobId ?? null;
+  const draftInterviewId = draft?.interviewId ?? null;
+  const draftDebounceMs = draft?.debounceMs;
+  const draftNow = draft?.now;
+
   useEffect(() => {
     conductor.send({ type: "ask", questions });
     conductor.send({ type: "begin" });
   }, [conductor, questions]);
+
+  // Restore the most recent draft for this job before the person types, then
+  // keep writing on every transition. A draft for another job is ignored.
+  useEffect(() => {
+    if (!draftStore || !draftJobId) {
+      return;
+    }
+    let cancelled = false;
+    const active = createDraftWriter({
+      store: draftStore,
+      interviewId: draftInterviewId ?? draftJobId,
+      jobId: draftJobId,
+      ...(draftDebounceMs === undefined ? {} : { debounceMs: draftDebounceMs }),
+      ...(draftNow === undefined ? {} : { now: draftNow }),
+    });
+    writer.current = active;
+
+    void (async () => {
+      const stored = await latestDraft(draftStore, draftJobId);
+      if (!cancelled && stored) {
+        conductor.send({ type: "restore", answers: stored.answers, index: stored.index });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      writer.current = null;
+      void active.flush();
+    };
+  }, [conductor, draftStore, draftJobId, draftInterviewId, draftDebounceMs, draftNow]);
+
+  // Every transition writes the draft; a terminal state deletes it. Debounced,
+  // so a burst of answers inside the window is one write.
+  useEffect(() => {
+    writer.current?.write(state);
+  }, [state]);
 
   useEffect(() => {
     if (state.status === "done") {

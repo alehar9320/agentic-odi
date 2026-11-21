@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
-import { SESSION_KEY } from "../lib/session";
+import { SESSION_KEY, SESSION_SCHEMA_VERSION } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
 import { getStudioBff } from "../bff/index";
 import {
@@ -15,6 +15,7 @@ import {
   typeIntoComposer,
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
+import { SETTINGS_KEY } from "./settings/SettingsContext";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
@@ -118,11 +119,17 @@ let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
+/** A write-only-store write the sidecar refuses, as an unreachable or unwritable
+ *  sidecar would. The migration must keep the browser copy when this is set. */
+let modelKeySaveFails = false;
 let catalogFetches = 0;
 let featuredFetches = 0;
 let capabilityProbes = 0;
 let approvalCalls: Record<string, unknown>[] = [];
 let headPatches: Record<string, unknown>[] = [];
+let renamePatches: Record<string, unknown>[] = [];
+/** When true, the conversation PATCH route answers 503 so a rename fails. */
+let renameFails = false;
 let conversationCreates = 0;
 /** When true, the canvas/evidence write routes answer 503 with no structured error. */
 let writeFails = false;
@@ -233,6 +240,24 @@ function route(
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
+  if (url === "/api/settings/model-key") {
+    if (init?.method === "PUT") {
+      if (modelKeySaveFails) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "internal",
+              message: "The secret store is not writable, so the key was not saved.",
+              retryable: true,
+            },
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return json({ configured: true, set_at: "2026-11-21T00:00:00+00:00" });
+    }
+    return json({ configured: false, set_at: null });
+  }
   if (url === "/api/config") {
     if (configHangs) {
       // A slow laptop, a cold sidecar: the request is in the air and nothing is
@@ -255,7 +280,7 @@ function route(
             code: "store_corrupt",
             message:
               "Your database failed its integrity check: /home/me/.odi.db. " +
-              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+              "Last backup: 06:14 local (odi-20260102T061400Z.db).",
             detail: "database disk image is malformed",
             suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
             retryable: false,
@@ -337,7 +362,19 @@ function route(
     return json({ ok: true, id: url.split("/").pop() });
   }
   if (init?.method === "PATCH" && url.startsWith("/api/conversations/")) {
-    headPatches.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+    const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+    if ("title" in body) {
+      if (renameFails) {
+        return new Response(JSON.stringify({ detail: "nope" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      renamePatches.push({ url, ...body });
+    }
+    if ("head_id" in body) {
+      headPatches.push(body);
+    }
     return json({ conversation: CONVERSATION });
   }
   if (url === "/api/conversations/c-1/tree") {
@@ -439,6 +476,8 @@ describe("StudioContext memory and resume", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -449,7 +488,12 @@ describe("StudioContext memory and resume", () => {
   it("restores the focused subject from the previous session", () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
+      JSON.stringify({
+        schema_version: SESSION_SCHEMA_VERSION,
+        job_id: null,
+        step_id: null,
+        outcome_id: "O-9",
+      }),
     );
 
     const { result } = renderHook(
@@ -480,6 +524,7 @@ describe("StudioContext memory and resume", () => {
 
     expect(result.current.focusedSubject).toEqual({ kind: "job", id: "JOB-7" });
     expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
+      schema_version: SESSION_SCHEMA_VERSION,
       job_id: "JOB-7",
       step_id: null,
       outcome_id: null,
@@ -806,6 +851,8 @@ describe("StudioContext failures", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -857,6 +904,70 @@ describe("StudioContext failures", () => {
     const messages = result.current.messages;
     expect(messages.some((message) => message.role === "user" && message.content === "list the jobs")).toBe(true);
     expect(messages.at(-1)?.error?.code).toBe("internal");
+  });
+
+  it("drops a failed send and its question when the row is dismissed (#405)", async () => {
+    chatFailure = new Error("network down");
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const before = result.current.messages;
+    const failed = before.at(-1);
+    const question = before.at(-2);
+    expect(question?.role).toBe("user");
+    expect(question?.content).toBe("list the jobs");
+    expect(failed?.role).toBe("assistant");
+    expect(failed?.error).toBeDefined();
+
+    await act(async () => {
+      result.current.dismissFailedTurn(failed?.id ?? null);
+    });
+
+    // Both the question and the dead reply leave together: the pair is one send.
+    // The earlier, answered turns stay.
+    const after = result.current.messages;
+    expect(after.map((message) => message.id)).not.toContain(failed?.id);
+    expect(after.map((message) => message.id)).not.toContain(question?.id);
+    expect(after).toHaveLength(before.length - 2);
+  });
+
+  it("never dismisses a turn that did not fail (#405)", async () => {
+    chatStream = 'event: message\ndata: {"content":"Here you go."}\n\n';
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(result.current.conversationId).toBe("c-1"));
+
+    await act(async () => {
+      await result.current.sendMessage("list the jobs");
+    });
+
+    const answered = result.current.messages.at(-1);
+    expect(answered?.role).toBe("assistant");
+    expect(answered?.error).toBeUndefined();
+    const before = result.current.messages.length;
+
+    await act(async () => {
+      result.current.dismissFailedTurn(answered?.id ?? null);
+    });
+
+    expect(result.current.messages).toHaveLength(before);
   });
 
   it("reports a stream that ends without a message as an internal failure", async () => {
@@ -1971,6 +2082,8 @@ describe("StudioContext canvas state", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2023,6 +2136,8 @@ describe("StudioContext stopped turns", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2066,6 +2181,8 @@ describe("StudioContext write approval and branches", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
   });
 
@@ -2236,6 +2353,8 @@ describe("StudioContext startNewThread (#319)", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     conversationCreates = 0;
     vi.stubGlobal(
       "fetch",
@@ -2638,6 +2757,8 @@ describe("StudioContext agent focus", () => {
     llmHealthFetches = 0;
     approvalCalls = [];
     headPatches = [];
+    renamePatches = [];
+    renameFails = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
@@ -3097,5 +3218,115 @@ describe("Studio render budget (#502)", () => {
     });
 
     expectRenderBudget(HEALTH_BUDGET);
+  });
+});
+
+describe("StudioContext rename conversation (#642)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    chatBody = null;
+    chatStream = null;
+    chatFailure = null;
+    chatAttempts = 0;
+    chatAborts = false;
+    canvasFails = false;
+    bootCorrupt = false;
+    connectorFetches = 0;
+    llmTransportFails = false;
+    llmHealthFetches = 0;
+    approvalCalls = [];
+    headPatches = [];
+    renamePatches = [];
+    renameFails = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function booted() {
+    const harness = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+    await waitFor(() => expect(harness.result.current.conversations).toHaveLength(2));
+    return harness;
+  }
+
+  it("renames a thread and re-reads the history", async () => {
+    const { result } = await booted();
+
+    await act(async () => {
+      await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(renamePatches).toEqual([{ url: "/api/conversations/c-1", title: "Renamed thread" }]);
+    // The list is re-read from the store, not patched by hand.
+    expect(result.current.conversations).toHaveLength(2);
+  });
+
+  it("reports a failed rename and leaves the history as it was", async () => {
+    const { result } = await booted();
+    renameFails = true;
+    const before = result.current.conversations;
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.renameConversation("c-1", "Renamed thread");
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.conversations).toEqual(before);
+    expect(result.current.toasts.map((toast) => toast.message)).toContain(
+      "I couldn't rename that conversation.",
+    );
+  });
+});
+
+describe("legacy model-key migration", () => {
+  beforeEach(() => {
+    localStorage.removeItem(SETTINGS_KEY);
+    modelKeySaveFails = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    modelKeySaveFails = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the browser copy when the sidecar refuses the key, then retries", async () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // The sidecar is unreachable or its store is unwritable: the key is not
+    // saved, so it must not be deleted from the browser either.
+    await waitFor(() => expect(result.current.migrationError).not.toBeNull());
+    expect(localStorage.getItem(SETTINGS_KEY)).toContain("sk-legacy-DO-NOT-LOSE");
+
+    // The sidecar comes back; the retry saves the key and only then drops it.
+    modelKeySaveFails = false;
+    await act(async () => {
+      await result.current.retryLegacyMigration();
+    });
+
+    expect(result.current.migrationError).toBeNull();
+    expect(localStorage.getItem(SETTINGS_KEY)).not.toContain("sk-legacy-DO-NOT-LOSE");
   });
 });

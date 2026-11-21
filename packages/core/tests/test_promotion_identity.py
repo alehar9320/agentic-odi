@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 from agentic_odi_core.errors import AlreadyPromotedError
+from agentic_odi_core.models import Outcome, compute_opportunity_score
 from agentic_odi_core.repository import (
     InMemoryRepository,
     compute_promotion_fingerprint,
@@ -133,3 +134,64 @@ def test_deleting_the_outcome_leaves_the_quote_promotable(tmp_path) -> None:
         quote.id, "outcome", job_id=job.id, statement=STATEMENT, importance=8.0, satisfaction=4.0
     )
     assert again.id != outcome.id
+
+
+# -- Confidence weights the promoted inputs, never the score -------------------
+
+
+def test_promoted_inputs_are_weighted_but_the_score_still_follows_the_formula(
+    service: ODIService,
+) -> None:
+    job = service.add_job("Secret rotation")
+    quote = _quote(service, job.id, "Lost 2 hours on deploy")
+    promoted = service.promote_evidence(
+        quote.id,
+        "outcome",
+        job_id=job.id,
+        statement=STATEMENT,
+        importance=8.0,
+        satisfaction=4.0,
+    )
+    assert isinstance(promoted, Outcome)
+
+    #: The quote is claimed, so its inputs are discounted before the scorer runs.
+    assert promoted.importance == 4.0
+    assert promoted.satisfaction == 2.0
+    assert promoted.importance is not None and promoted.satisfaction is not None
+    #: The stored score is still exactly the shared formula over stored inputs.
+    assert promoted.opportunity_score == compute_opportunity_score(
+        promoted.importance, promoted.satisfaction
+    )
+
+
+def test_verified_evidence_keeps_raw_inputs_and_outranks_a_claimed_quote(
+    service: ODIService,
+) -> None:
+    job = service.add_job("Secret rotation")
+    claimed = _quote(service, job.id, "Lost 2 hours on deploy")
+    verified = service.add_evidence(
+        source_name="grain",
+        source_kind="mcp",
+        name="interview",
+        content="Cannot find the runbook at 2am",
+        job_id=job.id,
+        confidence="verified",
+    )
+
+    claimed_promoted = service.promote_evidence(
+        claimed.id, "outcome", job_id=job.id, statement=STATEMENT, importance=8.0, satisfaction=4.0
+    )
+    verified_promoted = service.promote_evidence(
+        verified.id, "outcome", job_id=job.id, statement=STATEMENT, importance=8.0, satisfaction=4.0
+    )
+    assert isinstance(claimed_promoted, Outcome)
+    assert isinstance(verified_promoted, Outcome)
+
+    assert verified_promoted.importance == 8.0
+    assert verified_promoted.satisfaction == 4.0
+    claimed_score = claimed_promoted.opportunity_score
+    verified_score = verified_promoted.opportunity_score
+    assert claimed_score is not None and verified_score is not None
+    assert verified_score > claimed_score
+    assert verified_score > 10.0
+    assert claimed_score <= 10.0

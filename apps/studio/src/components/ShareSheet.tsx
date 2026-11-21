@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
-import { useFocusTrap } from "../lib/useFocusTrap";
 import type { ShareLink } from "../types";
-import { CheckIcon, CloseIcon, CopyIcon } from "./icons";
+import { CheckIcon, CopyIcon } from "./icons";
+import { Dialog } from "@/components/ui/dialog";
 
 /**
  * The one place a read-only link is made.
@@ -46,26 +46,12 @@ function ShareSheetBody({
   onCreate: (days: number) => Promise<ShareLink>;
   onRevoke?: (id: string) => Promise<void>;
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [days, setDays] = useState(7);
   const [link, setLink] = useState<ShareLink | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [revoked, setRevoked] = useState(false);
-
-  useFocusTrap(dialogRef, true);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
 
   async function create() {
     setBusy(true);
@@ -112,87 +98,87 @@ function ShareSheetBody({
   const shareUrl = link ? `${window.location.origin}/shared/${link.token}` : null;
 
   return (
-    <div
-      ref={dialogRef}
-      className="share-sheet"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Share a read-only link"
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Share a read-only link"
     >
-      <div className="share-sheet__card">
-        <button type="button" className="share-sheet__close" aria-label="Close" onClick={onClose}>
-          <CloseIcon size={15} />
-        </button>
-        <h2 className="share-sheet__title">Share a read-only link</h2>
-        <p className="share-sheet__body">
-          One artifact, read-only, expiring. The link never carries the workspace, memory,
-          conversations, or connector secrets.
+      <p className="share-sheet__body">
+        One artifact, read-only, expiring. The link never carries the workspace, memory,
+        conversations, or connector secrets.
+      </p>
+
+      {error ? (
+        <p className="share-sheet__error" role="alert">
+          {error}
         </p>
+      ) : null}
 
-        {error ? (
-          <p className="share-sheet__error" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        {shareUrl ? (
-          <div className="share-sheet__result">
-            <label className="sr-only" htmlFor="share-url">
-              Shareable link
-            </label>
-            <input id="share-url" className="input" readOnly value={shareUrl} />
-            <button type="button" className="button" onClick={() => void copy()}>
-              {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />} Copy link
-            </button>
-            {onRevoke ? (
-              <button
-                type="button"
-                className="quiet-action quiet-action--danger"
-                disabled={busy}
-                onClick={() => void revoke()}
-              >
-                Revoke link
-              </button>
-            ) : (
-              <p className="share-sheet__note">
-                This link cannot be revoked from this build. It stops working on its own when it
-                expires.
-              </p>
-            )}
-          </div>
-        ) : revoked ? (
-          <p className="share-sheet__note" role="status">
-            The link no longer works.
-          </p>
-        ) : (
-          <div className="share-sheet__create">
-            <label className="share-sheet__field" htmlFor="share-duration">
-              Link expires
-              <select
-                id="share-duration"
-                className="select"
-                value={days}
-                disabled={busy}
-                onChange={(event) => setDays(Number(event.target.value))}
-              >
-                {DURATIONS.map((option) => (
-                  <option key={option.days} value={option.days}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+      {shareUrl ? (
+        <div className="share-sheet__result">
+          {link && !link.shareable && (
+            <p className="share-sheet__note">
+              This link only opens on this machine. Set a public URL to share
+              it.
+            </p>
+          )}
+          <label className="sr-only" htmlFor="share-url">
+            Shareable link
+          </label>
+          <input id="share-url" className="input" readOnly value={shareUrl} />
+          <button type="button" className="button" onClick={() => void copy()}>
+            {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />} Copy link
+          </button>
+          {onRevoke ? (
             <button
               type="button"
-              className="button share-sheet__primary"
+              className="quiet-action quiet-action--danger"
               disabled={busy}
-              onClick={() => void create()}
+              onClick={() => void revoke()}
             >
-              {busy ? "Creating…" : "Create link"}
+              Revoke link
             </button>
-          </div>
-        )}
-      </div>
-    </div>
+          ) : (
+            <p className="share-sheet__note">
+              This link cannot be revoked from this build. It stops working on its own when it
+              expires.
+            </p>
+          )}
+        </div>
+      ) : revoked ? (
+        <p className="share-sheet__note" role="status">
+          The link no longer works.
+        </p>
+      ) : (
+        <div className="share-sheet__create">
+          <label className="share-sheet__field" htmlFor="share-duration">
+            Link expires
+            <select
+              id="share-duration"
+              className="select"
+              value={days}
+              disabled={busy}
+              onChange={(event) => setDays(Number(event.target.value))}
+            >
+              {DURATIONS.map((option) => (
+                <option key={option.days} value={option.days}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button share-sheet__primary"
+            disabled={busy}
+            onClick={() => void create()}
+          >
+            {busy ? "Creating…" : "Create link"}
+          </button>
+        </div>
+      )}
+    </Dialog>
   );
 }

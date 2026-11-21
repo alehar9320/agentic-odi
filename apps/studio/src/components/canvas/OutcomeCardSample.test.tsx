@@ -3,6 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { OutcomeCard } from "./OutcomeCard";
 
+vi.mock("../../api/studioApi", () => ({
+  fetchOutcomeHistory: vi.fn().mockResolvedValue([]),
+  fetchOutcomeInterval: vi.fn().mockResolvedValue({ outcome_id: "", band: null }),
+  fetchOutcomeAlternatives: vi.fn().mockResolvedValue([]),
+  fetchExistingSolution: vi.fn().mockResolvedValue("no_link_at_all"),
+  fetchAlternativeLinks: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({
     ask: vi.fn(),
@@ -10,6 +18,7 @@ vi.mock("../../state/StudioContext", () => ({
     deleteOutcome: vi.fn(),
     pushToast: vi.fn(),
     updateOutcome: vi.fn(),
+    settings: { mcp_url: "http://localhost:8000/mcp" },
   }),
 }));
 

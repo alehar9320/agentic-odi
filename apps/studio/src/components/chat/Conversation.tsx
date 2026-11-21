@@ -110,7 +110,7 @@ function DayDivider() {
 }
 
 function AssistantMessage() {
-  const { thinkingPhase, offlineReplyFor, sendMessage } = useStudio();
+  const { thinkingPhase, offlineReplyFor, sendMessage, dismissFailedTurn } = useStudio();
   const id = useAuiState((state) => state.message.id);
   const stamp = useMessageStamp();
   const running = useAuiState((state) => state.message.status?.type === "running");
@@ -199,6 +199,7 @@ function AssistantMessage() {
             error={error}
             retryText={retryText}
             onRetry={(text) => void sendMessage(text)}
+            onDelete={() => dismissFailedTurn(id)}
           />
         ) : null}
 

@@ -9,11 +9,13 @@
  * store.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { addEvidence as apiAddEvidence } from "../../api/studioApi";
 import { useStudio, writeReceipt } from "../../state/StudioContext";
 import type { InterviewPorts } from "./conductor";
+import type { InterviewDraftOptions } from "./Interview";
+import type { DraftStore } from "./persistence";
 
 export function useInterviewPorts(): InterviewPorts {
   const { createJob, addOutcome, settings, refreshCanvas, pushToast } = useStudio();
@@ -37,4 +39,38 @@ export function useInterviewPorts(): InterviewPorts {
     }),
     [createJob, addOutcome, mcpUrl, refreshCanvas, pushToast],
   );
+}
+
+/**
+ * The interview's draft store, read from the local BFF (#402).
+ *
+ * `getStudioBff()` opens the same store every other Studio write uses, so the
+ * draft lands beside the records rather than in a second store. It is opened in
+ * an effect, not during render, because the store is a promise and a render must
+ * stay synchronous; until it resolves the interview runs without a draft and
+ * starts persisting as soon as it does. A store that never opens leaves the
+ * interview fully usable in memory — the fail-soft rule of #402.
+ */
+export function useInterviewDraft(jobId: string | null): InterviewDraftOptions | undefined {
+  const [store, setStore] = useState<DraftStore | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { getStudioBff } = await import("../../bff/index");
+        const bff = await getStudioBff();
+        if (!cancelled) {
+          setStore(bff.store);
+        }
+      } catch {
+        // Fail soft: no store, no draft, and the interview still works.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return useMemo(() => (jobId && store ? { store, jobId } : undefined), [jobId, store]);
 }

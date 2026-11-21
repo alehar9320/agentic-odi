@@ -13,6 +13,7 @@ import {
   byCreated,
   bySeq,
   type DrainLease,
+  type InterviewDraft,
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
@@ -296,6 +297,20 @@ export class IndexedDbLocalStore implements LocalStore {
     return next;
   }
 
+  async renameConversation(id: string, title: string): Promise<StoredConversation> {
+    const conversation = await this.db.get("conversations", id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title,
+      updated_at: nowIso(),
+    };
+    await this.db.put("conversations", next);
+    return next;
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.db.getAllFromIndex("turns", "by-conversation", conversationId);
   }
@@ -352,6 +367,25 @@ export class IndexedDbLocalStore implements LocalStore {
       ...keys.map((key) => tx.objectStore("turns").delete(key)),
     ]);
     await tx.done;
+  }
+
+  async listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]> {
+    const drafts = jobId
+      ? await this.db.getAllFromIndex("interview_drafts", "by-job", jobId)
+      : await this.db.getAll("interview_drafts");
+    return drafts.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async getInterviewDraft(id: string): Promise<InterviewDraft | undefined> {
+    return this.db.get("interview_drafts", id);
+  }
+
+  async putInterviewDraft(draft: InterviewDraft): Promise<void> {
+    await this.db.put("interview_drafts", draft);
+  }
+
+  async deleteInterviewDraft(id: string): Promise<void> {
+    await this.db.delete("interview_drafts", id);
   }
 
   async snapshot(): Promise<WorkspaceSnapshot> {
@@ -424,6 +458,7 @@ export class IndexedDbLocalStore implements LocalStore {
         "outbox",
         "conversations",
         "turns",
+        "interview_drafts",
       ],
       "readwrite",
     );
@@ -437,6 +472,7 @@ export class IndexedDbLocalStore implements LocalStore {
       tx.objectStore("outbox").clear(),
       tx.objectStore("conversations").clear(),
       tx.objectStore("turns").clear(),
+      tx.objectStore("interview_drafts").clear(),
     ]);
     await tx.done;
   }

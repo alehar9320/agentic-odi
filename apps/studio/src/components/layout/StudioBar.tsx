@@ -15,6 +15,7 @@ import {
   HistoryIcon,
   MenuIcon,
   MoonIcon,
+  PencilIcon,
   PlugIcon,
   PlusIcon,
   SettingsIcon,
@@ -42,6 +43,7 @@ export function StudioBar({
     conversationId,
     conversations,
     deleteConversation,
+    renameConversation,
     llmHealth,
     probeRetry,
     messages,
@@ -69,6 +71,15 @@ export function StudioBar({
   // delete and an index would point at the wrong row.
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // The row being renamed and its draft. An id, not an index: the list re-reads
+  // after the rename and an index would point at the wrong row.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  // Escape cancels and Enter commits, and either unmounts the input — which can
+  // fire one last blur. Two refs settle the row exactly once: `abandoned` when
+  // Escape threw the draft away, `settled` once a commit has been sent.
+  const renameAbandonedRef = useRef(false);
+  const renameSettledRef = useRef(false);
   const keepThreadRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wide = useMediaQuery("(min-width: 720px)");
@@ -208,6 +219,49 @@ export function StudioBar({
   function beginDelete(id: string) {
     setConfirmingDeleteId(id);
     setDeletingId(null);
+  }
+
+  function beginRename(id: string, currentTitle: string) {
+    setRenamingId(id);
+    setRenameDraft(currentTitle);
+    renameAbandonedRef.current = false;
+    renameSettledRef.current = false;
+  }
+
+  function cancelRename() {
+    // Tell the input's blur, which fires as focus leaves, not to commit.
+    renameAbandonedRef.current = true;
+    setRenamingId(null);
+    setRenameDraft("");
+  }
+
+  async function commitRename(id: string, currentTitle: string) {
+    if (renameAbandonedRef.current || renameSettledRef.current) {
+      return;
+    }
+    renameSettledRef.current = true;
+    const next = renameDraft.trim().slice(0, 200);
+    setRenamingId(null);
+    setRenameDraft("");
+    // An empty name, or a name unchanged, is not a rename: leaving it as it was
+    // is quieter than a write that changes nothing and bumps the thread's time.
+    if (!next || next === currentTitle.trim()) {
+      return;
+    }
+    await renameConversation(id, next);
+  }
+
+  function onRenameKeyDown(event: ReactKeyboardEvent<HTMLInputElement>, id: string, currentTitle: string) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitRename(id, currentTitle);
+    } else if (event.key === "Escape") {
+      // Escape cancels the edit, not the whole menu: the keystroke must not
+      // reach the window listener that closes the history list.
+      event.preventDefault();
+      event.stopPropagation();
+      cancelRename();
+    }
   }
 
   function cancelDelete() {
@@ -402,27 +456,55 @@ export function StudioBar({
                       const current = conversation.id === conversationId;
                       const label = conversation.title.trim() || "New conversation";
                       const confirming = confirmingDeleteId === conversation.id;
+                      const renaming = renamingId === conversation.id;
                       return (
                         <div className="bar__history-row" key={conversation.id}>
-                          <button
-                            ref={current ? activeHistoryRef : undefined}
-                            type="button"
-                            role="menuitem"
-                            className="bar__menu-item bar__history-item"
-                            aria-current={current ? "true" : undefined}
-                            onClick={() => selectConversation(conversation.id)}
-                          >
-                            <span className="bar__history-title">{label}</span>
-                            {/* A thread with no turns has nothing to count, so
-                                it says nothing rather than "0 turns". */}
-                            {conversation.turn_count > 0 ? (
-                              <span className="bar__history-meta">
-                                {formatRelativeTime(conversation.updated_at)} ·{" "}
-                                {conversation.turn_count}{" "}
-                                {conversation.turn_count === 1 ? "turn" : "turns"}
-                              </span>
-                            ) : null}
-                          </button>
+                          {renaming ? (
+                            <input
+                              type="text"
+                              className="bar__history-rename"
+                              aria-label={`Rename ${label}`}
+                              maxLength={200}
+                              value={renameDraft}
+                              autoFocus
+                              onChange={(event) => setRenameDraft(event.target.value)}
+                              onKeyDown={(event) =>
+                                onRenameKeyDown(event, conversation.id, conversation.title)
+                              }
+                              onBlur={() => void commitRename(conversation.id, conversation.title)}
+                            />
+                          ) : (
+                            <button
+                              ref={current ? activeHistoryRef : undefined}
+                              type="button"
+                              role="menuitem"
+                              className="bar__menu-item bar__history-item"
+                              aria-current={current ? "true" : undefined}
+                              onClick={() => selectConversation(conversation.id)}
+                            >
+                              <span className="bar__history-title">{label}</span>
+                              {/* A thread with no turns has nothing to count, so
+                                  it says nothing rather than "0 turns". */}
+                              {conversation.turn_count > 0 ? (
+                                <span className="bar__history-meta">
+                                  {formatRelativeTime(conversation.updated_at)} ·{" "}
+                                  {conversation.turn_count}{" "}
+                                  {conversation.turn_count === 1 ? "turn" : "turns"}
+                                </span>
+                              ) : null}
+                            </button>
+                          )}
+                          {!renaming && !confirming ? (
+                            <button
+                              type="button"
+                              className="bar__history-rename-open"
+                              aria-label={`Rename ${label}`}
+                              title={`Rename ${label}`}
+                              onClick={() => beginRename(conversation.id, conversation.title)}
+                            >
+                              <PencilIcon size={14} />
+                            </button>
+                          ) : null}
                           {confirming ? (
                             <div
                               className="bar__history-confirm"
@@ -456,7 +538,7 @@ export function StudioBar({
                                 </button>
                               </div>
                             </div>
-                          ) : (
+                          ) : renaming ? null : (
                             <button
                               type="button"
                               className="bar__history-delete"

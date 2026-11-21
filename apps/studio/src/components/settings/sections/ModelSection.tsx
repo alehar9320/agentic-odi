@@ -1,9 +1,8 @@
-import { useState } from "react";
-
 import type { StudioConfig } from "../../../types";
+import { ModelKeyField } from "./ModelKeyField";
 import { SavedField, SectionSaveLine } from "../SavedField";
 import { useSectionSaves } from "../saves";
-import { validateApiKey, validateBaseUrl, validateModelName } from "../validation";
+import { validateBaseUrl, validateModelName } from "../validation";
 
 interface ModelSectionProps {
   settings: StudioConfig;
@@ -29,9 +28,7 @@ export function ModelSection({
   modelsMessage,
   refreshModels,
 }: ModelSectionProps) {
-  const [showApiKey, setShowApiKey] = useState(false);
   const { report, summary } = useSectionSaves();
-
   const commit = (key: keyof StudioConfig) => (value: string) =>
     saveSettings({ ...settings, [key]: value });
 
@@ -49,26 +46,7 @@ export function ModelSection({
         onCommit={commit("base_url")}
         onStatusChange={(status) => report("base_url", status)}
       />
-      <SavedField
-        id="api-key"
-        label="API key"
-        value={settings.api_key}
-        type={showApiKey ? "text" : "password"}
-        autoComplete="off"
-        validate={validateApiKey}
-        onCommit={commit("api_key")}
-        onStatusChange={(status) => report("api_key", status)}
-        trailing={
-          <button
-            type="button"
-            className="quiet-action"
-            aria-label={showApiKey ? "Hide API key" : "Show API key"}
-            onClick={() => setShowApiKey((visible) => !visible)}
-          >
-            {showApiKey ? "Hide" : "Show"}
-          </button>
-        }
-      />
+      <ModelKeyField />
       <SavedField
         id="model-name"
         label={

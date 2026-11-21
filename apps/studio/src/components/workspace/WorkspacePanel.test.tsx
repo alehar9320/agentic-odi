@@ -5,18 +5,26 @@ const brokenPanel = vi.hoisted(() => ({ renders: 0, fail: true }));
 
 const studio = vi.hoisted(() => ({
   activePanel: "landscape" as string | null,
+  openPanel: vi.fn(),
   closePanel: vi.fn(),
   sendMessage: vi.fn(async () => undefined),
+  conversationId: "c1",
+  conversations: [{ id: "c1", title: "Pricing research", turn_count: 2 }],
+  memory: [],
+  segments: [],
+  detail: null as null | { panel: string; subject?: { kind: string; id: string } },
   canvas: {
-    jobs: [],
-    steps: [],
+    jobs: [{ id: "J-1", name: "Ship" }],
+    steps: [{ id: "S-1", job_id: "J-1", name: "Plan", order: 1 }],
     outcomes: [
       {
         id: "O-1",
+        job_id: "J-1",
         statement: "Minimize the time it takes to ship",
         importance: 9,
         satisfaction: 3,
         opportunity_score: 15,
+        evidence: "quote",
       },
     ],
     source: "seed" as const,
@@ -78,20 +86,26 @@ describe("WorkspacePanel", () => {
   beforeEach(() => {
     brokenPanel.renders = 0;
     studio.activePanel = "landscape";
+    studio.openPanel.mockClear();
+    studio.detail = null;
     studio.closePanel.mockClear();
     studio.sendMessage.mockClear();
+    studio.conversationId = "c1";
+    studio.conversations = [{ id: "c1", title: "Pricing research", turn_count: 2 }];
     studio.canvasState = {
       kind: "ready",
       data: {
-        jobs: [],
-        steps: [],
+        jobs: [{ id: "J-1", name: "Ship" }],
+        steps: [{ id: "S-1", job_id: "J-1", name: "Plan", order: 1 }],
         outcomes: [
           {
             id: "O-1",
+            job_id: "J-1",
             statement: "Minimize the time it takes to ship",
             importance: 9,
             satisfaction: 3,
             opportunity_score: 15,
+            evidence: "quote",
           },
         ],
         source: "seed",
@@ -102,12 +116,12 @@ describe("WorkspacePanel", () => {
   it("renders the view as a lens, not a takeover", () => {
     render(<Stage />);
 
+    const lens = screen.getByRole("complementary", { name: /opportunity landscape/i });
+    expect(lens).toBeInTheDocument();
+    expect(screen.getByText(/a lens on the conversation, not a separate place/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("complementary", { name: /opportunity landscape/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/a lens on the conversation, not a separate place/i),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toHaveAccessibleName(/opportunity landscape/i);
   });
 
   it("returns to the conversation through a question, not a menu", () => {
@@ -128,6 +142,60 @@ describe("WorkspacePanel", () => {
 
     expect(studio.closePanel).toHaveBeenCalled();
     expect(studio.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("names the conversation and artifact in the header (#324)", () => {
+    render(<Stage />);
+
+    expect(screen.getByText("Pricing research")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("lists sibling artifacts with counts and switches without closing (#324)", () => {
+    const { rerender } = render(<Stage />);
+
+    const siblingNav = screen.getByRole("navigation", { name: /other views|siblings/i });
+    expect(within(siblingNav).getByRole("button", { name: /job map.*1/i })).toBeInTheDocument();
+    expect(within(siblingNav).getByRole("button", { name: /evidence.*1/i })).toBeInTheDocument();
+
+    fireEvent.click(within(siblingNav).getByRole("button", { name: /job map/i }));
+
+    expect(studio.openPanel).toHaveBeenCalledWith("jobmap");
+    expect(studio.closePanel).not.toHaveBeenCalled();
+
+    studio.activePanel = "jobmap";
+    rerender(<Stage />);
+
+    expect(
+      screen.getByRole("complementary", { name: /universal job map/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /universal job map/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("returns focus to the opener on Escape (#324)", () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Open landscape";
+    document.body.append(opener);
+    opener.focus();
+
+    const { rerender } = render(<Stage />);
+    expect(
+      screen.getByRole("heading", { name: /opportunity landscape/i }),
+    ).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(studio.closePanel).toHaveBeenCalled();
+
+    studio.activePanel = null;
+    rerender(<Stage />);
+
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 
   it("moves focus into the lens and gives it back to the chip when it closes (#696)", () => {
@@ -175,6 +243,47 @@ describe("WorkspacePanel", () => {
 
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("frames the detail with its place in the job when a step backs it (#740)", () => {
+    studio.activePanel = "jobmap";
+    studio.detail = { panel: "jobmap", subject: { kind: "step", id: "S-2" } };
+    studio.canvas = {
+      jobs: [],
+      steps: [
+        { id: "S-1", order: 1, name: "Frame the question" },
+        { id: "S-2", order: 2, name: "Locate" },
+      ],
+      outcomes: [],
+      source: "seed",
+    } as never;
+
+    render(<Stage />);
+
+    expect(screen.getByText("Step 2 of 2 • Locate")).toBeInTheDocument();
+  });
+
+  it("omits the context line when nothing real backs it (#740)", () => {
+    studio.activePanel = "landscape";
+    studio.detail = { panel: "landscape" };
+
+    render(<Stage />);
+
+    expect(document.querySelector(".lens__context")).toBeNull();
+  });
+
+  it("offers an expand control that is off until used (#740)", () => {
+    render(<Stage />);
+
+    const expand = screen.getByRole("button", { name: /expand workspace view/i });
+    expect(expand).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(expand);
+
+    expect(screen.getByRole("button", { name: /restore workspace view/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });
 
