@@ -55,8 +55,9 @@ the settings a ruleset *can* hold: up-to-date branches and the merge queue.
    (`.github/workflows/ci.yml`, `.github/workflows/pr-guardrails.yml`) declares the
    `merge_group` trigger today, so a queued commit would report neither `CI green`
    nor `PR guardrails` and could never leave the queue. The owner enables the queue
-   only after both workflows run on `merge_group`; that workflow change is not part
-   of this record.
+   only after both workflows run on `merge_group`, and `pr-guardrails.yml` needs its
+   own base resolution for that event because it reads `github.base_ref` and
+   `github.event.pull_request`; that workflow change is not part of this record.
 4. **Record the two settings as owner-applied, not as done.** The documents that
    describe the ruleset state the post-change intent and name these two settings
    as applied by the owner, so a reader can tell what the checkout enforces from
