@@ -46,10 +46,12 @@ def test_effect_derivation_matches_naming_rule() -> None:
     # effect explicitly rather than relying on the prefix rule.
     read_exceptions = {"links_list"}
     for name, spec in TOOL_SPECS.items():
-        if name.startswith(("get_", "list_")) or name in pure_calculations or name in read_exceptions:
-            assert spec.effect == ToolEffect.READ, (
-                f"Tool {name} should be READ, got {spec.effect}"
-            )
+        if (
+            name.startswith(("get_", "list_"))
+            or name in pure_calculations
+            or name in read_exceptions
+        ):
+            assert spec.effect == ToolEffect.READ, f"Tool {name} should be READ, got {spec.effect}"
         elif name.startswith("delete_"):
             assert spec.effect == ToolEffect.DESTRUCTIVE, (
                 f"Tool {name} (starts with delete_) should be DESTRUCTIVE, got {spec.effect}"
