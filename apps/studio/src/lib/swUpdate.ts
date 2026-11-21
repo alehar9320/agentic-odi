@@ -32,7 +32,11 @@ export interface RegistrationLike {
 /** The subset of `ServiceWorkerContainer` the handshake uses. */
 export interface ContainerLike {
   controller: unknown;
-  addEventListener(type: "controllerchange", listener: () => void): void;
+  addEventListener(
+    type: "controllerchange",
+    listener: () => void,
+    options?: { once?: boolean },
+  ): void;
   register(scriptURL: string): Promise<RegistrationLike>;
 }
 
@@ -117,10 +121,21 @@ export function watchForUpdates({
  * waits for `controllerchange` so the new worker — and its new cache — serves the
  * next document, rather than reloading into the old one. It reloads at most once,
  * so the update can never loop.
+ *
+ * The listener is registered `once`, so it cannot outlive the reload it was
+ * attached for: a later `controllerchange` from a second update that day must not
+ * fire a stale reload. The `reloaded` flag covers a duplicate dispatch that
+ * arrives before the browser deregisters the listener.
  */
 export function activateWaiting(
   registration: RegistrationLike,
-  container: { addEventListener(type: "controllerchange", listener: () => void): void },
+  container: {
+    addEventListener(
+      type: "controllerchange",
+      listener: () => void,
+      options?: { once?: boolean },
+    ): void;
+  },
   reload: () => void,
 ): boolean {
   const waiting = registration.waiting;
@@ -128,13 +143,14 @@ export function activateWaiting(
     return false;
   }
   let reloaded = false;
-  container.addEventListener("controllerchange", () => {
+  const onControllerChange = () => {
     if (reloaded) {
       return;
     }
     reloaded = true;
     reload();
-  });
+  };
+  container.addEventListener("controllerchange", onControllerChange, { once: true });
   waiting.postMessage({ type: "SKIP_WAITING" });
   return true;
 }

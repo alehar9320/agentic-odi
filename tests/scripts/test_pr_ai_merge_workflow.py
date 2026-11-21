@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "pr-ai-merge.yml"
 
@@ -106,3 +108,24 @@ def test_the_development_guide_documents_the_label():
     guide = (ROOT / "docs" / "development.md").read_text(encoding="utf-8")
     assert "ai-merge-safe" in guide
     assert "AI merge" in guide
+
+
+def test_the_checkout_pins_the_base_ref_not_the_pull_request_head():
+    """The labeler reads only repo scripts, so it must not check out the head.
+
+    The default ref for a ``pull_request`` event is the merge commit. When a
+    branch carries a stray gitlink (mode 160000, no ``.gitmodules`` url),
+    ``actions/checkout`` runs ``git submodule foreach`` while it strips its auth
+    header and git exits 128, so the step fails before any command runs. Pinning
+    the base ref both avoids that and keeps the write token off pull request
+    code.
+    """
+    workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    checkouts = [
+        step
+        for step in workflow["jobs"]["labels"]["steps"]
+        if (step.get("uses") or "").startswith("actions/checkout")
+    ]
+    assert checkouts, "the labeler runs scripts/pr_ai_merge.py and needs a tree"
+    for step in checkouts:
+        assert step["with"]["ref"] == "${{ github.event.pull_request.base.ref || github.ref }}"

@@ -11,6 +11,7 @@ const ALL_KINDS: BannerKind[] = [
   "update-available",
   "update-ready",
   "write-rejected",
+  "model-key-unsaved",
   "info",
   "success",
   "error",
@@ -29,6 +30,14 @@ describe("BANNER_CATALOG", () => {
       expect(entry.life, kind).toMatch(/^(persistent|transient)$/);
       expect(entry.dock, kind).toMatch(/^(top|corner)$/);
     }
+  });
+
+  it("warns about an unsaved model key without blocking the studio", () => {
+    const entry = BANNER_CATALOG["model-key-unsaved"];
+    expect(entry.severity).toBe("warning");
+    expect(entry.life).toBe("persistent");
+    expect(entry.dock).toBe("top");
+    expect(entry.dismissible).toBe(true);
   });
 
   it("treats the sidecar being down as a critical, persistent, top strip", () => {

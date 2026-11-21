@@ -160,7 +160,7 @@ generated artefact that follows from it — never a list to hand-edit.
 | New workflow or agent instruction | `.agents/` | `docs/living-studio.md` (via `scripts/docs_index.py`) |
 | New message part or conversation capability | `apps/studio/src/assistant/convert.ts` | `docs/living-studio.md` (via `scripts/docs_index.py`) |
 | Deployment URL or cloud setup changes | `docs/deployment.md` | `docs/deployment.md` |
-| Roadmap item completed or added | `docs/roadmap.md` | `docs/roadmap.md` |
+| Shipped capability | the merged pull request | `CHANGELOG.md` / Releases (release-please) |
 | Test layout or coverage changes | `tests/` | `docs/reference/test-map.md` (via `scripts/docs_index.py`) |
 
 ### Rules
@@ -170,7 +170,7 @@ generated artefact that follows from it — never a list to hand-edit.
 - ✅ **Optimize the first five seconds**: the top of the README carries the one-line value proposition and two distinct calls to action — try the hosted Living Studio, or run the full stack locally. Keep the `curl … install.sh | sh` one-liner in the hero.
 - ✅ **Keep the Install section accurate**: always reflect `uv run python scripts/dev.py` as the recommended launch command.
 - ✅ **Keep Prerequisites up to date**: add any new `pip install` dependency immediately.
-- ✅ **Mark Roadmap items `[x]` when completed** — do not leave stale unchecked items.
+- ✅ **Record a shipped capability where it is owned**: the merged pull request and `CHANGELOG.md`, not a hand-maintained roadmap list — `docs/roadmap.md` is a pointer page with no lists to tick.
 - ❌ **Never leave the README or `docs/` in a stale state** where documented commands or files no longer match the codebase.
 - ❌ **Never hand-edit a generated block.** If a register needs a new value, change the source — directory, front matter, or contract — and run the generator. A hand-edited register is a broken invariant.
 
@@ -197,6 +197,7 @@ generated artefact that follows from it — never a list to hand-edit.
 - When expanding the server to accept complex payloads or to query data, utilize these Pydantic models for built-in type validation and schema enforcement before the server processes the request.
 
 ### 4. General Philosophy
+- **Every broad except logs**: a handler that catches `Exception` (or nothing) must record what it swallowed — a `log.warning(...)` naming the operation and the exception class, never the message, which can carry a URL or token. A suppression that genuinely needs no log lives in `ALLOWED` in `tests/scripts/test_blind_excepts.py` with a reason; that list is capped and can only shrink.
 - **Reuse before you write**: take the ladder in `docs/architecture/reuse.md` in cost order — something already in this repo, then a dependency the workspace already declares, then a copy with a ledger entry, then new. A near-duplicate is a refactor-to-share, not a second copy. Any plan or pull request that adds a source file states a `Reuses:` block; `.agents/skills/reuse-first/SKILL.md` is the short form.
 - **UI component selection**: when adding or changing Studio interaction surfaces, follow the UI Component Selection Workflow in `.agents/skills/reuse-first/SKILL.md` (rungs: existing Studio component → declared foundation/specialist library → reviewed presentation copy-in with provenance → custom behavior). The workflow includes the restraint rule (one decorative standout per page) and preserves boundaries for assistant-ui, behavior dependencies, the vendor ledger, and dependency review.
 - **Separation of Concerns**: Isolate the ODI data logic/retrieval from the MCP server tooling logic.

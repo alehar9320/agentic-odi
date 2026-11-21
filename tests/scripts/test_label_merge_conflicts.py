@@ -126,6 +126,24 @@ def test_the_scheduled_sweep_is_not_capped_at_one_page():
     assert "--limit 1000" in text
 
 
+def test_concurrency_is_keyed_on_the_commit_not_the_default_branch():
+    """A `workflow_run` reports `github.ref` as refs/heads/main for every PR.
+
+    With the group keyed on it, two pull requests whose CI finished at the same
+    moment shared one concurrency group, and `cancel-in-progress` killed all but
+    one of the labeler runs. Keying on the commit (and on the PR number for a
+    `pull_request` event) gives each completion its own group.
+    """
+    workflow = yaml.safe_load(CONFLICTS.read_text(encoding="utf-8"))
+    group = str(workflow["concurrency"]["group"])
+
+    assert "github.event.workflow_run.head_sha" in group
+    assert "github.event.pull_request.number" in group
+    assert not group.endswith("${{ github.ref }}"), (
+        "a group ending in bare `github.ref` serializes every workflow_run on main"
+    )
+
+
 def test_the_development_guide_documents_the_labeler():
     guide = (ROOT / "docs" / "development.md").read_text(encoding="utf-8")
     assert "PR labels" in guide

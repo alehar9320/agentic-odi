@@ -14,6 +14,7 @@ elsewhere is drift this module exists to prevent.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +25,7 @@ DEFAULT_MCP_KEEPALIVE = 15.0
 
 TIMEOUT_ENV = "AGENTIC_ODI_MCP_TIMEOUT"
 KEEPALIVE_ENV = "AGENTIC_ODI_MCP_KEEPALIVE"
+XDG_CONFIG_HOME_ENV = "XDG_CONFIG_HOME"
 
 
 def _raw(name: str) -> str | None:
@@ -72,6 +74,19 @@ def non_negative_float_or_none(name: str, default: float) -> float | None:
             f"{name}={raw!r} must be zero or greater; use a number of seconds, or 0 to disable it"
         )
     return value or None
+
+
+def config_dir() -> Path:
+    """Resolve the per-user config directory for ODI and Studio.
+
+    ``XDG_CONFIG_HOME`` wins when it is set, so a person can relocate the
+    directory the way every other XDG-aware tool expects; otherwise the
+    conventional ``~/.config/agentic-odi`` is used.
+    """
+    xdg = _raw(XDG_CONFIG_HOME_ENV)
+    if xdg:
+        return Path(xdg) / "agentic-odi"
+    return Path.home() / ".config" / "agentic-odi"
 
 
 class MCPConnectionSettings(BaseModel):

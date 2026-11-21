@@ -100,3 +100,25 @@ def test_data_help_lists_path_and_existing_data_commands(monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert "path" in result.output
     assert "Inspect the local ODI data files" in result.output
+
+
+def test_store_reports_the_db_flag_path_over_the_env_override(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_ODI_DB", str(tmp_path / "env.db"))
+    explicit = tmp_path / "explicit.db"
+
+    result = runner.invoke(app, ["--no-update", "--db", str(explicit), "store", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["db_path"] == str(explicit)
+
+
+def test_store_reports_the_env_override_when_no_db_flag_is_given(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    odi = tmp_path / "env.db"
+    monkeypatch.setenv("AGENTIC_ODI_DB", str(odi))
+
+    result = runner.invoke(app, ["--no-update", "store", "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["db_path"] == str(odi)

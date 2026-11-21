@@ -40,6 +40,20 @@ interface Env {
 
 const API_PREFIX = "/api/";
 
+/** Module-scope cache so the entry is resolved once per isolate. */
+let entryCache: string | null = null;
+
+/** Resolve the entry bundle name from the asset shelf. */
+async function resolveEntry(env: Env): Promise<string> {
+  const page = await env.ASSETS.fetch(new Request("https://assets/"));
+  if (page.status !== 200) {
+    return "unknown";
+  }
+  const text = await page.text();
+  const match = text.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
+  return match?.[0] ?? "unresolved";
+}
+
 /**
  * Capabilities the Worker can guarantee without any sidecar: local-only data,
  * memory, and the deterministic assistant. Everything that needs a sidecar
@@ -123,6 +137,10 @@ function buildConnectSrc(env: Env): string {
 }
 
 function securityHeaders(env: Env): Record<string, string> {
+  // `style-src 'unsafe-inline'` is required by React's `style` prop, which the
+  // Studio uses for a handful of one-off layout values (see EvidenceStream,
+  // SkeletonCard). Removing it means moving every one of those into a class in
+  // theme.css first. Scripts are NOT relaxed: `script-src 'self'` stays.
   return {
     "Content-Security-Policy": [
       "default-src 'self'",
@@ -140,6 +158,17 @@ function securityHeaders(env: Env): Record<string, string> {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    // The hosted Studio is served over HTTPS only, and a first visit over a
+    // hostile network can be downgraded before the redirect lands. HSTS tells
+    // the browser to refuse plaintext for a year, including subdomains.
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    // Isolate the Studio from cross-origin windows and resources. No
+    // `Cross-Origin-Embedder-Policy`: the model-endpoint fetches allowed by
+    // `connect-src` and the blob/image handling in `img-src` require embedding
+    // external content, which `require-corp` would break. This absence is
+    // deliberate; do not "finish the job" by adding it.
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
   };
 }
 
@@ -262,11 +291,8 @@ export default {
           env,
         );
       }
-      const page = await env.ASSETS.fetch(new Request("https://assets/"));
-      const entry =
-        page.status === 200
-          ? ((await page.text()).match(/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? "unknown")
-          : "unknown";
+      const entry = entryCache ?? (await resolveEntry(env));
+      entryCache = entry;
       return secure(
         Response.json(
           {
@@ -284,9 +310,26 @@ export default {
 
     // Without a sidecar the Worker can still serve a local-only capabilities
     // manifest so the browser BFF knows what works offline. Anything else
-    // under /api needs the sidecar.
+    // under /api needs the sidecar. Like `/api/build` and `/api/deploy`, the
+    // route answers only GET, so a probe that guesses the verb is told so
+    // rather than handed a manifest that reads as accepted.
     if (!sidecar) {
       if (url.pathname === "/api/capabilities" || url.pathname === "/api/capabilities/") {
+        if (request.method !== "GET") {
+          return secure(
+            sidecarError(
+              {
+                code: "method_not_allowed",
+                message: "The capabilities route only answers GET.",
+                suggestion: "Read /api/capabilities with GET.",
+                retryable: false,
+              },
+              requestId,
+              { status: 405, headers: { Allow: "GET" } },
+            ),
+            env,
+          );
+        }
         return localCapabilitiesResponse(env);
       }
       console.error(
@@ -308,9 +351,25 @@ export default {
     }
 
     // The Quick Tunnel routes by hostname, so the Worker's Host must not leak.
-    const headers = new Headers(request.headers);
-    headers.delete("host");
-    headers.delete("cf-connecting-ip");
+    // The allowlist is the point: the sidecar asks for Authorization, Content-Type,
+    // Accept, Accept-Language and the request id, and nothing else crosses the
+    // tunnel. Copying the client's headers wholesale would forward cookies,
+    // origin, referer, and any browser-extension header to a machine the person
+    // owns, where they are useless and logged by anything that logs headers.
+    // `accept-encoding` is deliberately excluded: the Worker's own fetch
+    // negotiates encoding, and copying it can produce a double-encoded stream.
+    const FORWARDED_HEADERS = [
+      "authorization",
+      "content-type",
+      "accept",
+      "accept-language",
+      "x-request-id",
+    ] as const;
+    const headers = new Headers();
+    for (const name of FORWARDED_HEADERS) {
+      const value = request.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
 
     const target = new URL(`${url.pathname}${url.search}`, `${sidecar}/`);
 

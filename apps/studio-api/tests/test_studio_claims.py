@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from agentic_odi_studio_api.studio.claims import (
     MAX_EVIDENCE_PER_CLAIM,
+    TOO_MANY_EVIDENCE_IDS,
     UNKNOWN_EVIDENCE_ID,
     EvidenceIndex,
     EvidenceSnapshot,
@@ -80,6 +81,55 @@ def test_one_sentence_may_cite_several_records_up_to_the_cap() -> None:
     assert len(claims[0].evidence) == MAX_EVIDENCE_PER_CLAIM
 
 
+def test_four_ids_keep_three_and_set_a_reason() -> None:
+    index = _index(
+        ("A", "First call", "Gong"),
+        ("B", "Second call", "Gong"),
+        ("C", "Third call", "Gong"),
+        ("D", "Fourth call", "Gong"),
+    )
+
+    claims = split_claims("They agree on the invite step. [[ev:A,B,C,D]]", index)
+
+    assert claims[0].status == "cited"
+    assert [snapshot.id for snapshot in claims[0].evidence] == ["A", "B", "C"]
+    assert len(claims[0].evidence) == MAX_EVIDENCE_PER_CLAIM
+    assert claims[0].reason == TOO_MANY_EVIDENCE_IDS
+
+
+def test_three_ids_have_no_reason() -> None:
+    index = _index(
+        ("A", "First call", "Gong"),
+        ("B", "Second call", "Gong"),
+        ("C", "Third call", "Gong"),
+    )
+
+    claims = split_claims("They agree on the invite step. [[ev:A,B,C]]", index)
+
+    assert claims[0].status == "cited"
+    assert claims[0].reason is None
+
+
+def test_an_unknown_id_outranks_the_overflow_reason() -> None:
+    index = _index(("A", "First call", "Gong"))
+
+    claims = split_claims("They churned. [[ev:A,B,C,E-9]]", index)
+
+    assert claims[0].status == "uncited"
+    assert claims[0].reason == UNKNOWN_EVIDENCE_ID
+    assert claims[0].evidence == ()
+
+
+def test_a_duplicate_id_is_not_overflow() -> None:
+    index = _index(("A", "First call", "Gong"))
+
+    claims = split_claims("They agree. [[ev:A,A,A]]", index)
+
+    assert claims[0].status == "cited"
+    assert claims[0].reason is None
+    assert [snapshot.id for snapshot in claims[0].evidence] == ["A"]
+
+
 def test_an_id_the_turn_never_received_becomes_uncited_with_a_reason() -> None:
     claims = split_claims("They churned. [[ev:E-9]]", _index(("E-1", "Call", "Gong")))
 
@@ -128,8 +178,46 @@ def test_an_instruction_makes_no_claim() -> None:
 def test_a_list_item_is_one_claim() -> None:
     claims = split_claims("- Stalled accounts. And more of them.")
 
+    assert [claim.text for claim in claims] == [
+        "Stalled accounts.",
+        "And more of them.",
+    ]
+    assert [claim.index for claim in claims] == [0, 1]
+
+
+def test_a_two_sentence_bullet_is_two_claims() -> None:
+    claims = split_claims("- Rotation is slow. It costs two days.")
+
+    assert [claim.text for claim in claims] == [
+        "Rotation is slow.",
+        "It costs two days.",
+    ]
+    assert [claim.index for claim in claims] == [0, 1]
+
+
+def test_each_sentence_in_a_bullet_keeps_its_own_status() -> None:
+    index = _index(("E-1", "Call with Acme", "Gong"))
+    claims = split_claims(
+        "- Rotation is slow. [[ev:E-1]] It costs two days. [[hypothesis]]",
+        index,
+    )
+
+    assert [claim.status for claim in claims] == ["cited", "hypothesis"]
+    assert claims[0].evidence == (index.resolve("E-1"),)
+    assert claims[1].evidence == ()
+
+
+def test_a_bullet_with_no_terminator_is_one_claim() -> None:
+    claims = split_claims("- Minimize the time")
+
     assert len(claims) == 1
-    assert claims[0].text == "Stalled accounts. And more of them."
+    assert claims[0].text == "Minimize the time"
+
+
+def test_ordered_list_markers_are_stripped() -> None:
+    claims = split_claims("1. First. Second.")
+
+    assert [claim.text for claim in claims] == ["First.", "Second."]
 
 
 def test_a_decimal_is_not_a_sentence_boundary() -> None:
@@ -235,3 +323,36 @@ def test_the_existing_abbreviations_still_hold_a_sentence_together() -> None:
         "We ran it with tools, e.g. a probe.",
         "It worked.",
     ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Record counts fell 40% last quarter.",
+        "Run time doubled after the migration.",
+        "Review latency is the bottleneck.",
+        "Copy volume is up.",
+    ],
+)
+def test_a_declarative_opening_with_an_imperative_verb_is_a_claim(text: str) -> None:
+    claims = split_claims(text)
+
+    assert len(claims) == 1
+    assert claims[0].status == "uncited"
+    assert claims[0].text == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Check the invoice step.",
+        "Try the newer model.",
+        "Open the records lens.",
+    ],
+)
+def test_an_instruction_opening_with_an_imperative_verb_is_exempt(text: str) -> None:
+    assert split_claims(text) == []
+
+
+def test_a_question_still_ends_the_exemption_check_early() -> None:
+    assert split_claims("Review the latency, is it the bottleneck?") == []

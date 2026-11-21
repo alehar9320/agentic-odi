@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { fetchConfig, healthLlm } from "./api/studioApi";
+import { fetchConfig, healthLlm, saveModelKey } from "./api/studioApi";
 import { PROBE_BASE_MS, PROBE_JITTER } from "./state/scheduleProbe";
 
 vi.mock("./api/studioApi", () => ({
@@ -27,6 +27,10 @@ vi.mock("./api/studioApi", () => ({
     ],
     source: "local" as const,
   })),
+  saveModelKey: vi.fn(async () => ({
+    configured: true,
+    set_at: "2026-11-21T00:00:00+00:00",
+  })),
   healthMcp: vi.fn(async () => ({ reachable: true })),
   healthLlm: vi.fn(async () => ({ healthy: true, message: "LLM backend is reachable." })),
   addStep: vi.fn(async () => ({ ok: true, result: "created" })),
@@ -39,6 +43,11 @@ vi.mock("./api/studioApi", () => ({
   updateOutcome: vi.fn(async () => ({ ok: true })),
   deleteOutcome: vi.fn(async () => ({ ok: true })),
   fetchMemory: vi.fn(async () => []),
+  fetchOutcomeHistory: vi.fn(async () => []),
+  fetchOutcomeInterval: vi.fn(async () => ({ outcome_id: "O-1", band: null })),
+  fetchOutcomeAlternatives: vi.fn(async () => []),
+  fetchExistingSolution: vi.fn(async () => "no_link_at_all"),
+  fetchAlternativeLinks: vi.fn(async () => []),
   fetchSignals: vi.fn(async () => [
     {
       id: "sig-1",
@@ -743,7 +752,7 @@ describe("boot failure", () => {
           code: "store_corrupt",
           message:
             "Your database failed its integrity check: /home/me/.odi.db. " +
-            "Last backup: 06:14 (odi-20260102T061400Z.db).",
+            "Last backup: 06:14 local (odi-20260102T061400Z.db).",
           detail: "database disk image is malformed",
           suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
           retryable: false,
@@ -758,7 +767,7 @@ describe("boot failure", () => {
         name: "Your database failed its integrity check.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14");
+    expect(screen.getByRole("alert")).toHaveTextContent("Last backup: 06:14 local");
     expect(screen.getByRole("button", { name: "Recheck the database" })).toBeInTheDocument();
     // The conversation is not offered: there is nothing to show from a store
     // that failed its check.
@@ -940,5 +949,26 @@ describe("the bar's new thread can be undone (#319)", () => {
     await waitFor(() => {
       expect(screen.getByText("Where do I start?")).toBeInTheDocument();
     });
+  });
+});
+
+describe("a model key that cannot be migrated", () => {
+  it("warns on the banner strip and leaves the studio usable", async () => {
+    window.localStorage.setItem(
+      "studio.settings",
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+    vi.mocked(saveModelKey).mockRejectedValueOnce(new Error("The sidecar is unreachable."));
+
+    render(<App />);
+
+    // The key is still on the device, so the failure is a warning: the studio
+    // renders and the person can keep working while the sidecar is down.
+    expect(await screen.findByText(/could not be moved to the sidecar/i)).toBeInTheDocument();
+    expect(screen.getByRole("main")).toBeInTheDocument();
   });
 });

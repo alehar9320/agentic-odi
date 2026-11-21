@@ -30,7 +30,7 @@ def _payload(result: Any) -> Any:
 def _seed_vision() -> None:
     # The vision has no MCP write tool yet (#312 owns that surface), so the test
     # seeds it through the same service the tools read.
-    mcp_server.service.save_v2mom(V2MOM(vision="Make onboarding painless", methods=[_METHOD]))
+    mcp_server.get_service().save_v2mom(V2MOM(vision="Make onboarding painless", methods=[_METHOD]))
 
 
 async def _seed_outcome(client: Client) -> str:
@@ -56,7 +56,7 @@ async def _seed_outcome(client: Client) -> str:
 
 @pytest.mark.asyncio
 async def test_an_empty_vision_says_there_is_nothing_to_check() -> None:
-    mcp_server.service.repo.v2mom.clear()
+    mcp_server.get_service().repo.v2mom.clear()
     async with Client(mcp) as client:
         report = _payload(await client.call_tool("get_traceability_report", {}))
 
@@ -173,7 +173,7 @@ async def test_add_outcome_refuses_an_unknown_objective_and_names_what_exists() 
 
 @pytest.mark.asyncio
 async def test_update_outcome_replaces_the_objectives() -> None:
-    mcp_server.service.save_v2mom(
+    mcp_server.get_service().save_v2mom(
         V2MOM(vision="Make onboarding painless", methods=[_METHOD], measures=[_MEASURE])
     )
     async with Client(mcp) as client:

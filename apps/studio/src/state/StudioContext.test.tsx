@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The browser BFF is the first-run answer path, and it lives in IndexedDB.
 import "fake-indexeddb/auto";
 
-import { SESSION_KEY } from "../lib/session";
+import { SESSION_KEY, SESSION_SCHEMA_VERSION } from "../lib/session";
 import { queuedUserMessage } from "../assistant/queue";
 import { getStudioBff } from "../bff/index";
 import {
@@ -15,6 +15,7 @@ import {
   typeIntoComposer,
 } from "../test/renderCounts";
 import type { StudioContextValue } from "./StudioContext";
+import { SETTINGS_KEY } from "./settings/SettingsContext";
 import { StudioProvider, useStudio } from "./StudioContext";
 import { useToasts } from "./notices/NoticesContext";
 import { PROBE_BASE_MS, PROBE_JITTER, PROBE_SETTINGS_DEBOUNCE_MS } from "./scheduleProbe";
@@ -118,6 +119,9 @@ let llmTransportFails = false;
 let signalFetches = 0;
 let configHangs = false;
 let configAborts = 0;
+/** A write-only-store write the sidecar refuses, as an unreachable or unwritable
+ *  sidecar would. The migration must keep the browser copy when this is set. */
+let modelKeySaveFails = false;
 let catalogFetches = 0;
 let featuredFetches = 0;
 let capabilityProbes = 0;
@@ -236,6 +240,24 @@ function route(
     }
     return sse(chatStream ?? DEFAULT_CHAT_STREAM);
   }
+  if (url === "/api/settings/model-key") {
+    if (init?.method === "PUT") {
+      if (modelKeySaveFails) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "internal",
+              message: "The secret store is not writable, so the key was not saved.",
+              retryable: true,
+            },
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return json({ configured: true, set_at: "2026-11-21T00:00:00+00:00" });
+    }
+    return json({ configured: false, set_at: null });
+  }
   if (url === "/api/config") {
     if (configHangs) {
       // A slow laptop, a cold sidecar: the request is in the air and nothing is
@@ -258,7 +280,7 @@ function route(
             code: "store_corrupt",
             message:
               "Your database failed its integrity check: /home/me/.odi.db. " +
-              "Last backup: 06:14 (odi-20260102T061400Z.db).",
+              "Last backup: 06:14 local (odi-20260102T061400Z.db).",
             detail: "database disk image is malformed",
             suggestion: "Restore odi-20260102T061400Z.db over odi.db, then restart.",
             retryable: false,
@@ -466,7 +488,12 @@ describe("StudioContext memory and resume", () => {
   it("restores the focused subject from the previous session", () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
+      JSON.stringify({
+        schema_version: SESSION_SCHEMA_VERSION,
+        job_id: null,
+        step_id: null,
+        outcome_id: "O-9",
+      }),
     );
 
     const { result } = renderHook(
@@ -484,7 +511,12 @@ describe("StudioContext memory and resume", () => {
   it("opens the subject a shared address names, not only its lens", () => {
     localStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ job_id: null, step_id: null, outcome_id: "O-9" }),
+      JSON.stringify({
+        schema_version: SESSION_SCHEMA_VERSION,
+        job_id: null,
+        step_id: null,
+        outcome_id: "O-9",
+      }),
     );
     window.history.replaceState({}, "", "/t/c-1/landscape/outcome/O-12");
 
@@ -499,9 +531,7 @@ describe("StudioContext memory and resume", () => {
 
     // The address wins over the stored session: the link names O-12.
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-12" });
-    expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
-      job_id: null,
-      step_id: null,
+    expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toMatchObject({
       outcome_id: "O-12",
     });
   });
@@ -541,6 +571,7 @@ describe("StudioContext memory and resume", () => {
 
     expect(result.current.focusedSubject).toEqual({ kind: "job", id: "JOB-7" });
     expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toEqual({
+      schema_version: SESSION_SCHEMA_VERSION,
       job_id: "JOB-7",
       step_id: null,
       outcome_id: null,
@@ -3301,5 +3332,48 @@ describe("StudioContext rename conversation (#642)", () => {
     expect(result.current.toasts.map((toast) => toast.message)).toContain(
       "I couldn't rename that conversation.",
     );
+  });
+});
+
+describe("legacy model-key migration", () => {
+  beforeEach(() => {
+    localStorage.removeItem(SETTINGS_KEY);
+    modelKeySaveFails = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => route(input, init)),
+    );
+  });
+
+  afterEach(() => {
+    modelKeySaveFails = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the browser copy when the sidecar refuses the key, then retries", async () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        base_url: "http://localhost:8001/v1",
+        api_key: "sk-legacy-DO-NOT-LOSE",
+        model_name: "local-tools-model",
+      }),
+    );
+
+    const { result } = renderHook(() => useStudio(), { wrapper: StudioProvider });
+
+    // The sidecar is unreachable or its store is unwritable: the key is not
+    // saved, so it must not be deleted from the browser either.
+    await waitFor(() => expect(result.current.migrationError).not.toBeNull());
+    expect(localStorage.getItem(SETTINGS_KEY)).toContain("sk-legacy-DO-NOT-LOSE");
+
+    // The sidecar comes back; the retry saves the key and only then drops it.
+    modelKeySaveFails = false;
+    await act(async () => {
+      await result.current.retryLegacyMigration();
+    });
+
+    expect(result.current.migrationError).toBeNull();
+    expect(localStorage.getItem(SETTINGS_KEY)).not.toContain("sk-legacy-DO-NOT-LOSE");
   });
 });

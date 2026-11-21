@@ -48,8 +48,10 @@ function StudioShell() {
     bootError,
     recheckBoot,
     navigateTo,
+    migrationError,
+    retryLegacyMigration,
   } = useStudio();
-  const { view } = useBanner();
+  const { view, raise, resolve } = useBanner();
   const { onIntent, onAction, onDismiss } = useBannerActionDispatcher();
   const [showChangelog, setShowChangelog] = useState(false);
 
@@ -163,6 +165,31 @@ function StudioShell() {
       window.removeEventListener("beforeunload", save);
     };
   }, []);
+
+  // A legacy key that could not be moved to the sidecar's write-only store is
+  // a warning, not a wall. The browser copy is kept, so nothing is lost, and
+  // the Studio stays usable: an unreachable sidecar is exactly the state that
+  // fails the migration, and taking the shell away there would lock the person
+  // out of work that never depended on the key.
+  useEffect(() => {
+    if (!migrationError) {
+      return;
+    }
+    raise({
+      kind: "model-key-unsaved",
+      body: [migrationError.message, migrationError.suggestion].filter(Boolean).join(" "),
+      actions: [
+        {
+          label: "Retry",
+          run: () => {
+            void retryLegacyMigration();
+          },
+          tone: "primary",
+        },
+      ],
+    });
+    return () => resolve("model-key-unsaved");
+  }, [migrationError, raise, resolve, retryLegacyMigration]);
 
   // A damaged database is not a broken screen: the file is intact on disk and
   // the only honest thing to show is that failure, not a zeroed-out studio.
