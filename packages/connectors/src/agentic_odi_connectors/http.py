@@ -1,9 +1,20 @@
 """Shared HTTP client for connector traffic.
 
-Connector ingests can fan out to many REST endpoints at once. A single
-configured client keeps the connection pool, timeout, and retry budget
-predictable instead of inheriting httpx defaults that may be too small for
-concurrent ingest or too large for a constrained deployment.
+Connector ingests can fan out to many REST endpoints at once, so the client
+carries a configured connection pool, timeout, and retry budget instead of
+inheriting httpx defaults that may be too small for concurrent ingest or too
+large for a constrained deployment.
+
+``new_http_client()`` is a factory, not a singleton: every call builds a new
+client, and the caller owns its lifetime. Use it as an async context manager
+so the pool is closed when the ingest run ends::
+
+    async with new_http_client() as client:
+        ...
+
+A client left unclosed leaks its connection pool, so a loop that calls the
+factory per record without closing opens one pool per record. There is no
+process-wide client and nothing closes a client the caller forgot.
 """
 
 from __future__ import annotations
@@ -51,7 +62,11 @@ def _env_float(name: str, default: float, *, minimum: float) -> float:
 
 
 class ConnectorHTTPClient:
-    """An ``httpx.AsyncClient`` with a configured pool, timeout, and retries."""
+    """An ``httpx.AsyncClient`` with a configured pool, timeout, and retries.
+
+    The instance owns the underlying client: close it with ``aclose()``, or
+    enter it with ``async with`` so ``__aexit__`` closes it for you.
+    """
 
     def __init__(
         self,
@@ -90,8 +105,13 @@ class ConnectorHTTPClient:
         await self.aclose()
 
 
-def get_http_client() -> ConnectorHTTPClient:
-    """Build a client from the connector HTTP environment variables."""
+def new_http_client() -> ConnectorHTTPClient:
+    """Build a new client from the connector HTTP environment variables.
+
+    This is a factory: each call returns a distinct client with its own
+    connection pool. The caller owns it and must close it — prefer
+    ``async with new_http_client() as client:`` so the pool is released.
+    """
     return ConnectorHTTPClient(
         pool_size=_env_int(POOL_SIZE_ENV, DEFAULT_POOL_SIZE, minimum=1),
         timeout=_env_float(TIMEOUT_ENV, DEFAULT_TIMEOUT, minimum=0.001),

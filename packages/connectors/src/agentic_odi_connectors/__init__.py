@@ -15,7 +15,7 @@ from agentic_odi_connectors.catalog import (
     list_presets,
 )
 from agentic_odi_connectors.factory import build_connector, known_kinds, register_kind
-from agentic_odi_connectors.http import ConnectorHTTPClient, get_http_client
+from agentic_odi_connectors.http import ConnectorHTTPClient, new_http_client
 from agentic_odi_connectors.mapping import (
     EvidenceDraft,
     drafts_from_batch,
@@ -160,7 +160,7 @@ __all__ = [
     "connector_config_from_preset",
     "drafts_from_batch",
     "env_vars_in_listing",
-    "get_http_client",
+    "new_http_client",
     "get_default_sink",
     "get_preset",
     "known_kinds",
