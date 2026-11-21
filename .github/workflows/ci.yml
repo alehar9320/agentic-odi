@@ -145,7 +145,7 @@ jobs:
         run: uv pip install zizmor==1.32.0
 
       - name: Run actionlint
-        run: actionlint -color never
+        run: actionlint
 
       - name: Run zizmor
         run: zizmor --no-progress .github/workflows/ .github/actions/
