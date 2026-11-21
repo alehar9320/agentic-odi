@@ -942,3 +942,24 @@ def render_candidate_list(items: Any, *, as_json: bool) -> str:
         ],
         empty="No outcome candidates found.",
     )
+
+
+def render_link_list(items: Any, *, as_json: bool) -> str:
+    """Render links as an aligned table or JSON."""
+    if not isinstance(items, list):
+        return _json(items) if as_json else str(items)
+    if as_json:
+        return _json(items)
+    return _table(
+        ("id", "source", "target", "relationship"),
+        [
+            (
+                str(item.get("id", "")),
+                f"{item.get('source_type', '')}:{item.get('source_id', '')}",
+                f"{item.get('target_type', '')}:{item.get('target_id', '')}",
+                str(item.get("relationship_type", "")),
+            )
+            for item in items
+        ],
+        empty="No links found.",
+    )

@@ -48,6 +48,7 @@ from agentic_odi_core.models import (
     InterviewQuote,
     Job,
     JobStage,
+    Link,
     Outcome,
     OutcomeAlignment,
     OutcomeCandidate,
@@ -2213,6 +2214,40 @@ class ODIService:
             if outcome is not None
             for alignment in outcome.trace
         ]
+
+    def add_link(self, link: Link) -> Link:
+        """Create a typed link between two entities.
+
+        Duplicate links (same source, target, and relationship) raise
+        ``ConflictError``. The model validates the relationship type and
+        entity types.
+        """
+        return self.repo.add_link(link)
+
+    def list_links(
+        self,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        target_type: str | None = None,
+        target_id: str | None = None,
+        relationship_type: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[Link]:
+        """List links, optionally filtered by source/target entity and relationship type."""
+        return self.repo.list_links(
+            source_type=source_type,
+            source_id=source_id,
+            target_type=target_type,
+            target_id=target_id,
+            relationship_type=relationship_type,
+            limit=limit,
+            offset=offset,
+        )
+
+    def remove_link(self, link_id: str) -> bool:
+        """Remove a link by ID. Returns ``True`` if removed, ``False`` if not found."""
+        return self.repo.remove_link(link_id)
 
     def traceability_report(self) -> TraceabilityReport:
         """The three failures: orphans, unfunded objectives, and drift.

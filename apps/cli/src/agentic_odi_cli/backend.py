@@ -1435,13 +1435,39 @@ class LocalBackend(Backend):
         return self.service.traceability_report().as_dict()
 
     def _links_add(self, args: dict[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError("links_add is not yet implemented")
+        from agentic_odi_core.models import Link
+
+        link = Link(
+            source_type=args["source_type"],
+            source_id=args["source_id"],
+            target_type=args["target_type"],
+            target_id=args["target_id"],
+            relationship_type=args["relationship_type"],
+            external_system=args.get("external_system"),
+            external_id=args.get("external_id"),
+            preview=args.get("preview"),
+        )
+        created = self.service.add_link(link)
+        return created.model_dump(mode="json")
 
     def _links_list(self, args: dict[str, Any]) -> list[dict[str, Any]]:
-        raise NotImplementedError("links_list is not yet implemented")
+        kwargs: dict[str, Any] = {}
+        for key in (
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "relationship_type",
+            "limit",
+            "offset",
+        ):
+            if key in args:
+                kwargs[key] = args[key]
+        links = self.service.list_links(**kwargs)
+        return [link.model_dump(mode="json") for link in links]
 
-    def _links_remove(self, args: dict[str, Any]) -> str:
-        raise NotImplementedError("links_remove is not yet implemented")
+    def _links_remove(self, args: dict[str, Any]) -> bool:
+        return self.service.remove_link(args["link_id"])
 
 
 _LOCAL_HANDLERS = {
@@ -1608,6 +1634,7 @@ _LIST_TOOLS = frozenset(
         "list_scheduled_work",
         "segment_market",
         "get_segments",
+        "links_list",
     }
 )
 

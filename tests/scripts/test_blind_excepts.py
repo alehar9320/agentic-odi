@@ -44,16 +44,16 @@ ALLOWED_CAP = 77
 #: that moves leaves the old key stale and the new site unlisted, so both fail
 #: and the next person re-reviews rather than inheriting a silent gap.
 ALLOWED: dict[str, str] = {
-    "apps/cli/src/agentic_odi_cli/backend.py:1580": "reviewed 2026-11-16; optional context",
+    "apps/cli/src/agentic_odi_cli/backend.py:1606": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/chat.py:87": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/chat.py:224": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/chat.py:290": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/chat.py:397": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/chat.py:434": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/chat.py:633": "reviewed 2026-11-16; optional context",
-    "apps/cli/src/agentic_odi_cli/cli.py:129": "reviewed 2026-11-16; optional context",
-    "apps/cli/src/agentic_odi_cli/cli.py:446": "surfaced verbatim, it is the point",
-    "apps/cli/src/agentic_odi_cli/cli.py:759": "reviewed 2026-11-16; optional context",
+    "apps/cli/src/agentic_odi_cli/cli.py:135": "reviewed 2026-11-16; optional context",
+    "apps/cli/src/agentic_odi_cli/cli.py:452": "surfaced verbatim, it is the point",
+    "apps/cli/src/agentic_odi_cli/cli.py:765": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/connectors.py:412": "one broken connector must not hide the rest",
     "apps/cli/src/agentic_odi_cli/update.py:137": "reviewed 2026-11-16; optional context",
     "apps/cli/src/agentic_odi_cli/update.py:192": "reviewed 2026-11-16; optional context",
