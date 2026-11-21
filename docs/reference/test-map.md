@@ -135,6 +135,7 @@ isolation, and coverage rules stay in
 | `apps/studio-api/tests/test_studio_probes.py` | Tests for endpoint probing and LLM health classification. |
 | `apps/studio-api/tests/test_studio_proposals.py` | The proposal routes: mine evidence, review it, approve or reject it. |
 | `apps/studio-api/tests/test_studio_router.py` | Tests for successful passthrough responses from the Studio router. |
+| `apps/studio-api/tests/test_studio_secrets.py` | The model key leaves the browser for the sidecar's write-only store. |
 | `apps/studio-api/tests/test_studio_segments.py` | Stages 5 and 6 through the sidecar: the same records under both backends. |
 | `apps/studio-api/tests/test_studio_sharing.py` | The scoped share token: one artifact, read-only, expiring, revocable. |
 | `apps/studio-api/tests/test_studio_signals.py` | The four signal routes answer under both the local and the mcp backend. |
@@ -187,7 +188,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/ChangelogModal.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/FailurePanel.visual.test.tsx` | The build table would otherwise name this `FailurePanel.visual` after the |
 | `apps/studio/src/components/OdiMascot.test.tsx` | — |
-| `apps/studio/src/components/SettingsPanel.test.tsx` | A browser build has no desktop version to report, so About shows the |
+| `apps/studio/src/components/SettingsPanel.test.tsx` | The key control asks the sidecar for a key's state on mount; the panel tests |
 | `apps/studio/src/components/ShareAction.test.tsx` | — |
 | `apps/studio/src/components/ShareSheet.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/SharedArtifact.test.tsx` | An ISO timestamp `ms` from now, so the expiry wording is stable in the test. */ |
@@ -243,7 +244,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/settings/ContextSection.test.tsx` | — |
 | `apps/studio/src/components/settings/DataSection.test.tsx` | — |
 | `apps/studio/src/components/settings/InstallSection.test.tsx` | #800: the desktop app is already its own window, so it cannot be installed. |
-| `apps/studio/src/components/settings/ModelSection.test.tsx` | — |
+| `apps/studio/src/components/settings/ModelSection.test.tsx` | The key control asks the sidecar for a key's state on mount; a unit test does |
 | `apps/studio/src/components/settings/SettingsLayout.test.tsx` | The updater's state stays in the Updates row. |
 | `apps/studio/src/components/settings/SettingsPanel.perFieldSave.test.tsx` | Typing is not saving: the request waits for the field to be left. |
 | `apps/studio/src/components/settings/UpdatesSection.test.tsx` | — |
@@ -304,6 +305,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/state/probeBreaker.test.ts` | A controllable clock, so the breaker's window is tested without waiting. */ |
 | `apps/studio/src/state/regions.test.ts` | The navigation contract from #735, proved without a renderer: |
 | `apps/studio/src/state/scheduleProbe.test.ts` | A document whose visibility the test drives, and which records its listeners. */ |
+| `apps/studio/src/state/settings/SettingsContext.test.ts` | The field is dropped, not blanked: nothing a script reads holds a key. |
 | `apps/studio/src/styles/bootShell.test.ts` | Guards for the pre-JavaScript shell in `index.html`. |
 | `apps/studio/src/styles/brief.test.ts` | Guards for the brief lens stylesheet. |
 | `apps/studio/src/styles/colors.test.ts` | The raw-colour gate (issue #543, parent #331). |
