@@ -1,9 +1,20 @@
 """Shared HTTP client for connector traffic.
 
-Connector ingests can fan out to many REST endpoints at once. A single
-configured client keeps the connection pool, timeout, and retry budget
-predictable instead of inheriting httpx defaults that may be too small for
-concurrent ingest or too large for a constrained deployment.
+Connector ingests can fan out to many REST endpoints at once, so the client
+carries a configured connection pool, timeout, and retry budget instead of
+inheriting httpx defaults that may be too small for concurrent ingest or too
+large for a constrained deployment.
+
+``new_http_client()`` is a factory, not a singleton: every call builds a new
+client, and the caller owns its lifetime. Use it as an async context manager
+so the pool is closed when the ingest run ends::
+
+    async with new_http_client() as client:
+        ...
+
+A client left unclosed leaks its connection pool, so a loop that calls the
+factory per record without closing opens one pool per record. There is no
+process-wide client and nothing closes a client the caller forgot.
 """
 
 from __future__ import annotations
@@ -24,28 +35,38 @@ RETRIES_ENV = "AGENTIC_ODI_HTTP_RETRIES"
 
 def _env_int(name: str, default: int, *, minimum: int) -> int:
     raw = os.environ.get(name)
-    if raw is None:
+    if raw is None or not raw.strip():
         return default
     try:
         value = int(raw)
-    except ValueError:
-        return default
-    return value if value >= minimum else default
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {raw!r}") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {value}")
+    return value
 
 
 def _env_float(name: str, default: float, *, minimum: float) -> float:
     raw = os.environ.get(name)
-    if raw is None:
+    if raw is None or not raw.strip():
         return default
     try:
         value = float(raw)
-    except ValueError:
-        return default
-    return value if value >= minimum else default
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number >= {minimum}, got {raw!r}") from exc
+    # ``nan`` compares false against every bound, so a plain ``value < minimum``
+    # would let it through; negate the comparison to reject it.
+    if not value >= minimum:
+        raise ValueError(f"{name} must be a number >= {minimum}, got {value}")
+    return value
 
 
 class ConnectorHTTPClient:
-    """An ``httpx.AsyncClient`` with a configured pool, timeout, and retries."""
+    """An ``httpx.AsyncClient`` with a configured pool, timeout, and retries.
+
+    The instance owns the underlying client: close it with ``aclose()``, or
+    enter it with ``async with`` so ``__aexit__`` closes it for you.
+    """
 
     def __init__(
         self,
@@ -84,8 +105,13 @@ class ConnectorHTTPClient:
         await self.aclose()
 
 
-def get_http_client() -> ConnectorHTTPClient:
-    """Build a client from the connector HTTP environment variables."""
+def new_http_client() -> ConnectorHTTPClient:
+    """Build a new client from the connector HTTP environment variables.
+
+    This is a factory: each call returns a distinct client with its own
+    connection pool. The caller owns it and must close it — prefer
+    ``async with new_http_client() as client:`` so the pool is released.
+    """
     return ConnectorHTTPClient(
         pool_size=_env_int(POOL_SIZE_ENV, DEFAULT_POOL_SIZE, minimum=1),
         timeout=_env_float(TIMEOUT_ENV, DEFAULT_TIMEOUT, minimum=0.001),

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchModels } from "../../api/studioApi";
 import { useStudio } from "../../state/StudioContext";
-import { ChevronDownIcon } from "../icons";
+import { CheckIcon, ChevronDownIcon } from "../icons";
 
 export function ModelPicker() {
   const { settings, saveSettings, llmHealth, openPanel } = useStudio();
@@ -245,7 +245,12 @@ export function ModelPicker() {
                       onClick={() => choose(model)}
                     >
                       <span className="model-picker__option-name">{model}</span>
-                      {selected ? <span className="model-picker__check">Current</span> : null}
+                      {/* A check, not the word "Current": the row's
+                          aria-selected already carries the state, and a glyph
+                          keeps the menu width stable when selection moves. */}
+                      {selected ? (
+                        <CheckIcon className="model-picker__check" size={15} />
+                      ) : null}
                     </button>
                   );
                 })}

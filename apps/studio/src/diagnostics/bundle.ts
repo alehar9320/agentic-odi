@@ -19,6 +19,20 @@ export interface DiagnosticStream {
   duration_ms: number;
 }
 
+/**
+ * Where the app is running, in the same shape About shows (#800). Deliberately
+ * excludes the hostname and any URL: a bundle a person pastes into a support
+ * thread must not carry their origin, key, or message.
+ */
+export interface DiagnosticsRuntime {
+  host: string;
+  install: string;
+  originClass: string;
+  apiTransport: string;
+  offlineShell: boolean;
+  platform: string;
+}
+
 export interface DiagnosticsBundleOptions {
   version: string;
   versionSource: "build" | "desktop";
@@ -30,6 +44,7 @@ export interface DiagnosticsBundleOptions {
   engine: object | null;
   capabilities: unknown[];
   apiKey: string;
+  runtime: DiagnosticsRuntime;
 }
 
 interface RecordedStream extends DiagnosticStream {
@@ -128,6 +143,7 @@ export function createDiagnosticsBundle(options: DiagnosticsBundleOptions): Reco
       build: options.build,
       platform: options.platform,
       theme: options.theme,
+      runtime: options.runtime,
     },
     sidecar: {
       reachable: options.reachable,

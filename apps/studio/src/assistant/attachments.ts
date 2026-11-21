@@ -15,7 +15,7 @@ import type {
 } from "@assistant-ui/react";
 
 import type { ChatAttachment } from "../types";
-import { MAX_EXTRACTED_CHARS, MAX_DOCUMENT_BYTES } from "./extract/common";
+import { MAX_EXTRACTED_CHARS, MAX_DOCUMENT_BYTES, ExtractionError } from "./extract/common";
 import {
   DOCX_CONTENT_TYPE,
   LEGACY_DOC_REFUSAL,
@@ -23,6 +23,7 @@ import {
   isDocxLike,
   isLegacyDoc,
 } from "./extract/docx";
+import { PDF_CONTENT_TYPE, extractPdf, isPdfLike, pdfTooLargeMessage } from "./extract/pdf";
 
 /** How much of a text file the model sees. Shared with the document formats. */
 export const MAX_ATTACHMENT_CHARS = MAX_EXTRACTED_CHARS;
@@ -39,6 +40,11 @@ export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** What a chip says when the bytes never became content. */
 export const ATTACHMENT_READ_FAILURE = "Could not read this file";
 
+/** What a chip says when a text file is longer than the per-file cap. */
+export function tooLargeMessage(fileName: string): string {
+  return `${fileName} is larger than the ${MAX_ATTACHMENT_CHARS.toLocaleString("en-US")}-character limit`;
+}
+
 export const ATTACHMENT_ACCEPT = [
   "text/*",
   ".md",
@@ -50,6 +56,8 @@ export const ATTACHMENT_ACCEPT = [
   ".log",
   ".docx",
   DOCX_CONTENT_TYPE,
+  ".pdf",
+  PDF_CONTENT_TYPE,
   "image/png",
   "image/jpeg",
   "image/webp",
@@ -98,10 +106,16 @@ export function attachmentRejection(file: File): string | null {
     }
     return null;
   }
+  if (isPdfLike(file.name, file.type)) {
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      return pdfTooLargeMessage(file.name);
+    }
+    return null;
+  }
   if (isTextLike(file.name, file.type)) {
     return null;
   }
-  return `${file.name} is not a text, Word, or image file the studio can read.`;
+  return `${file.name} is not a text, Word, PDF, or image file the studio can read.`;
 }
 
 /** A short size for an attachment chip; empty when there is nothing to say. */
@@ -131,14 +145,24 @@ function readAsDataUrl(file: File): Promise<string> {
  * A file the studio was handed but could not turn into content.
  *
  * `name` carries the file's name so a chip can say which file failed without
- * reaching for the original.
+ * reaching for the original. `refused` carries a sentence the reader can act on
+ * — an encrypted PDF, a scan with no text layer — where `unreadable` is the
+ * generic "we could not read this" and `too_large` names the character limit.
  */
 export class AttachmentReadError extends Error {
-  readonly code = "unreadable" as const;
+  readonly code: "unreadable" | "too_large" | "refused";
 
-  constructor(fileName: string) {
-    super(`Could not read ${fileName}.`);
+  constructor(
+    fileName: string,
+    code: "unreadable" | "too_large" | "refused" = "unreadable",
+    sentence?: string,
+  ) {
+    super(
+      sentence ??
+        (code === "too_large" ? tooLargeMessage(fileName) : `Could not read ${fileName}.`),
+    );
     this.name = fileName;
+    this.code = code;
   }
 }
 
@@ -146,7 +170,11 @@ export class AttachmentReadError extends Error {
  * Prepare one file for a turn.
  *
  * Throws `AttachmentReadError` when the bytes do not become content: a name-only
- * attachment would promise a file the model never receives.
+ * attachment would promise a file the model never receives. A text file longer
+ * than the per-file cap is refused rather than silently shortened, because the
+ * person would otherwise send an interview transcript believing all of it
+ * arrived. `.docx` is capped with the cut announced in the extracted text, the
+ * same contract the document formats share.
  */
 export async function prepareAttachment(file: File): Promise<ChatAttachment> {
   const base: ChatAttachment = {
@@ -164,11 +192,24 @@ export async function prepareAttachment(file: File): Promise<ChatAttachment> {
       const { text } = await extractDocx(file);
       return { ...base, text };
     }
+    if (isPdfLike(file.name, base.contentType) && file.size <= MAX_DOCUMENT_BYTES) {
+      const { text } = await extractPdf(file);
+      return { ...base, text };
+    }
     if (isTextLike(file.name, base.contentType)) {
       const text = await file.text();
-      return { ...base, text: text.slice(0, MAX_ATTACHMENT_CHARS) };
+      if (text.length > MAX_ATTACHMENT_CHARS) {
+        throw new AttachmentReadError(base.name, "too_large");
+      }
+      return { ...base, text };
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof AttachmentReadError) {
+      throw error;
+    }
+    if (error instanceof ExtractionError) {
+      throw new AttachmentReadError(base.name, "refused", error.sentence);
+    }
     throw new AttachmentReadError(base.name);
   }
 
@@ -205,7 +246,14 @@ export function createAttachmentAdapter(): AttachmentAdapter {
         if (!(error instanceof AttachmentReadError)) {
           throw error;
         }
-        yield chip({ type: "incomplete", reason: "error", message: ATTACHMENT_READ_FAILURE });
+        // The chip carries the reason, so an oversized text file says which
+        // file and which limit, and a refused PDF says why, rather than the
+        // generic read failure.
+        yield chip({
+          type: "incomplete",
+          reason: "error",
+          message: error.code === "unreadable" ? ATTACHMENT_READ_FAILURE : error.message,
+        });
         return;
       }
 

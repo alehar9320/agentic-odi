@@ -24,10 +24,14 @@ LLM directly; the sidecar is its only backend.
 - **LLM key.** Resolution order is `AGENTIC_ODI_API_KEY`, then `api_key` in the
   plaintext profile at `~/.config/agentic-odi/llm_profile.json`, then the
   literal `local` for self-hosted models (`apps/cli/src/agentic_odi_cli/chat.py:90-94`).
-  The sidecar resolves the same values and **returns the resolved key** from
-  `GET /api/config` (`studio/probes.py:37-49`) so the browser can display and
-  edit it. The key is stored in the SPA's `localStorage` alongside the rest of
-  the Studio settings.
+  The sidecar resolves the same values and does **not** return the key from
+  `GET /api/config` (`studio/probes.py:37-49`); that route reports only whether a
+  key is set and when, and the browser no longer stores it. A key entered in
+  Settings is written to the sidecar's write-only store
+  (`studio/secrets.py`), a `0600` JSON file the sidecar owns, and every request
+  that would carry an empty key is filled from that store (then the profile
+  default). A key a previous version left in `localStorage` is migrated to the
+  store on first load and deleted.
 - **Connector tokens.** A connector config names the environment variables it
   needs and expands `${VAR}` at call time
   (`packages/connectors/src/agentic_odi_connectors/models.py:56-64`,
@@ -52,9 +56,12 @@ LLM directly; the sidecar is its only backend.
   the browser" is the LLM key described above.
 - **Sidecar → MCP:** JSON-RPC tool calls, carrying the same token.
 - **Sidecar → LLM:** OpenAI-compatible HTTP chat completions.
-- **Worker → sidecar:** the worker forwards `/api/*`, including the client's
-  `Authorization` header, to `SIDECAR_URL` (`infra/cloudflare/worker.ts:190-232`).
-  It does not authenticate the client itself.
+- **Worker → sidecar:** the worker forwards `/api/*` to `SIDECAR_URL`
+  (`infra/cloudflare/worker.ts:349-369`). It forwards an explicit allowlist —
+  `Authorization`, `Content-Type`, `Accept`, `Accept-Language`, and
+  `X-Request-ID` — and nothing else: no `Cookie`, `Origin`, `Referer`, or
+  custom header a browser extension adds. It does not authenticate the client
+  itself.
 - **Tauri → GitHub releases:** fetches `latest.json`, verifies the artifact
   signature against the key pinned in `tauri.conf.json`, and stages an update
   only after verification.
@@ -68,7 +75,11 @@ LLM directly; the sidecar is its only backend.
   `Authorization: Bearer <token>` with the issued key. `/health` and the static
   shell stay open, because the deployment's readiness probe and the browser's
   first request need them. The comparison is constant-time, and the token is
-  never read from a URL or a query string.
+  never read from a URL or a query string. The token file at
+  `~/.config/agentic-odi/studio-token` is written with mode `0o600` inside a
+  `0o700` directory regardless of the process umask, and a token that was
+  issued before that fix is tightened on read without being rotated
+  (`paths.py:TOKEN_FILE_MODE`, `paths.py:_tighten`).
 - **CORS allow-list.** The sidecar accepts `tauri://localhost`,
   `localhost:5173`, `127.0.0.1:5173`, `localhost:8100`, and `127.0.0.1:8100`,
   without credentials (`app.py:38-45`, `:211-213`).
@@ -100,8 +111,11 @@ LLM directly; the sidecar is its only backend.
   little gain. It stops being true the moment the sidecar is reachable
   off-host, which the Cloudflare tunnel already does.
 - **Keep the LLM key server-side.** The SPA only needs to display and change it;
-  the sidecar could own the value and never return it. This is the gap
-  [#90](https://github.com/alehar9320/agentic-odi/issues/90) tracks.
+  the sidecar owns the value and never returns it. This gap, tracked by
+  [#90](https://github.com/alehar9320/agentic-odi/issues/90), is closed by the
+  write-only store in `studio/secrets.py`: `GET /api/config` reports only
+  `model_key.configured`/`set_at`, and `PUT /api/settings/model-key` writes the
+  value without echoing it.
 - **Worker-side authentication.** The worker forwards headers rather than
   terminating auth, so the hosted path is only as protected as the sidecar.
 
@@ -118,6 +132,6 @@ LLM directly; the sidecar is its only backend.
   plaintext files in the user's home directory.
 - It does not sandbox connector code or the LLM's network egress beyond the
   endpoints the config names.
-- It does not keep the LLM key out of the browser, and it does not persist
-  approval decisions.
+- It keeps the LLM key out of the browser (the sidecar's write-only store holds
+  the value), but it does not persist approval decisions.
 - It is not a multi-tenant boundary: one running sidecar serves one person.

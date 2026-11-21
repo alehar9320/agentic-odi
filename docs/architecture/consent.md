@@ -17,8 +17,12 @@ The pieces:
   holds one pending request per tool call as an `asyncio` future.
 - **The gate** (`studio/chat.py:59-81`, `:719-731`) decides which calls need
   approval, emits an SSE `approval` frame, and awaits the decision.
-- **The frame** carries `id`, `tool_call_id`, `name`, `arguments`, `prompt`, and
-  `created_at`.
+- **The frame** carries `id`, `tool_call_id`, `name`, `arguments`, `prompt`,
+  `consequence`, and `created_at`. The `consequence` is one plain-language
+  sentence built from the call's arguments and the tool's `TOOL_SPECS` metadata
+  (for example `Add Job "Retention"`); the `prompt` wraps it as a question. It
+  names the artifact kind when no argument names it and truncates any long
+  argument, so it never dumps raw JSON.
 - **The decision** is `POST /api/approvals/{id}` (`studio/router.py:963-980`)
   with an allow/deny choice and an optional reason.
 - **The card** is the Allow / Don't allow surface in

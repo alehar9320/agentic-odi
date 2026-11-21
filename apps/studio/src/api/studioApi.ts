@@ -4,6 +4,8 @@ import type {
   AddConnectorPayload,
   AddOutcomePayload,
   AddStepPayload,
+  Alternative,
+  AlternativeLink,
   CanvasData,
   ChangelogData,
   ChatStreamRequest,
@@ -15,6 +17,7 @@ import type {
   ConversationSummary,
   ConversationTree,
   CreateJobPayload,
+  ExistingSolution,
   Job,
   LatestConversation,
   LlmHealth,
@@ -24,7 +27,13 @@ import type {
   Observation,
   ObservationKind,
   ObservationStatus,
+  ObservationSubjectType,
   Outcome,
+  OutcomeAlternative,
+  OutcomeAlternativeLink,
+  OutcomeInterval,
+  OutcomeInputs,
+  ScoreSnapshot,
   Segment,
   Signal,
   Step,
@@ -58,6 +67,11 @@ export class StudioApiError extends Error {
 /** Network or sidecar-proxy failures are transport failures; application errors are not. */
 export function isTransportFailure(error: unknown): boolean {
   if (error instanceof StudioApiError) {
+    // A Worker-generated failure says so with `origin: "proxy"`; a sidecar's
+    // own structured 502 keeps `fromSidecar` and stays an application error.
+    if (error.error.origin === "proxy") {
+      return true;
+    }
     return (
       (error.status === 502 || error.status === 503 || error.status === 504) &&
       !error.fromSidecar
@@ -208,6 +222,21 @@ async function studioError(response: Response): Promise<StudioApiError> {
   return new StudioApiError(described, response.status, false);
 }
 
+/**
+ * A static host answers an unknown `/api` route with the SPA shell and status
+ * 200, so `response.ok` alone cannot tell a payload from an HTML document.
+ * Anything that came back as HTML is transport, not an answer: throwing a
+ * `TypeError` sends it down the same fallback path as a dropped connection.
+ * A missing content type is accepted, because only an explicit HTML header
+ * proves the response was not the API's.
+ */
+function ensureApiPayload(response: Response): void {
+  const contentType = response.headers.get("Content-Type");
+  if (contentType && contentType.toLowerCase().includes("text/html")) {
+    throw new TypeError(`Expected an API payload, got ${contentType}`);
+  }
+}
+
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(apiUrl(path), {
     headers: { Accept: "application/json", ...authHeaders() },
@@ -218,6 +247,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     recordStudioError(error.error, path);
     throw error;
   }
+  ensureApiPayload(response);
   return (await response.json()) as T;
 }
 
@@ -232,6 +262,7 @@ async function sendJson<T>(method: "POST" | "PATCH", path: string, body: unknown
     recordStudioError(error.error, path);
     throw error;
   }
+  ensureApiPayload(response);
   return (await response.json()) as T;
 }
 
@@ -249,6 +280,7 @@ async function deleteJson<T>(path: string): Promise<T> {
     recordStudioError(error.error, path);
     throw error;
   }
+  ensureApiPayload(response);
   return (await response.json()) as T;
 }
 
@@ -315,6 +347,32 @@ export async function fetchConfig(): Promise<StudioConfig> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** Whether the sidecar holds a model key, and when it was set. Never the value. */
+export interface ModelKeyStatus {
+  configured: boolean;
+  set_at: string | null;
+}
+
+export function fetchModelKeyStatus(): Promise<ModelKeyStatus> {
+  return getJson<ModelKeyStatus>("/api/settings/model-key");
+}
+
+/** Store a model key once. The response reports its state, not its value. */
+export async function saveModelKey(value: string): Promise<ModelKeyStatus> {
+  const response = await fetch(apiUrl("/api/settings/model-key"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
+    body: JSON.stringify({ value }),
+  });
+  if (!response.ok) {
+    const error = await studioError(response);
+    recordStudioError(error.error, "/api/settings/model-key");
+    throw error;
+  }
+  ensureApiPayload(response);
+  return (await response.json()) as ModelKeyStatus;
 }
 
 export interface SidecarDiagnostics {
@@ -446,7 +504,16 @@ export function deleteStep(stepId: string, mcpUrl: string): Promise<{ deleted: s
 
 export function updateOutcome(
   outcomeId: string,
-  payload: { statement?: string; importance?: number; satisfaction?: number; mcp_url: string },
+  payload: {
+    statement?: string;
+    importance?: number;
+    satisfaction?: number;
+    importance_n?: number | null;
+    satisfaction_n?: number | null;
+    score_method?: "estimate" | "survey" | "import";
+    note?: string | null;
+    mcp_url: string;
+  },
 ): Promise<Outcome> {
   return queuedWrite<Outcome>(
     () =>
@@ -462,6 +529,124 @@ export function updateOutcome(
         satisfaction: payload.satisfaction,
       }),
   );
+}
+
+export function fetchOutcomeHistory(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ScoreSnapshot[]> {
+  return getJson<{ result: ScoreSnapshot[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/history?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch an outcome's stored band and its provenance. `band` is null when the
+ * score carries no band at all — an estimate or an unscored outcome — which is
+ * a distinct state from a zero-width band, so the caller must not treat null as
+ * a tight band.
+ */
+export function fetchOutcomeInterval(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInterval> {
+  return getJson<{ result: OutcomeInterval }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/interval?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/**
+ * Fetch the paired survey inputs a stored band was reproduced from (B3.1).
+ * `inputs` is null when no input set is retained — a legacy or aggregate-only
+ * outcome — which is a distinct state from a retained set, so the caller must
+ * not treat null as an empty response set.
+ */
+export function fetchOutcomeInputs(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeInputs> {
+  return getJson<{ result: OutcomeInputs }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/inputs?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Fetch the alternatives recorded for a job (M2-07). */
+export function fetchAlternatives(jobId: string, mcpUrl: string): Promise<Alternative[]> {
+  return getJson<{ result: Alternative[] }>(
+    `/api/alternatives?job_id=${encodeURIComponent(jobId)}&mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Record what a customer uses today for one job (M2-07). */
+export function addAlternative(
+  input: { job_id: string; name: string; kind: string; notes?: string; source_kind?: string },
+  mcpUrl: string,
+): Promise<Alternative> {
+  return postJson<{ result: Alternative }>("/api/alternatives", {
+    ...input,
+    mcp_url: mcpUrl,
+  }).then((body) => body.result);
+}
+
+export function deleteAlternative(
+  alternativeId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/alternatives/${encodeURIComponent(alternativeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/** Rate one alternative against one outcome with the customer's adequacy (M2-07). */
+export function linkAlternative(
+  outcomeId: string,
+  input: { alternative_id: string; adequacy: number; usage_n?: number; note?: string },
+  mcpUrl: string,
+): Promise<AlternativeLink> {
+  return postJson<{ result: AlternativeLink }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives`,
+    { ...input, mcp_url: mcpUrl },
+  ).then((body) => body.result);
+}
+
+export function unlinkAlternative(
+  outcomeId: string,
+  alternativeId: string,
+  mcpUrl: string,
+): Promise<{ ok: boolean }> {
+  return deleteJson<{ ok: boolean }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives/${encodeURIComponent(alternativeId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  );
+}
+
+/** The alternatives recorded for one outcome, each with its adequacy link (M2-07). */
+export function fetchOutcomeAlternatives(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<OutcomeAlternative[]> {
+  return getJson<{ result: OutcomeAlternative[] }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/alternatives?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
+}
+
+/** Whether an existing solution is recorded for an outcome (M2-07). */
+export function fetchExistingSolution(
+  outcomeId: string,
+  mcpUrl: string,
+): Promise<ExistingSolution> {
+  return getJson<{ result: { outcome_id: string; existing_solution: ExistingSolution } }>(
+    `/api/outcomes/${encodeURIComponent(outcomeId)}/existing-solution?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result.existing_solution);
+}
+
+/** Every recorded alternative for one job, with its outcome and link (M2-07.2). */
+export function fetchAlternativeLinks(
+  jobId: string,
+  mcpUrl: string,
+): Promise<OutcomeAlternativeLink[]> {
+  return getJson<{ result: OutcomeAlternativeLink[] }>(
+    `/api/alternative-links?job_id=${encodeURIComponent(jobId)}&mcp_url=${encodeURIComponent(mcpUrl)}`,
+  ).then((body) => body.result);
 }
 
 export function deleteOutcome(outcomeId: string, mcpUrl: string): Promise<{ deleted: string }> {
@@ -594,6 +779,8 @@ export async function streamChat(
       throw await studioError(response);
     }
 
+    ensureApiPayload(response);
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     const parser = createSseParser();
@@ -688,13 +875,24 @@ export async function proposeStrategy(mcpUrl: string, jobId?: string): Promise<S
 }
 
 
-export async function fetchMemory(): Promise<Observation[]> {
+export async function fetchMemory(subject?: {
+  subject_type?: string;
+  subject_id?: string;
+}): Promise<Observation[]> {
+  const query = new URLSearchParams();
+  if (subject?.subject_type) {
+    query.set("subject_type", subject.subject_type);
+  }
+  if (subject?.subject_id) {
+    query.set("subject_id", subject.subject_id);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
   return withLocal(
     () =>
-      getJson<{ observations: Observation[] }>("/api/memory/observations").then(
-        (body) => body.observations,
-      ),
-    (bff) => bff.memory.listObservations(),
+      getJson<{ observations: Observation[] }>(
+        `/api/memory/observations${suffix}`,
+      ).then((body) => body.observations),
+    (bff) => bff.memory.listObservations(false, subject),
   );
 }
 
@@ -704,6 +902,8 @@ export interface AddObservationPayload {
   data?: Record<string, unknown>;
   confidence?: number;
   confirmed?: boolean;
+  subject_type?: ObservationSubjectType | null;
+  subject_id?: string | null;
 }
 
 export async function addObservation(payload: AddObservationPayload): Promise<Observation> {
@@ -813,6 +1013,39 @@ export async function setConversationHead(
   );
 }
 
+/**
+ * Give a thread a new name. Falls through to the local store, so a rename still
+ * lands when the sidecar is down. The sidecar caps the title at 200 characters.
+ */
+export function renameConversation(
+  conversationId: string,
+  title: string,
+): Promise<Conversation> {
+  return withLocal(
+    () =>
+      sendJson<{ conversation: Conversation }>(
+        "PATCH",
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+        { title },
+      ).then((body) => body.conversation),
+    (bff) => bff.memory.renameConversation(conversationId, title),
+  );
+}
+
+/**
+ * Remove one thread and its turns. Falls through to the local store, so a
+ * delete still lands when the sidecar is down.
+ */
+export function deleteConversation(conversationId: string): Promise<{ ok: boolean }> {
+  return withLocal(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/conversations/${encodeURIComponent(conversationId)}`,
+      ),
+    (bff) => bff.memory.deleteConversation(conversationId),
+  );
+}
+
 /** Answer one paused write. The turn resumes on the stream it came from. */
 export async function resolveApproval(
   approvalId: string,
@@ -877,12 +1110,32 @@ export function addEvidence(payload: {
   outcome_id?: string;
   mcp_url: string;
 }): Promise<{ ok: boolean }> {
-  return postJson<{ ok: boolean }>("/api/evidence", payload);
+  return queuedWrite<{ ok: boolean }>(
+    () => postJson<{ ok: boolean }>("/api/evidence", payload),
+    (bff) =>
+      bff
+        .addEvidence({
+          source_name: payload.source_name,
+          source_kind: payload.source_kind,
+          item_type: payload.item_type,
+          name: payload.name,
+          content: payload.content,
+          url: payload.url,
+          job_id: payload.job_id,
+          step_id: payload.step_id,
+          outcome_id: payload.outcome_id,
+        })
+        .then(() => ({ ok: true })),
+  );
 }
 
 export function deleteEvidence(evidenceId: string, mcpUrl: string): Promise<{ ok: boolean }> {
-  return deleteJson<{ ok: boolean }>(
-    `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+  return queuedWrite<{ ok: boolean }>(
+    () =>
+      deleteJson<{ ok: boolean }>(
+        `/api/evidence/${encodeURIComponent(evidenceId)}?mcp_url=${encodeURIComponent(mcpUrl)}`,
+      ),
+    (bff) => bff.deleteEvidence(evidenceId).then(() => ({ ok: true })),
   );
 }
 
@@ -945,6 +1198,22 @@ export async function getStorageFacts(): Promise<StorageFacts> {
     bytes: facts.bytes === "unknown" ? undefined : facts.bytes,
     lastWrittenAt: facts.lastWrite ?? undefined,
   };
+}
+
+export interface DataStoreStatus {
+  id: "odi" | "studio";
+  path: string;
+  bytes: number | null;
+  lastModified: string | null;
+}
+
+export interface DataStatus {
+  stores: DataStoreStatus[];
+}
+
+/** Resolved paths and sizes for the sidecar's ODI and Studio SQLite stores. */
+export async function getDataStatus(): Promise<DataStatus> {
+  return getJson<DataStatus>("/api/data/status");
 }
 
 export async function exportWorkspace(): Promise<string> {

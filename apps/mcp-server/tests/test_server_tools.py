@@ -356,6 +356,58 @@ async def test_a_successful_tool_returns_no_envelope():
         assert res.content[0].text.startswith("Job created successfully:")
 
 
+@pytest.mark.asyncio
+async def test_add_evidence_records_impact_and_confidence():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "interview",
+                "source_kind": "manual",
+                "name": "Customer quote",
+                "content": "It takes too long to deploy",
+                "job_id": job_id,
+                "impact": "high",
+                "confidence": "verified",
+            },
+        )
+        text = res.content[0].text
+        assert "Evidence created successfully" in text
+        match = re.search(r"({.*})", text, re.DOTALL)
+        evidence_data = json.loads(match.group(1)) if match else {}
+        assert evidence_data["impact"] == "high"
+        assert evidence_data["confidence"] == "verified"
+
+
+@pytest.mark.asyncio
+async def test_add_evidence_applies_defaults_for_impact_and_confidence():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "interview",
+                "source_kind": "manual",
+                "name": "Customer quote",
+                "content": "It takes too long to deploy",
+                "job_id": job_id,
+            },
+        )
+        text = res.content[0].text
+        assert "Evidence created successfully" in text
+        match = re.search(r"({.*})", text, re.DOTALL)
+        evidence_data = json.loads(match.group(1)) if match else {}
+        assert evidence_data["impact"] == "medium"
+        assert evidence_data["confidence"] == "claimed"
+
+
 def _is_tool_handler(node: ast.FunctionDef) -> bool:
     for decorator in node.decorator_list:
         if isinstance(decorator, ast.Attribute) and decorator.attr == "tool":

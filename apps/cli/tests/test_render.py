@@ -10,6 +10,9 @@ from agentic_odi_cli.render import (
     render_deleted,
     render_saved,
     render_score,
+    render_segment,
+    render_segment_list,
+    render_strategy,
 )
 
 
@@ -107,3 +110,61 @@ def test_score_renderer_passes_through_non_numeric_values():
 
     assert "True" in rendered
     assert "n/a" in rendered
+
+
+def _segment(**overrides) -> dict:
+    segment = {
+        "id": "SEG-1",
+        "job_id": "JOB-1",
+        "name": "Platform engineers",
+        "people": "Platform engineers",
+        "job_statement": "Rotate a leaked secret",
+        "verdict": "underserved",
+        "confidence": 0.8,
+        "outcome_ids": ["O-1", "O-2"],
+        "rationale": "Two outcomes on the gather step.",
+        "stale": False,
+    }
+    segment.update(overrides)
+    return segment
+
+
+def test_a_stale_segment_is_labelled_stale_in_the_list():
+    rendered = render_segment_list([_segment(stale=True)], as_json=False)
+
+    assert "stale" in rendered
+
+
+def test_a_current_segment_is_labelled_current():
+    rendered = render_segment_list([_segment(stale=False)], as_json=False)
+
+    assert "current" in rendered
+
+
+def test_a_segment_with_no_freshness_reads_as_unknown_not_current():
+    """An older backend omits the flag; absence must not read as fresh."""
+    rendered = render_segment_list([_segment(stale=None)], as_json=False)
+
+    assert "unknown" in rendered
+
+
+def test_a_segment_shows_its_freshness_when_read_alone():
+    rendered = render_segment(_segment(stale=True), as_json=False)
+
+    assert "stale" in rendered
+
+
+def test_a_strategy_shows_its_freshness():
+    strategy = {
+        "id": "STR-1",
+        "kind": "differentiated",
+        "segment_id": "SEG-1",
+        "thesis": "Match each line is underserved.",
+        "bets": ["Build against match each line"],
+        "rejected": [{"kind": "disruptive", "why": "no segment is overserved"}],
+        "stale": True,
+    }
+
+    rendered = render_strategy(strategy, as_json=False)
+
+    assert "stale" in rendered

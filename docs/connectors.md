@@ -1,3 +1,11 @@
+---
+title: Connectors
+blurb: The registry, the presets, and the protocol.
+nav_group: Build
+nav_order: 2
+slug: connectors
+---
+
 # External Connectors (MCP Ingest)
 
 Connectors are named integrations stored in `~/.config/agentic-odi/connectors.json`
@@ -21,8 +29,8 @@ python -m agentic_odi_cli connectors catalog --json
 | Voice of customer & qualitative research (`voice-of-customer`) | `notion`, `gong`, `fireflies`, `intercom`, `confluence` |
 | Quantitative data & opportunity scoring (`quantitative-data`) | `posthog`, `amplitude`, `mixpanel` |
 | Market & competitive intelligence (`market-intelligence`) | `exa`, `tavily` |
-| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma` |
-| Strategy & knowledge management output (`knowledge-output`) | `slack` |
+| Product strategy & backlog alignment (`strategy-alignment`) | `linear`, `github`, `jira`, `miro`, `figma`, `composio` |
+| Strategy & knowledge management output (`knowledge-output`) | `context7`, `slack` |
 
 `docs/connectors-catalog.json` is the catalog as JSON, committed so a drift shows
 up in review. `packages/connectors/tests/test_catalog.py` fails when it stops
@@ -44,6 +52,7 @@ python -m agentic_odi_cli connectors list-presets   # markdown table of built-in
 
 # OAuth-based preset: the browser consent flow starts on first use
 python -m agentic_odi_cli connectors add mcp --preset notion
+python -m agentic_odi_cli connectors add mcp --preset composio
 ```
 
 Credentials never enter the registry. Presets that use API keys store `${VAR}`
@@ -75,6 +84,132 @@ so it can gate a deployment.
 > preset may ask for consent again on the next `connectors health` or
 > `connectors ingest`. Prefer a token-based preset where the server offers one.
 
+> [!NOTE]
+> **Composio is optional, and the CLI is fail-open.** Health and ingest are
+> per-connector, so a missing, unreachable, or rate-limited Composio endpoint
+> reports unhealthy for `composio` only and never blocks another connector, the
+> `connectors health` table, or any default flow. Adding the `composio` preset
+> changes behavior for no workspace that does not configure it. If Composio is
+> down or runs out, keep using the other connectors and the AI flow; it is
+> designed to keep working.
+
+## Adding Composio as an integration
+
+Composio is a managed MCP hub for 1000+ apps (GitHub, Slack, Linear, Notion,
+Jira, ...). It is wired up like any other preset, and it is **optional**:
+nothing in the CLI or the default flow requires it. Composio documents two
+connection modes, and this guide covers both without adding a dependency.
+
+### Shared endpoint (recommended for most teams)
+
+`https://connect.composio.dev/mcp` is Composio's hosted MCP URL for an MCP
+client that authorizes in the browser. The preset carries that static URL and
+`auth: "oauth"`, with no credential in the registry:
+
+Composio exposes two MCP entry points, and they are not interchangeable. The
+preset covers the first; the second is registered by hand.
+
+### 1. Composio Connect — the preset (shared OAuth URL)
+
+For a client that wants Composio's shared endpoint, the URL is static and
+OAuth handles app consent in the browser on first use. This is what the
+`composio` preset encodes:
+
+```bash
+# Register the preset; the browser consent flow starts on the first health/ingest call
+python -m agentic_odi_cli connectors add mcp --preset composio
+
+# Check it independently; a down or rate-limited endpoint reports unhealthy
+# for composio only
+python -m agentic_odi_cli connectors health --name composio
+
+# Ingest is per-connector and opt-in; another connector's ingest is unaffected
+python -m agentic_odi_cli connectors ingest --name composio --job-id job_123
+```
+
+Source: Composio's *Composio Connect* page documents
+`https://connect.composio.dev/mcp` as the shared MCP URL, and says "If you are
+building an application, start with the SDK Quickstart or create a session MCP
+endpoint instead." That is why the preset keeps `auth="oauth"` and a static
+URL: for Composio Connect, that URL is correct.
+
+A generic MCP client that cannot run the browser consent flow can send
+Composio's consumer key header instead. The `${VAR}` placeholder is resolved
+from the environment when a connection is opened, so the key never enters the
+registry:
+
+```bash
+export COMPOSIO_CONSUMER_KEY=your-consumer-key
+python -m agentic_odi_cli connectors add mcp --name composio \
+  --url https://connect.composio.dev/mcp \
+  --header "x-consumer-api-key=${COMPOSIO_CONSUMER_KEY}"
+```
+
+### Session-scoped MCP — per-user toolkits (no static URL)
+
+When each person needs their own toolkits and connected accounts, Composio
+issues a session-scoped MCP URL. There is no static per-user URL to hardcode:
+create a session with the Composio API, then read `session.mcp.url` and
+`session.mcp.headers` from the response. From Composio's *Using sessions via
+MCP* and the *Create a new tool router session* API reference:
+
+```bash
+# 1. Create a session (scoped project API key; opt into MCP with mcp: true).
+#    POST https://backend.composio.dev/api/v3.1/tool_router/session
+#    header: x-api-key: $COMPOSIO_API_KEY
+#    -> the response carries session.mcp.url and session.mcp.headers
+curl -sS -X POST https://backend.composio.dev/api/v3.1/tool_router/session \
+  -H "x-api-key: ${COMPOSIO_API_KEY}" -H "Content-Type: application/json" \
+  -d '{"user_id": "user-123", "mcp": true}' | jq -r '.mcp.url'
+
+# 2. Register the session endpoint the response returned. Do NOT construct this
+#    URL from a server id, and do NOT paste the session URL into the catalog —
+#    it is per-session and short-lived. The header carries the API key as a
+#    ${VAR} placeholder, so the registry never stores the token.
+python -m agentic_odi_cli connectors add mcp --name composio-session \
+  --url "<session.mcp.url>" \
+  --header "X-API-Key=\${COMPOSIO_API_KEY}"
+
+python -m agentic_odi_cli connectors health --name composio-session
+```
+
+Source: Composio's *Using sessions via MCP* guide and the v3.1
+*Create a new tool router session* reference. The guide says to read the URL and
+headers off `session.mcp`, and the API reference documents a session-create
+call to `backend.composio.dev/api/v3.1/tool_router/session` authenticated with
+`x-api-key`. Composio's *single-toolkit MCP* page adds: "Pass an `x-api-key`
+header when connecting to Composio MCP. ... Set `COMPOSIO_MCP_URL` to the URL
+returned by the generate step, and keep `COMPOSIO_API_KEY` on the server. Don't
+construct the MCP URL from a server ID."
+
+Because the preset is the shared OAuth endpoint and the session path is
+per-user, the two stories are consistent: the preset keeps
+`url="https://connect.composio.dev/mcp"` and `auth="oauth"`, while the guide
+above documents the session-scoped recipe for teams that need per-user
+toolkits. `--header` (repeatable, `KEY=VALUE`) is accepted for MCP connectors so
+the session recipe above works, and any `${VAR}` in a header is recorded in
+`env_vars` and resolved from the environment when the connection opens.
+
+Both modes are strictly optional and fail-open. `connectors health` and
+`connectors ingest` are per-connector, so a missing, unreachable, or
+rate-limited Composio endpoint reports unhealthy for `composio` only and never
+blocks another connector, the `connectors health` table, or any default flow.
+Adding the `composio` preset changes behavior for no workspace that does not
+configure it.
+
+### Taking it to another project
+
+The preset shape lives in
+`packages/connectors/src/agentic_odi_connectors/catalog.py`. To add it to
+another project, copy the `composio` entry (id, label, area, summary, url,
+auth, docs, `is_recommended: false`), regenerate the catalog JSON, and update
+the presets table. The shared URL is static; the session URL is per user and
+comes from the API response, so copy the recipe rather than the URL. Because
+health and ingest are per-connector, a missing or unreachable Composio endpoint
+never breaks another connector or the CLI — verify that in the host project
+before shipping.
+
+
 ## Ingest behavior
 
 Ingested records are normalized (`catalog`, `resource`, `tool_result`) and
@@ -98,6 +233,23 @@ Pass `--dry-run` to fetch and normalize without writing anything: it prints the
 record count, the first normalized record, and — when `--job-id`, `--step-id`,
 or `--outcome-id` is given — how many evidence drafts the ingest would create.
 
+## Item previews
+
+`Connector.preview(external_id)` returns a `LinkPreviewData` summary for one
+external item, or `None` when the connector cannot describe it. The default
+protocol implementation returns `None`, so connectors opt in without breaking
+existing kinds. A preview carries `title`, optional `status`, optional `url`,
+and the UTC `fetched_at` timestamp; it is a read-only summary ready to store on
+a `Link.preview`.
+
+`RestConnector` implements previews with a `GET` to the configured collection
+URL plus the URL-encoded item id. Query parameters on the collection URL are
+preserved. The response must be a JSON object; `title`, `name`, or `id` supplies
+the title, `status` or `state` supplies the status, and `url`, `html_url`, or
+`web_url` supplies the link. Non-success responses, non-JSON bodies, non-object
+payloads, and fetch errors return `None` rather than raising. Tests inject the
+fetcher, so preview coverage does not touch the network.
+
 Every evidence draft is an `EvidenceDraft` model, so construction raises before
 a record that crossed a process boundary can reach the ODI store with a missing
 or mistyped field. `validate_evidence_draft()` applies the same check to a draft
@@ -118,19 +270,47 @@ not consume tokens.
 | Records admitted per second | `AGENTIC_ODI_INGEST_RATE` | `100` |
 | Burst (max tokens held) | one second's worth | `100` for the default rate |
 
-Invalid or non-positive values fall back to 100. The limiter never blocks: a
-burst is shed with a typed error instead of being queued in memory, which is the
-failure mode this guard exists to prevent. Construct `IngestSink` with an
-explicit `RateLimiter` to override the rate or the burst in-process.
+An unset or empty `AGENTIC_ODI_INGEST_RATE` uses the default of 100. A value
+that is present but not a positive integer — `0`, `-1`, or a typo such as
+`1OO` — raises `ValueError` naming the variable, so the process does not run at
+a rate the operator did not choose. The limiter never blocks: a burst is shed
+with a typed error instead of being queued in memory, which is the failure mode
+this guard exists to prevent. Construct `IngestSink` with an explicit
+`RateLimiter` to override the rate or the burst in-process.
 
 Additional kinds (REST, webhooks, and so on) can register against the same
 `Connector` protocol later.
 
+### Optional previews
+
+`Connector.preview(external_id)` is a concrete method that returns
+`LinkPreviewData | None`; the default returns `None`, meaning "this connector
+cannot describe the item". It is not abstract, so a connector without preview
+support inherits the default and cannot break. `LinkPreviewData` carries
+`title`, `status`, `url`, and `fetched_at`, and serializes to the keys
+`Link.preview` already holds. `RestConnector` overrides it: one request to the
+item's URL, mapped from `title`/`name`/`id`, `status`/`state`, and
+`url`/`html_url`/`web_url`. A non-2xx response, a non-object body, or a
+transport error returns `None` rather than raising.
+
 ## HTTP client configuration
 
-Connector HTTP traffic goes through one configurable client,
-`agentic_odi_connectors.get_http_client()`, so pool size, timeout, and retry
-behavior are predictable. Tune it with environment variables:
+Connector HTTP traffic goes through one configurable factory,
+`agentic_odi_connectors.new_http_client()`, so pool size, timeout, and retry
+behavior are predictable. Each call builds a new client with its own connection
+pool, and the caller owns it: enter it as an async context manager so the pool
+is closed when the ingest run ends.
+
+```python
+from agentic_odi_connectors import new_http_client
+
+async with new_http_client() as client:
+    response = await client.get(url)
+```
+
+Nothing closes a client the caller forgot, so a loop that calls the factory per
+record without closing opens one pool per record. Tune it with environment
+variables:
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -138,6 +318,9 @@ behavior are predictable. Tune it with environment variables:
 | `AGENTIC_ODI_HTTP_TIMEOUT` | `30.0` | Per-request timeout in seconds |
 | `AGENTIC_ODI_HTTP_RETRIES` | `3` | Retries for connection-level failures |
 
-Invalid or out-of-range values fall back to the default instead of failing the
-process.
+An unset or empty variable uses its default. A present but invalid value — a
+typo, or a number below the minimum (1 for the pool size, 0.001 for the
+timeout, 0 for retries) — raises `ValueError` naming the variable, so a
+mistyped configuration fails loudly instead of silently behaving like the
+default.
 

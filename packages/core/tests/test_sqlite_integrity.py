@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import sys
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
+from agentic_odi_core import recovery
 from agentic_odi_core.errors import StoreCorrupt, error_status
 from agentic_odi_core.integrity import (
     BOOT_CHECK_VM_BUDGET,
@@ -22,10 +26,12 @@ from agentic_odi_core.integrity import (
 )
 from agentic_odi_core.intent_store import IntentStore
 from agentic_odi_core.recovery import (
+    backup_database,
     backup_prefix,
     corrupt_store_message,
     format_backup_time,
     latest_backup,
+    restore_database,
 )
 from agentic_odi_core.repository import InMemoryRepository
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -344,10 +350,31 @@ def test_latest_backup_is_none_when_nothing_exists(tmp_path) -> None:
     assert latest_backup("/home/me/.agentic-odi/odi.db", directory=tmp_path / "nope") is None
 
 
-def test_backup_time_is_read_from_the_filename(tmp_path) -> None:
-    assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == "06:14"
+def test_backup_time_is_local(tmp_path) -> None:
+    # The filename stamp is UTC; the display is the reader's local time. Compute
+    # the expectation from the same stamp so the test holds in any timezone.
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
+    assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == expected.strftime("%H:%M")
+
+
+def test_an_unparseable_stamp_returns_the_filename(tmp_path) -> None:
     # An unexpected name is shown as-is rather than dropped.
     assert format_backup_time(tmp_path / "odi-latest.db") == "odi-latest.db"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="time.tzset is not available on Windows")
+def test_backup_time_follows_a_non_utc_zone(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("TZ", "Etc/GMT-2")  # UTC+2
+    time.tzset()
+    try:
+        assert format_backup_time(tmp_path / "odi-20260102T061400Z.db") == "08:14"
+    finally:
+        monkeypatch.delenv("TZ", raising=False)
+        time.tzset()
 
 
 def test_the_message_names_the_file_and_the_last_backup(tmp_path) -> None:
@@ -359,8 +386,13 @@ def test_the_message_names_the_file_and_the_last_backup(tmp_path) -> None:
 
     message = corrupt_store_message(error, backup=backup)
 
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
     assert str(tmp_path / "odi.db") in message
-    assert "06:14" in message
+    assert f"Last backup: {expected.strftime('%H:%M')} local" in message
     assert backup.name in message
     assert "left untouched" in message
 
@@ -372,3 +404,252 @@ def test_the_message_is_actionable_when_no_backup_exists(tmp_path) -> None:
 
     assert "No backup exists yet." in message
     assert str(tmp_path / "odi.db") in message
+
+
+# -- backup and restore (issue #599) ---------------------------------------
+
+
+def _make_database(path) -> None:
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute("CREATE TABLE t (x INTEGER)")
+        conn.execute("INSERT INTO t VALUES (1)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _rows(path) -> list[tuple[int]]:
+    conn = sqlite3.connect(str(path))
+    try:
+        return conn.execute("SELECT x FROM t").fetchall()
+    finally:
+        conn.close()
+
+
+def test_backup_database_writes_a_verified_snapshot(tmp_path) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+
+    backup = backup_database(str(db), directory=tmp_path / "backups")
+
+    assert backup.exists()
+    assert backup.name.startswith("odi-")
+    assert backup.suffix == ".db"
+    # The snapshot is a real, intact copy of the data, not an empty file.
+    assert _rows(backup) == [(1,)]
+    conn = sqlite3.connect(str(backup))
+    try:
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        conn.close()
+
+
+def test_two_backups_in_one_second_are_two_files(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backups = tmp_path / "backups"
+    monkeypatch.setattr(recovery, "_timestamp", lambda: "20260101T000000Z")
+
+    first = backup_database(str(db), directory=backups)
+    second = backup_database(str(db), directory=backups)
+
+    assert first != second
+    assert first.exists() and second.exists()
+    assert len(list(backups.glob("odi-*.db"))) == 2
+
+
+def test_latest_backup_uses_mtime_not_name(tmp_path) -> None:
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    earlier_name = backups / "odi-20260101T060000Z.db"
+    later_name = backups / "odi-20260102T061400Z.db"
+    earlier_name.write_bytes(b"old")
+    later_name.write_bytes(b"new")
+    # The name says 2026-01-01 is older, but the file was written most
+    # recently: the newest backup is the one written last.
+    os.utime(earlier_name, (2_000_000_000, 2_000_000_000))
+    os.utime(later_name, (1_000_000_000, 1_000_000_000))
+
+    found = latest_backup("/home/me/.agentic-odi/odi.db", directory=backups)
+
+    assert found is not None
+    assert found.name == "odi-20260101T060000Z.db"
+
+
+def test_backup_time_handles_a_collision_suffix(tmp_path) -> None:
+    expected = (
+        datetime.strptime("20260102T061400Z", "%Y%m%dT%H%M%SZ")
+        .replace(tzinfo=timezone.utc)
+        .astimezone()
+    )
+    assert format_backup_time(tmp_path / "odi-20260102T061400Z-1.db") == expected.strftime("%H:%M")
+
+
+def test_restore_keeps_the_previous_file_as_pre_restore(tmp_path) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backup = backup_database(str(db), directory=tmp_path / "backups")
+    # Change the live file after the snapshot so the swap is observable.
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute("INSERT INTO t VALUES (2)")
+        conn.commit()
+    finally:
+        conn.close()
+
+    safety = restore_database(backup, str(db))
+
+    assert safety.name == "odi.db.pre-restore"
+    assert _rows(safety) == [(1,), (2,)]  # the file that was there is kept
+    assert _rows(db) == [(1,)]  # the snapshot is now live
+
+
+def test_restore_refuses_a_corrupt_snapshot_and_changes_nothing(tmp_path) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    broken = tmp_path / "odi-20260101T000000Z.db"
+    broken.write_bytes(b"not a database")
+
+    with pytest.raises(ValueError, match="integrity check"):
+        restore_database(broken, str(db))
+
+    # The live file is untouched and no safety copy was written.
+    assert _rows(db) == [(1,)]
+    assert not (tmp_path / "odi.db.pre-restore").exists()
+
+
+# -- backup retention (issue #1163) ----------------------------------------
+
+DAY = 24 * 60 * 60
+
+
+def _aged_backup(folder, name: str, age_seconds: int, *, now: float) -> None:
+    """Write a backup file and stamp its mtime ``age_seconds`` before ``now``."""
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / name
+    path.write_bytes(b"snapshot")
+    stamp = now - age_seconds
+    os.utime(path, (stamp, stamp))
+
+
+def test_prune_keeps_the_newest_n(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_BACKUP_KEEP", raising=False)
+    backups = tmp_path / "backups"
+    now = time.time()
+    names = [f"odi-2026010{i}T000000Z.db" for i in range(10)]
+    names += [f"odi-2026011{i}T000000Z.db" for i in range(10)]
+    for index, name in enumerate(names):
+        _aged_backup(backups, name, age_seconds=(len(names) - index) * 60, now=now)
+    newest_five = {path.name for path in sorted(backups.glob("odi-*.db"))[-5:]}
+
+    removed = recovery.prune_backups(
+        "/home/me/.agentic-odi/odi.db", keep=5, directory=backups, now=datetime.now(timezone.utc)
+    )
+
+    remaining = {path.name for path in backups.glob("odi-*.db")}
+    assert remaining == newest_five
+    assert len(removed) == 15
+
+
+def test_prune_never_deletes_one_per_day_for_a_week(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AGENTIC_ODI_BACKUP_KEEP", raising=False)
+    backups = tmp_path / "backups"
+    now = time.time()
+    for day in range(10):
+        for slot in range(3):
+            _aged_backup(
+                backups,
+                f"odi-2026010{day}-{slot}.db",
+                age_seconds=day * DAY + slot * 60,
+                now=now,
+            )
+
+    recovery.prune_backups(
+        "/home/me/.agentic-odi/odi.db", keep=2, directory=backups, now=datetime.now(timezone.utc)
+    )
+
+    remaining = {path.name for path in backups.glob("odi-*.db")}
+    # The newest two survive outright, the newest of each of the last seven days
+    # is protected, and days 7-9 are gone.
+    expected = {"odi-20260100-0.db", "odi-20260100-1.db"}
+    expected |= {f"odi-2026010{day}-0.db" for day in range(1, 7)}
+    assert remaining == expected
+
+
+def test_prune_does_not_delete_the_backup_it_just_wrote(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backups = tmp_path / "backups"
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "1")
+    monkeypatch.setattr(recovery, "_timestamp", lambda: "20260101T000000Z")
+    backup_database(str(db), directory=backups)
+
+    written = backup_database(str(db), directory=backups)
+
+    assert written.exists()
+    assert [path.name for path in backups.glob("odi-*.db")] == [written.name]
+
+
+def test_a_zero_keep_falls_back_to_the_default(tmp_path, monkeypatch) -> None:
+    backups = tmp_path / "backups"
+    now = time.time()
+    for index in range(recovery.DEFAULT_BACKUP_KEEP + 2):
+        _aged_backup(backups, f"odi-20260101T00{index:04d}Z.db", age_seconds=index * 60, now=now)
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "0")
+
+    recovery.prune_backups("/home/me/.agentic-odi/odi.db", directory=backups)
+
+    assert len(list(backups.glob("odi-*.db"))) == recovery.DEFAULT_BACKUP_KEEP
+
+
+def test_a_non_numeric_keep_falls_back_to_the_default(tmp_path, monkeypatch) -> None:
+    backups = tmp_path / "backups"
+    now = time.time()
+    _aged_backup(backups, "odi-20260101T000000Z.db", age_seconds=60, now=now)
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "lots")
+
+    assert recovery.prune_backups("/home/me/.agentic-odi/odi.db", directory=backups) == []
+
+
+def test_a_failed_unlink_does_not_raise(tmp_path, monkeypatch) -> None:
+    backups = tmp_path / "backups"
+    now = time.time()
+    for index in range(4):
+        _aged_backup(backups, f"odi-20260101T000{index:02d}Z.db", age_seconds=index * 60, now=now)
+    # The oldest snapshot is the one a keep=1 prune would remove first.
+    stuck = min(backups.glob("odi-*.db"), key=lambda path: path.stat().st_mtime_ns)
+    original = Path.unlink
+
+    def refuse(self, *args, **kwargs):
+        if self == stuck:
+            raise PermissionError("read-only directory")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", refuse)
+
+    removed = recovery.prune_backups("/home/me/.agentic-odi/odi.db", keep=1, directory=backups)
+
+    assert stuck.exists()
+    assert stuck not in removed
+    assert len(removed) == 2
+
+
+def test_a_failed_backup_does_not_prune(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "odi.db"
+    _make_database(db)
+    backups = tmp_path / "backups"
+    now = time.time()
+    _aged_backup(backups, "odi-20200101T000000Z.db", age_seconds=100 * DAY, now=now)
+    monkeypatch.setenv("AGENTIC_ODI_BACKUP_KEEP", "1")
+    monkeypatch.setattr(recovery, "_integrity_ok", lambda path: False)
+
+    with pytest.raises(RuntimeError, match="integrity check"):
+        backup_database(str(db), directory=backups)
+
+    # The unverified snapshot was removed; the pre-existing history was not pruned.
+    assert (backups / "odi-20200101T000000Z.db").exists()
+
+
+def test_prune_is_a_no_op_when_no_backup_exists(tmp_path) -> None:
+    assert recovery.prune_backups("/home/me/.agentic-odi/odi.db", directory=tmp_path / "none") == []

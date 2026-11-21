@@ -17,21 +17,55 @@ const actionList: UiPropSchema = {
   type: "array",
   maxItems: UI_LIMITS.maxActions,
   description:
-    "Buttons rendered under the surface. Each one sends its `intent` back to you as the user's next message.",
+    "Buttons rendered under the surface. An intent button sends its `intent` back to you as the user's next message; a detail button opens the right region on a record and sends nothing.",
   items: {
-    type: "object",
-    properties: {
-      label: {
-        type: "string",
-        description: "Short imperative label, two to four words. e.g. \"Simulate this bet\"",
+    anyOf: [
+      {
+        type: "object",
+        properties: {
+          label: {
+            type: "string",
+            description: "Short imperative label, two to four words. e.g. \"Simulate this bet\"",
+          },
+          intent: {
+            type: "string",
+            description: "The full message to send when clicked, written as the user would say it.",
+          },
+          tone: { enum: ["primary", "ghost"], description: "Use primary at most once per surface." },
+        },
+        required: ["label", "intent"],
       },
-      intent: {
-        type: "string",
-        description: "The full message to send when clicked, written as the user would say it.",
+      {
+        type: "object",
+        properties: {
+          kind: { enum: ["detail"] },
+          label: {
+            type: "string",
+            description: "Short imperative label, two to four words. e.g. \"See the finding\"",
+          },
+          target: {
+            type: "object",
+            properties: {
+              panel: {
+                type: "string",
+                description: "The right-region lens to open. e.g. \"landscape\", \"jobmap\", \"evidence\".",
+              },
+              subject: {
+                type: "object",
+                properties: {
+                  kind: { type: "string", description: "The record kind. e.g. \"outcome\", \"job\"." },
+                  id: { type: "string", description: "The record id the lens should focus." },
+                },
+                required: ["kind", "id"],
+              },
+            },
+            required: ["panel"],
+          },
+          tone: { enum: ["primary", "ghost"], description: "Use primary at most once per surface." },
+        },
+        required: ["kind", "label", "target"],
       },
-      tone: { enum: ["primary", "ghost"], description: "Use primary at most once per surface." },
-    },
-    required: ["label", "intent"],
+    ],
   },
 };
 
@@ -440,6 +474,59 @@ export const CATALOG: readonly UiCatalogEntry[] = [
       },
     },
     ["kind", "thesis", "rejected"],
+  ),
+  entry(
+    "finding-card",
+    "leaf",
+    "One finding the PM should act on: a headline claim, the impact band, the measured number behind it, and the step it happens on. Use it when one sentence matters more than the rest of the reply — and give it one detail action labelled \"View breakdown\" pointing at the record it is about, so the line opens on the right instead of costing a turn.",
+    {
+      kind: {
+        enum: ["key_finding", "risk", "opportunity"],
+        description:
+          "What sort of finding this is. Defaults to key_finding. Omit it rather than guessing.",
+      },
+      headline: {
+        type: "string",
+        description:
+          "One claim per line, tied to a number, a step, or a named actor. No hedging, no qualifiers, no \"we believe\".",
+      },
+      impact: {
+        enum: ["high", "medium", "low"],
+        description:
+          "The impact band, shown beside the number. Omit it when the evidence does not support one.",
+      },
+      detail: {
+        type: "string",
+        description:
+          "What is happening, in two plain sentences. Explain the number; do not restate it.",
+      },
+      metric: {
+        type: "object",
+        properties: {
+          label: {
+            type: "string",
+            description: "What the number measures, e.g. \"Drop-off at Step 2\".",
+          },
+          value: {
+            type: "string",
+            description:
+              "The measured number, pre-formatted with its unit and copied from the data. Never a number the agent did not measure.",
+          },
+          delta: {
+            type: "string",
+            description:
+              "An optional comparison against an earlier measurement, in the words the data already uses.",
+          },
+        },
+        required: ["label", "value"],
+      },
+      step: {
+        type: "string",
+        description:
+          "The Step.name this happens on, copied from canvas.steps. Omit it when the finding is not about one step; never invent a step.",
+      },
+    },
+    ["headline", "detail", "metric"],
   ),
 ];
 

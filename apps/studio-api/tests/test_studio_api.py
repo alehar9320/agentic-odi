@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import socket
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from agentic_odi_core import InMemoryRepository, ODIService
 from agentic_odi_studio_api.app import create_app
+from agentic_odi_studio_api.studio.router import _with_stored_key
 from fastapi.testclient import TestClient
 
 OFFLINE = {
@@ -90,7 +92,10 @@ def _stream(path: str, payload: dict[str, Any]) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
-def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_returns_env_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Isolate the per-user secret store so this assertion does not depend on a
+    # key the developer happens to have saved (atomic-test rule in AGENTS.md).
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://llm:9999/v1")
     monkeypatch.setenv("AGENTIC_ODI_API_KEY", "secret-key")
     monkeypatch.setenv("AGENTIC_ODI_MODEL", "my-model")
@@ -99,12 +104,16 @@ def test_config_returns_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     response = _client().get("/api/config")
 
     assert response.status_code == 200
+    # The endpoint and model are defaults; the key is not: it is held by the
+    # sidecar's write-only store and reported only as a state.
     assert response.json()["defaults"] == {
         "base_url": "http://llm:9999/v1",
-        "api_key": "secret-key",
+        "api_key": "",
         "model_name": "my-model",
         "mcp_url": "http://mcp:9999/mcp",
     }
+    assert "secret-key" not in response.text
+    assert response.json()["model_key"] == {"configured": False, "set_at": None}
 
 
 def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,10 +129,75 @@ def test_config_uses_streamlit_compatible_fallbacks(monkeypatch: pytest.MonkeyPa
 
     assert defaults == {
         "base_url": "http://localhost:8001/v1",
-        "api_key": "local",
+        "api_key": "",
         "model_name": "local-tools-model",
         "mcp_url": "http://localhost:8000/mcp",
     }
+
+
+def _patch_load_model_key(monkeypatch: pytest.MonkeyPatch, value):
+    monkeypatch.setattr(
+        "agentic_odi_studio_api.studio.router.load_model_key",
+        lambda: value,
+    )
+
+
+def test_with_stored_key_uses_stored_key_for_configured_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, "sk-stored")
+    assert _with_stored_key("", "http://configured:9/v1") == "sk-stored"
+
+
+def test_with_stored_key_withholds_stored_key_for_foreign_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, "sk-stored")
+    # A custom or foreign origin must never receive the stored key.
+    assert _with_stored_key("", "http://evil:1/v1") == ""
+
+
+def test_with_stored_key_uses_request_key_when_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, "sk-stored")
+    assert _with_stored_key("sk-client", "http://evil:1/v1") == "sk-client"
+
+
+def test_with_stored_key_withholds_the_configured_key_from_a_foreign_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    monkeypatch.setenv("AGENTIC_ODI_API_KEY", "sk-operator-DO-NOT-LEAK")
+    _patch_load_model_key(monkeypatch, None)
+    # The profile's own key is a credential too: a caller that supplies a foreign
+    # base_url must not receive it either.
+    assert _with_stored_key("", "http://evil:1/v1") == ""
+
+
+def test_with_stored_key_falls_back_to_default_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    _patch_load_model_key(monkeypatch, None)
+    # No stored key: fall back to the profile default api key ("local").
+    assert _with_stored_key("", "http://configured:9/v1") == "local"
+
+
+def test_with_stored_key_treats_store_failure_as_no_stored_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+
+    from agentic_odi_studio_api.studio.secrets import SecretStoreError
+
+    # The throw happens inside the lambda body, so it is raised when
+    # load_model_key is called, not when it is patched.
+    monkeypatch.setattr(
+        "agentic_odi_studio_api.studio.router.load_model_key",
+        lambda: (_ for _ in ()).throw(SecretStoreError("unwritable")),
+    )
+    # Store failure is treated as no stored key: fall back to the default.
+    assert _with_stored_key("", "http://configured:9/v1") == "local"
 
 
 # ---------------------------------------------------------------------------
@@ -408,6 +482,7 @@ def test_promote_evidence_creates_a_scored_outcome() -> None:
         name="Call with Ada",
         content="Third time staging broke after a secret rotation.",
         job_id=job.id,
+        confidence="verified",
     )
 
     response = TestClient(create_app(repo)).post(
@@ -616,6 +691,68 @@ def test_pm_authored_context_can_start_confirmed() -> None:
     )
     assert response.status_code == 200
     assert response.json()["observation"]["status"] == "confirmed"
+
+
+def test_an_observation_carries_a_subject_and_can_be_filtered_by_it() -> None:
+    client = _client()
+    attached = client.post(
+        "/api/memory/observations",
+        json={
+            "kind": "opportunity",
+            "text": "Activation is stuck.",
+            "subject_type": "outcome",
+            "subject_id": "O-12",
+        },
+    )
+    assert attached.status_code == 200
+    observation = attached.json()["observation"]
+    assert observation["subject_type"] == "outcome"
+    assert observation["subject_id"] == "O-12"
+
+    client.post(
+        "/api/memory/observations",
+        json={
+            "kind": "opportunity",
+            "text": "Retention is stuck.",
+            "subject_type": "outcome",
+            "subject_id": "O-13",
+        },
+    )
+    client.post("/api/memory/observations", json={"kind": "career", "text": "Owns activation."})
+
+    filtered = client.get("/api/memory/observations?subject_type=outcome&subject_id=O-12").json()[
+        "observations"
+    ]
+    assert [item["text"] for item in filtered] == ["Activation is stuck."]
+
+
+def test_an_unknown_subject_type_is_a_422() -> None:
+    client = _client()
+    response = client.post(
+        "/api/memory/observations",
+        json={
+            "kind": "opportunity",
+            "text": "Activation is stuck.",
+            "subject_type": "planet",
+            "subject_id": "O-12",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_repeating_an_observation_does_not_duplicate_it() -> None:
+    client = _client()
+    body = {
+        "kind": "opportunity",
+        "text": "Activation is stuck.",
+        "subject_type": "outcome",
+        "subject_id": "O-12",
+    }
+    first = client.post("/api/memory/observations", json=body).json()["observation"]
+    second = client.post("/api/memory/observations", json=body).json()["observation"]
+
+    assert second["id"] == first["id"]
+    assert len(client.get("/api/memory/observations").json()["observations"]) == 1
 
 
 def test_conversation_endpoints_and_chat_persistence() -> None:

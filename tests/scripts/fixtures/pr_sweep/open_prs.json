@@ -1,0 +1,141 @@
+[
+  {
+    "number": 1101,
+    "title": "Add a helper for the ODX export path",
+    "createdAt": "2026-11-10T09:00:00Z",
+    "updatedAt": "2026-11-15T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "main",
+    "headRefName": "feat/a",
+    "body": "Small helper, no behaviour change.",
+    "files": [
+      {"path": "packages/core/src/agentic_odi_core/odx.py", "additions": 20, "deletions": 0, "changeType": "ADDED"},
+      {"path": "tests/core/test_odx.py", "additions": 12, "deletions": 0, "changeType": "ADDED"}
+    ]
+  },
+  {
+    "number": 1102,
+    "title": "Rename the export command",
+    "createdAt": "2026-11-09T09:00:00Z",
+    "updatedAt": "2026-11-14T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "main",
+    "headRefName": "feat/rename-export",
+    "body": "Superseded by #1090, which already merged.",
+    "files": [
+      {"path": "apps/cli/src/agentic_odi_cli/export.py", "additions": 4, "deletions": 4, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1103,
+    "title": "Old experiment with the scoring weights",
+    "createdAt": "2026-10-18T09:00:00Z",
+    "updatedAt": "2026-10-27T00:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "main",
+    "headRefName": "feat/weights",
+    "body": "Trying a different weight for underserved.",
+    "files": [
+      {"path": "packages/core/src/agentic_odi_core/scoring.py", "additions": 30, "deletions": 10, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1104,
+    "title": "Follow-up to the ODX helper",
+    "createdAt": "2026-11-12T09:00:00Z",
+    "updatedAt": "2026-11-15T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "feat/a",
+    "headRefName": "feat/a-followup",
+    "body": "Builds on #1101; merge that first.",
+    "files": [
+      {"path": "packages/core/src/agentic_odi_core/odx.py", "additions": 5, "deletions": 1, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1105,
+    "title": "WIP: new landing page",
+    "createdAt": "2026-11-14T09:00:00Z",
+    "updatedAt": "2026-11-15T09:00:00Z",
+    "isDraft": true,
+    "mergeable": "UNKNOWN",
+    "baseRefName": "main",
+    "headRefName": "feat/landing",
+    "body": "Not ready for review.",
+    "files": [
+      {"path": "website/src/pages/index.astro", "additions": 60, "deletions": 2, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1106,
+    "title": "Conflicting dependency bump",
+    "createdAt": "2026-11-13T09:00:00Z",
+    "updatedAt": "2026-11-15T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "CONFLICTING",
+    "baseRefName": "main",
+    "headRefName": "dependabot/uv/httpx",
+    "body": "Bumps httpx.",
+    "files": [
+      {"path": "uv.lock", "additions": 8, "deletions": 8, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1107,
+    "title": "Draft that went quiet",
+    "createdAt": "2026-10-20T09:00:00Z",
+    "updatedAt": "2026-10-25T09:00:00Z",
+    "isDraft": true,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "main",
+    "headRefName": "feat/quiet-draft",
+    "body": "Draft and untouched for weeks.",
+    "files": [
+      {"path": "docs/notes.md", "additions": 3, "deletions": 0, "changeType": "ADDED"}
+    ]
+  },
+  {
+    "number": 1108,
+    "title": "Stacked on #1101 and also superseded",
+    "createdAt": "2026-11-11T09:00:00Z",
+    "updatedAt": "2026-11-15T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "feat/a",
+    "headRefName": "feat/a-second",
+    "body": "Superseded by #1090, and it is also stacked on #1101.",
+    "files": [
+      {"path": "packages/core/src/agentic_odi_core/odx.py", "additions": 2, "deletions": 0, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1109,
+    "title": "Abandoned and stacked",
+    "createdAt": "2026-10-19T09:00:00Z",
+    "updatedAt": "2026-10-25T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "feat/a",
+    "headRefName": "feat/a-old",
+    "body": "Stacked on #1101 but untouched for weeks.",
+    "files": [
+      {"path": "packages/core/src/agentic_odi_core/odx.py", "additions": 1, "deletions": 1, "changeType": "MODIFIED"}
+    ]
+  },
+  {
+    "number": 1110,
+    "title": "Row with no update time",
+    "createdAt": "2026-11-10T09:00:00Z",
+    "isDraft": false,
+    "mergeable": "MERGEABLE",
+    "baseRefName": "main",
+    "headRefName": "feat/no-update",
+    "body": "",
+    "files": []
+  },
+  "not a dict"
+]

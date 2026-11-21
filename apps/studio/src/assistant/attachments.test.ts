@@ -15,6 +15,7 @@ import {
   formatFileSize,
   isTextLike,
   prepareAttachment,
+  tooLargeMessage,
 } from "./attachments";
 
 function fileOf(name: string, type: string, size = 10): File {
@@ -26,6 +27,11 @@ function fileOf(name: string, type: string, size = 10): File {
 const docxFixture = (name: string): File =>
   new File([readFileSync(`src/assistant/extract/__fixtures__/${name}`)], name, {
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  });
+
+const pdfFixture = (name: string): File =>
+  new File([readFileSync(`src/assistant/extract/__fixtures__/${name}`)], name, {
+    type: "application/pdf",
   });
 
 describe("attachmentRejection", () => {
@@ -68,8 +74,15 @@ describe("attachmentRejection", () => {
     expect(rejection).toContain("5 MB");
   });
 
-  it("rejects a file the studio cannot read", () => {
-    expect(attachmentRejection(fileOf("deck.pdf", "application/pdf"))).toContain("deck.pdf");
+  it("accepts a .pdf by name and by the PDF content type", () => {
+    expect(attachmentRejection(fileOf("deck.pdf", ""))).toBeNull();
+    expect(attachmentRejection(fileOf("deck", "application/pdf"))).toBeNull();
+  });
+
+  it("refuses a .pdf over the size limit before it is ever read", () => {
+    const rejection = attachmentRejection(fileOf("huge.pdf", "application/pdf", MAX_DOCUMENT_BYTES + 1));
+    expect(rejection).toContain("huge.pdf");
+    expect(rejection).toContain("25 MB");
   });
 
   it("rejects an image format the model cannot be sent", () => {
@@ -101,6 +114,42 @@ describe("prepareAttachment", () => {
     await expect(prepareAttachment(docxFixture("legacy.doc"))).rejects.toBeInstanceOf(
       AttachmentReadError,
     );
+  });
+});
+
+describe("prepareAttachment with a PDF", () => {
+  it("gives a .pdf the same shape of record as a text file", async () => {
+    const text = await prepareAttachment(fileOf("notes.md", "text/markdown"));
+    const pdf = await prepareAttachment(pdfFixture("two-page.pdf"));
+    expect(Object.keys(pdf).sort()).toEqual(Object.keys(text).sort());
+    expect(pdf).toMatchObject({ name: "two-page.pdf" });
+    expect(pdf.text).toContain("[page 1]");
+    expect(pdf.text).toContain("The onboarding step takes far too long today.");
+  });
+
+  it("keeps whole pages and announces the cut in the extracted text", async () => {
+    const pdf = await prepareAttachment(pdfFixture("long.pdf"));
+    expect(pdf.text).toContain("[Truncated:");
+    expect(pdf.text).toMatch(/\[Truncated: \d+ pages were left out/);
+  });
+
+  it("refuses a PDF with no text layer with a sentence, not a blank attachment", async () => {
+    const failure = await prepareAttachment(pdfFixture("no-text-layer.pdf")).catch(
+      (error) => error,
+    );
+    expect(failure).toBeInstanceOf(AttachmentReadError);
+    expect((failure as AttachmentReadError).code).toBe("refused");
+    expect((failure as AttachmentReadError).message).toContain("no text layer");
+  });
+
+  it("hands the composer a failed chip carrying the PDF's own reason", async () => {
+    const states = await addedStates(createAttachmentAdapter(), pdfFixture("encrypted.pdf"));
+
+    expect(states).toHaveLength(1);
+    const status = states[0]!.status;
+    expect(status.type).toBe("incomplete");
+    expect(status).toMatchObject({ reason: "error" });
+    expect((status as { message?: string }).message).toContain("password");
   });
 });
 
@@ -161,6 +210,83 @@ describe("an unreadable file", () => {
   });
 });
 
+
+/**
+ * A text file whose bytes are actually readable, with the exact character count
+ * the caller asks for. Unlike `fileOf`, `.text()` returns real content.
+ */
+function textFileOf(name: string, text: string): File {
+  return new File([text], name, { type: "text/markdown" });
+}
+
+describe("an over-limit text file", () => {
+  it("is refused rather than silently shortened, naming the file and the limit", async () => {
+    const failure = await prepareAttachment(
+      textFileOf("interview.md", "a".repeat(MAX_ATTACHMENT_CHARS + 5)),
+    ).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(AttachmentReadError);
+    expect((failure as AttachmentReadError).name).toBe("interview.md");
+    expect((failure as AttachmentReadError).code).toBe("too_large");
+    expect((failure as AttachmentReadError).message).toBe(tooLargeMessage("interview.md"));
+    expect((failure as AttachmentReadError).message).toContain("20,000");
+  });
+
+  it("keeps the whole file when it is exactly at the limit", async () => {
+    const text = "a".repeat(MAX_ATTACHMENT_CHARS);
+    const prepared = await prepareAttachment(textFileOf("notes.md", text));
+    expect(prepared.text).toBe(text);
+    expect(prepared.text).toHaveLength(MAX_ATTACHMENT_CHARS);
+  });
+
+  it("hands the composer a failed chip that explains the limit, not a shortened file", async () => {
+    const states = await addedStates(
+      createAttachmentAdapter(),
+      textFileOf("interview.md", "a".repeat(MAX_ATTACHMENT_CHARS + 1)),
+    );
+
+    expect(states).toHaveLength(1);
+    expect(states[0]).toMatchObject({
+      name: "interview.md",
+      status: {
+        type: "incomplete",
+        reason: "error",
+        message: tooLargeMessage("interview.md"),
+      },
+    });
+  });
+});
+
+// The client counts UTF-16 code units (`String.length`); the sidecar counts
+// code points (`len()` on a Python `str`). For BMP text — including this file,
+// whose every character is one unit in both — the two agree, so a file at the
+// limit reaches the sidecar whole. They diverge only for astral characters
+// (an emoji is two UTF-16 units but one code point): a file of 20,000 emoji is
+// refused here as 40,000 units even though the sidecar would accept it. The
+// client is the stricter of the two, so nothing that passes the client is cut
+// by the sidecar; neither limit is changed to paper over the difference.
+describe("the client and sidecar character caps", () => {
+  it("agree for BMP text at the shared limit", () => {
+    const bmp = "a".repeat(MAX_ATTACHMENT_CHARS);
+    expect(bmp.length).toBe(MAX_ATTACHMENT_CHARS);
+    expect([...bmp].length).toBe(MAX_ATTACHMENT_CHARS);
+  });
+
+  it("counts an astral character as two units on the client, one code point on the sidecar", () => {
+    const emoji = "🎯";
+    expect(emoji.length).toBe(2);
+    expect([...emoji].length).toBe(1);
+  });
+
+  it("accepts a 20,000-unit file that carries an emoji, because the client is the stricter count", async () => {
+    const text = "a".repeat(MAX_ATTACHMENT_CHARS - 2) + "🎯";
+    expect(text.length).toBe(MAX_ATTACHMENT_CHARS);
+    expect([...text].length).toBeLessThan(MAX_ATTACHMENT_CHARS);
+
+    const prepared = await prepareAttachment(textFileOf("notes.md", text));
+    expect(prepared.text).toBe(text);
+  });
+});
 
 describe("formatFileSize", () => {
   it("reads at a human scale", () => {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 
 import { asStudioError } from "../../api/studioApi";
 import { focusLastClaimChip } from "../../assistant/claims";
-import { savedCopyCaption } from "../../lib/canvasProvenance";
+import { keptByBrowserCaption, savedCopyCaption } from "../../lib/canvasProvenance";
 import { formatOpportunityScore, opportunityPill } from "../../lib/odi";
 import { useStudio } from "../../state/StudioContext";
 import type { Evidence, StudioError } from "../../types";
@@ -53,6 +53,7 @@ export function EvidenceStream() {
   const [satisfaction, setSatisfaction] = useState(3.5);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<StudioError | null>(null);
+  const [moveAnnouncement, setMoveAnnouncement] = useState("");
 
   const ordered = useMemo(() => {
     const byId = new Map(evidence.map((item) => [item.id, item]));
@@ -70,6 +71,7 @@ export function EvidenceStream() {
   // failed one they are the previous copy, and the caption says so rather than
   // letting them read as freshly confirmed.
   const savedCaption = canvasCached ? savedCopyCaption(canvasState.data) : null;
+  const keptCaption = keptByBrowserCaption(canvasState.data);
 
   const outcomes = useMemo(() => canvasState.data?.outcomes ?? [], [canvasState.data]);
   const outcomeMap = useMemo(
@@ -103,12 +105,23 @@ export function EvidenceStream() {
   const move = (id: string, delta: number) => {
     const index = ordered.findIndex((item) => item.id === id);
     const target = index + delta;
-    if (index < 0 || target < 0 || target >= ordered.length) {
+    if (index < 0) {
+      return;
+    }
+    const item = ordered[index];
+    const label = item.name || item.source_name || "Untitled evidence";
+    if (target < 0) {
+      setMoveAnnouncement("Already first.");
+      return;
+    }
+    if (target >= ordered.length) {
+      setMoveAnnouncement("Already last.");
       return;
     }
     const next = [...ordered];
     [next[index], next[target]] = [next[target], next[index]];
     commit(next);
+    setMoveAnnouncement(`${label} moved to position ${target + 1} of ${ordered.length}.`);
   };
 
   const dropOn = (targetId: string) => {
@@ -126,6 +139,8 @@ export function EvidenceStream() {
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     commit(next);
+    const label = moved.name || moved.source_name || "Untitled evidence";
+    setMoveAnnouncement(`${label} moved to position ${to + 1} of ${ordered.length}.`);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>, id: string) => {
@@ -238,6 +253,16 @@ export function EvidenceStream() {
       {savedCaption ? (
         <p className="canvas-saved" role="status">
           {savedCaption}
+        </p>
+      ) : null}
+      {keptCaption ? (
+        <p className="canvas-saved" role="status">
+          {keptCaption}
+        </p>
+      ) : null}
+      {moveAnnouncement ? (
+        <p className="sr-only" role="status" aria-live="polite">
+          {moveAnnouncement}
         </p>
       ) : null}
 

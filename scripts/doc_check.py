@@ -53,6 +53,13 @@ PATH_PARAM = re.compile(r"\{[^}]+\}")
 ENV_VAR = re.compile(r"\bAGENTIC_ODI_[A-Z0-9_]+\b")
 COMMAND_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
 
+_FRONT_MATTER_RE = re.compile(r"^---\n.*?\n---\n?", re.DOTALL)
+
+
+def strip_front_matter(text: str) -> str:
+    """Remove YAML front matter from markdown if present."""
+    return _FRONT_MATTER_RE.sub("", text, count=1)
+
 
 def documentation(root: Path = ROOT) -> dict[str, str]:
     """Every living Markdown document the drift check reads.
@@ -67,7 +74,7 @@ def documentation(root: Path = ROOT) -> dict[str, str]:
         relative = path.relative_to(root).as_posix()
         if relative.startswith("docs/superpowers/"):
             continue
-        docs[relative] = path.read_text(encoding="utf-8")
+        docs[relative] = strip_front_matter(path.read_text(encoding="utf-8"))
     return docs
 
 
@@ -304,10 +311,76 @@ def readme_code_overview_paths(readme: str) -> list[str]:
 
 LEDGER_HEADING = "# The assistant-ui ledger"
 LEDGER_SOURCE = "docs/assistant-ui-ledger.md"
-LEDGER_PROJECTION_HEADING = "#### What the runtime gives us, and what we did not take"
 LEDGER_STATUSES = {"Adopted", "Partial", "Planned", "Decision", "Rejected"}
 LEDGER_CITATION = re.compile(r"#(\d+)")
 LEDGER_DASH = "—"
+# The tree that actually imports the primitives. Docs prose is excluded on
+# purpose: a mention in living-studio.md is not an adoption.
+LEDGER_PRIMITIVE_SOURCE_GLOB = "apps/studio/src/**/*.ts*"
+
+
+def _primitive_tokens(capability: str) -> list[str]:
+    """The literal primitive names a ledger row is about.
+
+    A row like ``ActionBarPrimitive.Speak / .StopSpeaking`` is about two
+    primitives; ``threads.item().rename() / .updateCustom()`` is about two
+    state hooks. Splitting on `` / `` and stripping trailing punctuation is
+    enough, because every token in the ledger is a code span or a dotted path.
+
+    Only tokens that are unambiguous primitive references are returned. A bare
+    member name such as ``.Title`` or ``.Delete`` is dropped: those words occur
+    all over the tree in unrelated code, and matching them would cry wolf. The
+    library names every primitive with a ``Primitive`` suffix or a dotted path
+    (``thread.canResume``, ``adapters.threadList``), and every unstable hook
+    with an ``unstable_`` prefix — so a token is kept only when it contains
+    ``Primitive``, contains a ``.`` that is not a leading dot, or starts with
+    ``unstable_``.
+    """
+    tokens: list[str] = []
+    for part in capability.split(" / "):
+        token = part.strip().strip("`").rstrip(")").strip()
+        if not token:
+            continue
+        if (
+            "Primitive" in token
+            or ("." in token and not token.startswith("."))
+            or token.startswith("unstable_")
+        ):
+            tokens.append(token)
+    return tokens
+
+
+def planned_rows_cite_installed_primitives(source: str, root: Path = ROOT) -> list[str]:
+    """A *Planned* row may not name a primitive the code already imports.
+
+    The merged-citation rule (``planned row cites #N, which already merged``)
+    needs git history to know what shipped, so on a shallow checkout it is
+    skipped and a green docs job proves nothing about staleness. This rule has
+    no such dependency: it reads the tree, so it runs everywhere — including a
+    checkout with no history and a restricted agent sandbox — and it catches
+    the case the citation rule misses, where a row stayed *Planned* after the
+    capability landed without a citation being updated.
+    """
+    files = sorted(root.glob(LEDGER_PRIMITIVE_SOURCE_GLOB))
+    contents = {path.relative_to(root): path.read_text(encoding="utf-8") for path in files}
+    issues: list[str] = []
+    for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
+        if len(cells) != 5:
+            continue
+        capability, status, *_ = cells
+        if status != "Planned":
+            continue
+        for token in _primitive_tokens(capability):
+            for rel, text in contents.items():
+                if token in text:
+                    issues.append(
+                        f"planned row cites an installed primitive: {capability} ({token} in {rel})"
+                    )
+                    break
+            else:
+                continue
+            break
+    return issues
 
 
 def _section_lines(text: str, heading: str) -> list[str]:
@@ -343,30 +416,41 @@ def _table_rows(lines: list[str]) -> list[list[str]]:
     return rows
 
 
+def ledger_rows(source: str) -> list[list[str]]:
+    """The five-column capability rows of the ledger, in file order.
+
+    The ``## The count`` table and the Living Studio projection are generated
+    from these rows by ``scripts/docs_index.py``; the generator and this module
+    share this one parser so a row is read the same way in both places.
+    """
+    return [
+        cells for cells in _table_rows(_section_lines(source, LEDGER_HEADING)) if len(cells) == 5
+    ]
+
+
 def ledger_errors(
     source: str,
-    projection: str,
     root: Path = ROOT,
     delivered: set[str] | None = None,
 ) -> list[str]:
-    """Check the assistant-ui ledger page and its Living Studio projection.
+    """Row-validity for the assistant-ui ledger.
+
+    The ``## The count`` table and the Living Studio projection are generated
+    from these rows by ``scripts/docs_index.py``, so this checker no longer
+    polices their arithmetic — ``docs_index.py --check`` fails when either
+    generated block is stale. What remains is the judgement a generator cannot
+    make: a status is known, an ``Adopted`` row cites a delivery that history
+    proves merged and names a file that exists, and a ``Planned`` row does not
+    cite one that already landed.
 
     ``delivered`` is the set of issue/PR numbers this repository's history
     proves merged. It is only supplied by the command-line entry point, which
     reads git; on a shallow checkout the membership rule is skipped, because a
     green docs job must not depend on how deep the clone happened to be.
     """
-    has_source = LEDGER_HEADING in source
-    has_projection = LEDGER_PROJECTION_HEADING in projection
-    if not has_source and not has_projection:
+    if LEDGER_HEADING not in source:
         return []
     issues: list[str] = []
-    if not has_source:
-        return ["ledger projection exists but the source section is missing"]
-    if not has_projection:
-        return ["the ledger exists but its Living Studio projection is missing"]
-
-    rows: list[tuple[str, str, str, str]] = []
     seen: set[str] = set()
     for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
         if len(cells) != 5:
@@ -378,7 +462,6 @@ def ledger_errors(
         if status not in LEDGER_STATUSES:
             issues.append(f"unknown ledger status {status!r} for {capability}")
             continue
-        rows.append((capability, status, file_cell, delivered_cell))
         if status == "Adopted":
             citation = LEDGER_CITATION.fullmatch(delivered_cell)
             if citation is None:
@@ -403,35 +486,6 @@ def ledger_errors(
                 )
         elif delivered_cell != LEDGER_DASH:
             issues.append(f"{status.lower()} row must not cite a delivery: {capability}")
-
-    tallies: dict[str, int] = {}
-    declared: dict[str, int] = {}
-    for cells in _table_rows(_section_lines(source, LEDGER_HEADING)):
-        if len(cells) == 2:
-            if not cells[1].isdigit():
-                issues.append(f"count table row is not a number: {cells[1]}")
-                continue
-            declared[cells[0]] = int(cells[1])
-    for _, status, _, _ in rows:
-        tallies[status] = tallies.get(status, 0) + 1
-    for status in sorted(LEDGER_STATUSES):
-        if declared.get(status) != tallies.get(status, 0):
-            issues.append(
-                f"count table says {declared.get(status)} {status}, the rows say {tallies.get(status, 0)}"
-            )
-    if declared.get("Total") != len(rows):
-        issues.append(f"count table says {declared.get('Total')} total, the rows count {len(rows)}")
-
-    projected = {
-        (cells[0], cells[1], cells[3])
-        for cells in _table_rows(_section_lines(projection, LEDGER_PROJECTION_HEADING))
-        if len(cells) == 4
-    }
-    expected = {(r[0], r[1], r[3]) for r in rows if r[1] in {"Adopted", "Partial"}}
-    for missing in sorted(expected - projected):
-        issues.append(f"projection is missing a ledger row: {missing[0]}")
-    for extra in sorted(projected - expected):
-        issues.append(f"projection carries a row the ledger does not adopt: {extra[0]}")
     return issues
 
 
@@ -498,10 +552,13 @@ def collect_issues(root: Path = ROOT, delivered: set[str] | None = None) -> list
         f"assistant-ui ledger: {issue}"
         for issue in ledger_errors(
             docs.get(LEDGER_SOURCE, ""),
-            docs.get("docs/living-studio.md", ""),
             root=root,
             delivered=delivered,
         )
+    ]
+    issues += [
+        f"assistant-ui ledger: {issue}"
+        for issue in planned_rows_cite_installed_primitives(docs.get(LEDGER_SOURCE, ""), root=root)
     ]
     return issues
 

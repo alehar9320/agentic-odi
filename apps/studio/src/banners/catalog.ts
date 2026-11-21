@@ -80,6 +80,14 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     body: "The change was not saved. Nothing was written to your ODI repository.",
     dismissible: true,
   },
+  "model-key-unsaved": {
+    severity: "warning",
+    life: "persistent",
+    dock: "top",
+    title: "Your saved API key could not be moved to the sidecar.",
+    body: "The key is still on this device and nothing was lost. Retry once the sidecar is running.",
+    dismissible: true,
+  },
   info: {
     severity: "info",
     life: "transient",

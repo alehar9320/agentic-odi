@@ -31,3 +31,8 @@ decisions.
 | [0003](0003-consent-on-the-domain-path.md) | Put consent on the domain path, not the Studio's chat loop | proposed |
 | [0004](0004-two-stores-one-reference.md) | Two stores stay two stores; the reference between them becomes honest | proposed |
 | [0005](0005-core-layers-and-the-contract-split.md) | Name core's four layers; do not split `contract.py` out yet | accepted |
+| [0006](0006-browser-first-studio-sidecar-optional.md) | Browser-first, sidecar-optional Studio | proposed |
+| [0007](0007-branch-protection-enforces-checks-not-labels.md) | Branch protection enforces the checks, not the label | accepted |
+| [0008](0008-dependency-advisories-are-a-gate.md) | Dependency advisories are a gate, not a report | accepted |
+| [0009](0009-ai-merge-gate-reads-the-check-suite.md) | The AI merge gate reads the check suite, not the commit status | accepted |
+| [0010](0010-pre-pr-gate-covers-required-ci-jobs.md) | The pre-PR gate accounts for every required CI job | accepted |

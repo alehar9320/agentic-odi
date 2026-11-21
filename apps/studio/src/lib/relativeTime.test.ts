@@ -5,6 +5,7 @@ import {
   formatClockTime,
   formatDayHeading,
   formatRelativeTime,
+  formatTurnTime,
   groupByDay,
   startsNewDay,
 } from "./relativeTime";
@@ -32,6 +33,30 @@ describe("formatRelativeTime", () => {
 
   it("says Recently instead of crashing on an unparseable value", () => {
     expect(formatRelativeTime("not a date")).toBe("Recently");
+  });
+
+  it("says what a future moment is, not that it just happened", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+
+    expect(formatRelativeTime("2026-10-22T12:30:00Z")).toBe("in 30m");
+    expect(formatRelativeTime("2026-10-25T12:00:00Z")).toBe("in 3d");
+  });
+
+  it("rises past days into weeks, months and years", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+
+    expect(formatRelativeTime("2026-09-12T12:00:00Z")).toBe("1mo ago");
+    expect(formatRelativeTime("2024-07-01T12:00:00Z")).toBe("2y ago");
+  });
+
+  it("still rounds a sub-minute either way to Just now", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+
+    expect(formatRelativeTime("2026-10-22T11:59:30Z")).toBe("Just now");
+    expect(formatRelativeTime("2026-10-22T12:00:30Z")).toBe("Just now");
   });
 });
 
@@ -106,5 +131,27 @@ describe("clock time (#694 D15)", () => {
   it("reads a clock time and refuses to invent one", () => {
     expect(formatClockTime(new Date(2026, 9, 22, 14, 5).toISOString())).toMatch(/\d/);
     expect(formatClockTime("not a date")).toBe("");
+  });
+});
+
+describe("turn time (#737)", () => {
+  it("summarises a recent turn and clocks an old one", () => {
+    const now = new Date(2026, 9, 22, 12, 0);
+    const recent = new Date(now.getTime() - 14 * 60 * 1000).toISOString();
+    const old = new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString();
+
+    expect(formatTurnTime(recent, now)).toBe("14m ago");
+    expect(formatTurnTime(old, now)).toBe(formatClockTime(old));
+  });
+
+  it("refuses to invent a relation for a moment it cannot read", () => {
+    expect(formatTurnTime("not a date")).toBe("");
+  });
+
+  it("clocks a future moment rather than claiming it just happened", () => {
+    const now = new Date(2026, 9, 22, 12, 0);
+    const ahead = new Date(now.getTime() + 60 * 1000).toISOString();
+
+    expect(formatTurnTime(ahead, now)).toBe(formatClockTime(ahead));
   });
 });

@@ -51,11 +51,16 @@ ALLOWED_EXTERNAL_PREFIXES = (
     "https://pypi.org/project/",
     "https://codecov.io",
     "https://developers.cloudflare.com",
+    "https://img.shields.io",
     "https://docs.entire.io",
     "https://www.chromatic.com",
     "https://playwright.dev",
     "https://freebuff.com",
     "https://pi.dev",
+    # Composio's hosted MCP endpoint and its session API, which the connector
+    # guide documents for the `composio` preset.
+    "https://connect.composio.dev/mcp",
+    "https://backend.composio.dev",
     # The agent vendors whose docs the assignment guide cites as sources.
     "https://docs.openhands.dev",
     "https://kiro.dev",
@@ -66,6 +71,11 @@ ALLOWED_EXTERNAL_PREFIXES = (
     # A placeholder in the connector documentation. It is not routable, and
     # it is shown as an example of what a connector URL looks like.
     "https://mcp.internal.example",
+    # Composio's documented MCP entry points, cited as sources by the
+    # connectors guide: the shared OAuth URL the preset encodes, and the
+    # session-create endpoint the session-scoped recipe calls.
+    "https://connect.composio.dev/mcp",
+    "https://backend.composio.dev/api/v3.1/tool_router/session",
     # The local endpoints, which the site points developers at.
     "http://localhost:8000/mcp",
     "http://localhost:8000",
@@ -407,11 +417,13 @@ def test_the_landing_carries_complete_social_metadata():
     assert _meta(html, "og:type") == "website"
     assert _meta(html, "og:site_name") == "Agentic ODI"
     assert _meta(html, "og:url") == PAGES_URL
-    assert _meta(html, "og:image") == PAGES_URL + "assets/og.png"
+    image = _meta(html, "og:image")
+    assert image is not None and image.startswith(f"{PAGES_URL}og/") and image.endswith(".png")
+    assert _meta(html, "og:image:alt"), "the card needs a text equivalent"
     assert _meta(html, "twitter:card") == "summary_large_image"
     assert _meta(html, "twitter:title")
     assert _meta(html, "twitter:description")
-    assert _meta(html, "twitter:image") == PAGES_URL + "assets/og.png"
+    assert _meta(html, "twitter:image") == image
     assert f'<link rel="canonical" href="{PAGES_URL}">' in html
     assert html.count('name="theme-color"') == 1
 
@@ -509,8 +521,9 @@ def test_page_weights_are_within_budget(page: str):
     # The page budget is a soft ceiling: individual pages are coverage records
     # (ledgers, entity docs, schema references), not decoration, so the ceiling
     # moves with legitimate content growth rather than trimming reference
-    # material. The Development page now exceeds 100 KB: the assistant-ui ledger
-    # (issue #429) contributes 129 rows, and the Study entity plus its two
-    # tools (open_study, list_studies) and the outcome-proposal tools add the
-    # rest. Bump the ceiling to keep the page green while the content stays.
-    assert size <= 110 * 1024, f"{page}: {size} bytes"
+    # material. The MCP reference is the long pole at ~142 KB: it lists every
+    # tool's schema, and the merged interview, candidate and trust surfaces add
+    # dozens of entries. It grew ~28 KB when those branches landed together, so
+    # the ceiling moves once more -- and the next growth should extract the tool
+    # list into its own page rather than raise this number again.
+    assert size <= 164 * 1024, f"{page}: {size} bytes"
