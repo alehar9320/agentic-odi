@@ -5,7 +5,7 @@
 # Agentic ODI
 
 [![CI](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml/badge.svg)](https://github.com/alehar9320/agentic-odi/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg)](https://codecov.io/gh/alehar9320/agentic-odi)
+[![codecov](https://codecov.io/gh/alehar9320/agentic-odi/branch/main/graph/badge.svg?flag=python)](https://codecov.io/gh/alehar9320/agentic-odi)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/uv-managed-green)](https://docs.astral.sh/uv/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)

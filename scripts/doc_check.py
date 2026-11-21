@@ -97,7 +97,8 @@ def documented_file_paths(text: str) -> list[str]:
         if span.split("/", 1)[0] not in KNOWN_TOP_LEVEL:
             continue
         if any(
-            part in {"dist", "build", "node_modules", "__pycache__"} for part in span.split("/")
+            part in {"dist", "build", "coverage", "node_modules", "__pycache__"}
+            for part in span.split("/")
         ):
             continue
         found.append(span)

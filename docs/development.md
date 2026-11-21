@@ -672,30 +672,40 @@ unrelated to the code under review.
 
 ## Test Coverage
 
-CI runs the suite on Python **3.10, 3.11, and 3.12** and uploads one combined
-`coverage.xml` from the 3.12 job to
-[Codecov](https://codecov.io/gh/alehar9320/agentic-odi).
+The `test` job is the authoritative Python gate. Pytest runs on Python **3.10,
+3.11, and 3.12** with coverage on and `--cov-fail-under=89` — the same floor as
+`[tool.coverage.report] fail_under` in `pyproject.toml` — so a pull request that
+drops the combined number fails in a job that needs no secret, a fork's pull
+request included. Measured on 2026-11-21: **89.52%** (16,467 statements, 1,726
+missed), so the gate has little slack.
 
-The Codecov upload authenticates with the `CODECOV_TOKEN` repository secret and
-is non-blocking (`fail_ci_if_error: false`), so a Codecov outage or a fork PR
-without secrets cannot fail the test job. The badge at the top of the README
-tracks `main`, which is the baseline every PR is compared against:
-
-- **Project** status requires at least **90%** coverage (`target: 90%`) and
-  tolerates a 1% dip from `codecov.yml`.
-- **Patch** status is informational for now, so new code can land while the
-  suite catches up.
-
-Codecov itself never fails the build (`fail_ci_if_error: false`), so the same
-floor is enforced locally: `[tool.coverage.report] fail_under` in
-`pyproject.toml` makes any run with `--cov` fail below **89%** — the 90% target
-minus codecov's 1% tolerance. The current measurement is ~89.2%, so the gate has
-little slack; raise `fail_under` as coverage improves rather than lowering it to
+The floor is a ratchet. On every pull request, `scripts/coverage_floor.py`
+compares `fail_under` in `pyproject.toml` with the base branch and fails when the
+head value is lower. Raise `fail_under` as coverage improves; never lower it to
 unblock a change.
 
-To reproduce the report locally:
+[Codecov](https://codecov.io/gh/alehar9320/agentic-odi) stays the reporting
+surface, not the gate. The 3.12 job writes a per-distribution table to the job
+summary and uploads `coverage.xml` with the `CODECOV_TOKEN` secret under the
+`python` flag. A run without the secret (a fork, or Dependabot) skips the upload
+and says so in the log and the job summary instead of passing silently; an
+attempted upload that fails does fail the job (`fail_ci_if_error: true`).
+`codecov.yml` keeps a **90%** project target with a 1% dip — the same **89%**
+minimum pytest enforces — and scopes that status to the `python` flag, so the
+Studio's lower number cannot turn it red. Patch status is informational while
+new code lands.
+
+The Studio is gated separately. `npm run test:coverage` runs Vitest with the V8
+provider, writes `apps/studio/coverage/lcov.info`, and fails the `studio` job
+below statements **83%**, branches **75%**, functions **83%**, and lines **83%**.
+Measured on 2026-11-21: 83.3%, 75.9%, 83.5%, 83.4%. The lcov file is
+uploaded to Codecov under the `studio` flag, also non-blocking — the Vitest
+thresholds are what gate the merge.
+
+Reproduce both reports locally:
 
 ```bash
+# Python: the combined number CI sees
 uv run pytest \
   --cov=agentic_odi_cli \
   --cov=agentic_odi_connectors \
@@ -703,12 +713,16 @@ uv run pytest \
   --cov=agentic_odi_mcp_server \
   --cov=agentic_odi_studio_api \
   --cov-report=term-missing \
-  --cov-report=xml:coverage.xml
+  --cov-report=xml:coverage.xml \
+  --cov-fail-under=89
+
+# Studio
+npm --prefix apps/studio run test:coverage
 ```
 
 > [!NOTE]
-> Coverage is only collected for the Python packages. `apps/studio/` and test
-> directories are excluded in `codecov.yml`.
+> Codecov's project status covers the Python packages. `apps/studio/` reports
+> under its own flag, and test directories stay excluded in `codecov.yml`.
 
 ### Conventions
 
@@ -723,19 +737,506 @@ uv run pytest \
 
 ### Test Coverage Map
 
-| Area | What it covers |
+Every test file and the source it exercises, generated from the test tree rather
+than maintained by hand. `uv run python scripts/coverage_map.py --check` fails CI
+when this table drifts from the repository; `--write` regenerates it. A test with
+no resolvable pair stays in the table, named, rather than disappearing.
+
+<!-- coverage-map:start -->
+| Test file | Exercises |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence and its numbered schema-migration ledger, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
-| `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
-| `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
-| `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
-| `packages/connectors/tests/` | Catalog presets, registry persistence, factory, MCP and REST connectors, evidence mapping, and sink |
-| `tests/contract/` | Live MCP tool surface and CLI local-handler parity |
-| `tests/scripts/` | `scripts/dev.py` startup, port checks, signals, and shutdown; PR guardrails; documentation drift; the artifact structural rules and the renderer inventory gate |
-| `apps/studio/src/**/*.test.ts` | SPA units: ODI math, transport bridge, SSE parser, sidecar client |
-| `apps/studio/src/**/*.visual.test.tsx` | Component states captured for Chromatic visual review |
-| `apps/studio/e2e/` | Browser journeys against the real stack: the conversation, the first-run starters, capturing an outcome, the opportunity landscape, the workspace views, and the MCP passthrough backend |
-| `website/tests/` | Static site integrity, the sample workspace fixture and its no-network contract, every built page through the artifact rule set, OG art reproducibility and the per-page social cards, and README sync |
+| `apps/cli/tests/test_alternatives_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/cli/tests/test_backend.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/cli/tests/test_backend_edges.py` | `apps/cli/src/agentic_odi_cli/backend.py` |
+| `apps/cli/tests/test_backend_selection.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/cli/tests/test_build_info.py` | `apps/cli/src/agentic_odi_cli/_build_info.py`<br>`apps/cli/src/agentic_odi_cli/version.py` |
+| `apps/cli/tests/test_candidates_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_chat_cli.py` | `apps/cli/src/agentic_odi_cli/chat.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_chat_runtime.py` | `apps/cli/src/agentic_odi_cli/chat.py` |
+| `apps/cli/tests/test_chat_wizard.py` | `apps/cli/src/agentic_odi_cli/chat.py`<br>`apps/cli/src/agentic_odi_cli/wizard.py` |
+| `apps/cli/tests/test_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/version.py` |
+| `apps/cli/tests/test_cli_edges.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_connectors_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rest/connector.py` |
+| `apps/cli/tests/test_connectors_edges.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/connectors.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/paths.py` |
+| `apps/cli/tests/test_context.py` | `apps/cli/src/agentic_odi_cli/context.py` |
+| `apps/cli/tests/test_customer_outcomes_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/cli/tests/test_data_export.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/cli/tests/test_data_path.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_demo_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_desired_outcomes_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/desired_outcomes.py` |
+| `apps/cli/tests/test_doctor.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/doctor.py` |
+| `apps/cli/tests/test_evidence_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_insight_commands.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_interviews_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
+| `apps/cli/tests/test_jobs_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_link_outcome_errors.py` | `apps/cli/src/agentic_odi_cli/backend.py` |
+| `apps/cli/tests/test_mascot.py` | `apps/cli/src/agentic_odi_cli/mascot.py` |
+| `apps/cli/tests/test_onboard.py` | `apps/cli/src/agentic_odi_cli/onboard.py`<br>`apps/cli/src/agentic_odi_cli/profile.py`<br>`apps/cli/src/agentic_odi_cli/version.py` |
+| `apps/cli/tests/test_paths.py` | `apps/cli/src/agentic_odi_cli/paths.py` |
+| `apps/cli/tests/test_persistence.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/cli/tests/test_profile.py` | `apps/cli/src/agentic_odi_cli/chat.py`<br>`apps/cli/src/agentic_odi_cli/paths.py`<br>`apps/cli/src/agentic_odi_cli/profile.py` |
+| `apps/cli/tests/test_profile_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/profile.py` |
+| `apps/cli/tests/test_render.py` | `apps/cli/src/agentic_odi_cli/render.py` |
+| `apps/cli/tests/test_schedule_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_segments_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_settings_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_signals_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_startup_perf.py` | — no direct source pair |
+| `apps/cli/tests/test_stats_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/intent_store.py` |
+| `apps/cli/tests/test_steps_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_studies_cli.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_summary_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_trust_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/cli/tests/test_update.py` | `apps/cli/src/agentic_odi_cli/update.py` |
+| `apps/cli/tests/test_update_check.py` | `apps/cli/src/agentic_odi_cli/update.py` |
+| `apps/cli/tests/test_update_command.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/update.py`<br>`apps/cli/src/agentic_odi_cli/version.py` |
+| `apps/cli/tests/test_update_edges.py` | `apps/cli/src/agentic_odi_cli/update.py` |
+| `apps/cli/tests/test_version_flag.py` | `apps/cli/src/agentic_odi_cli/cli.py`<br>`apps/cli/src/agentic_odi_cli/version.py` |
+| `apps/cli/tests/test_wizard_cli.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `apps/mcp-server/tests/mcp_failures.py` | `packages/core/src/agentic_odi_core/remote.py` |
+| `apps/mcp-server/tests/test_candidates.py` | `packages/core/src/agentic_odi_core/remote.py` |
+| `apps/mcp-server/tests/test_context_tools.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_customer_outcomes.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_graceful_shutdown.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `apps/mcp-server/tests/test_health.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_import_side_effects.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_interviews.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_odi.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_parity.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_port_config.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_segments.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_server_tools.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
+| `apps/mcp-server/tests/test_signals.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_spine_tools.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_tool_branches.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_tool_progress.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py` |
+| `apps/mcp-server/tests/test_tool_spec_validation.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
+| `apps/mcp-server/tests/test_tool_timing.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_tools.py` | — no direct source pair |
+| `apps/mcp-server/tests/test_traceability_tools.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `apps/studio/e2e/a11y.spec.ts` | `apps/studio/e2e/a11y/knownPairs.ts`<br>`apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts`<br>`apps/studio/src/test/contrast.ts` |
+| `apps/studio/e2e/brief.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/capture.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/chat.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/first-paint.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/first-run.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/landscape.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/mcp-backend.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/motion.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/no-sidecar/offline.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/pr-screenshots.spec.ts` | `apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/starters.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/e2e/visual.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts`<br>`apps/studio/e2e/visual/fixtures.ts` |
+| `apps/studio/e2e/workspace.spec.ts` | `apps/studio/e2e/fixtures.ts`<br>`apps/studio/e2e/helpers.ts` |
+| `apps/studio/src/App.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/state/scheduleProbe.ts` |
+| `apps/studio/src/api/sse.test.ts` | `apps/studio/src/api/sse.ts` |
+| `apps/studio/src/api/studioApi.local.test.ts` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/bff/store/types.ts` |
+| `apps/studio/src/api/studioApi.test.ts` | `apps/studio/src/api/studioApi.ts` |
+| `apps/studio/src/assistant/attachments.test.ts` | `apps/studio/src/assistant/attachments.ts` |
+| `apps/studio/src/assistant/claims.test.ts` | `apps/studio/src/assistant/claims.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/consequence.test.ts` | `apps/studio/src/assistant/consequence.ts` |
+| `apps/studio/src/assistant/convert.test.ts` | `apps/studio/src/assistant/convert.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/assistant/dictation.test.ts` | `apps/studio/src/assistant/dictation.ts` |
+| `apps/studio/src/assistant/extract/common.test.ts` | `apps/studio/src/assistant/extract/common.ts` |
+| `apps/studio/src/assistant/extract/docx.test.ts` | `apps/studio/src/assistant/extract/common.ts`<br>`apps/studio/src/assistant/extract/docx.ts` |
+| `apps/studio/src/assistant/extract/pdf.test.ts` | `apps/studio/src/assistant/extract/common.ts`<br>`apps/studio/src/assistant/extract/pdf.ts` |
+| `apps/studio/src/assistant/interview/Interview.test.tsx` | `apps/studio/src/assistant/interview/Interview.tsx`<br>`apps/studio/src/assistant/interview/conductor.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
+| `apps/studio/src/assistant/interview/conductor.test.ts` | `apps/studio/src/assistant/interview/conductor.ts` |
+| `apps/studio/src/assistant/interview/persistence.test.ts` | `apps/studio/src/assistant/interview/persistence.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/bff/store/types.ts` |
+| `apps/studio/src/assistant/parts.approval.test.tsx` | `apps/studio/src/assistant/parts.tsx` |
+| `apps/studio/src/assistant/parts.test.tsx` | `apps/studio/src/assistant/parts.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/pending.test.ts` | `apps/studio/src/assistant/pending.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/plan.test.ts` | `apps/studio/src/assistant/plan.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/assistant/queue.test.ts` | `apps/studio/src/assistant/queue.ts` |
+| `apps/studio/src/assistant/quote.test.ts` | `apps/studio/src/assistant/quote.ts` |
+| `apps/studio/src/assistant/speech.test.ts` | `apps/studio/src/assistant/speech.ts` |
+| `apps/studio/src/assistant/starterCopy.test.ts` | `apps/studio/src/assistant/StudioRuntime.tsx` |
+| `apps/studio/src/banners/BannerBridge.test.tsx` | `apps/studio/src/banners/BannerBridge.tsx`<br>`apps/studio/src/banners/BannerProvider.tsx`<br>`apps/studio/src/banners/BannerStack.tsx` |
+| `apps/studio/src/banners/BannerProvider.test.tsx` | `apps/studio/src/banners/BannerProvider.tsx` |
+| `apps/studio/src/banners/BannerStack.test.tsx` | `apps/studio/src/banners/BannerProvider.tsx`<br>`apps/studio/src/banners/BannerStack.tsx`<br>`apps/studio/src/banners/types.ts` |
+| `apps/studio/src/banners/BannerStack.visual.test.tsx` | `apps/studio/src/banners/BannerStack.tsx`<br>`apps/studio/src/banners/catalog.ts`<br>`apps/studio/src/banners/types.ts` |
+| `apps/studio/src/banners/BannerToasts.test.tsx` | `apps/studio/src/banners/BannerProvider.tsx`<br>`apps/studio/src/banners/BannerStack.tsx`<br>`apps/studio/src/banners/BannerToasts.tsx` |
+| `apps/studio/src/banners/catalog.test.ts` | `apps/studio/src/banners/catalog.ts`<br>`apps/studio/src/banners/types.ts` |
+| `apps/studio/src/banners/store.test.ts` | `apps/studio/src/banners/store.ts` |
+| `apps/studio/src/bff/capabilities/registry.test.ts` | `apps/studio/src/bff/capabilities/registry.ts` |
+| `apps/studio/src/bff/chat/orchestrator.test.ts` | `apps/studio/src/api/sse.ts`<br>`apps/studio/src/bff/chat/orchestrator.ts`<br>`apps/studio/src/bff/data/localDataService.ts`<br>`apps/studio/src/bff/memory/localMemoryService.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/bff/data/localDataService.test.ts` | `apps/studio/src/bff/data/localDataService.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/lib/odi.ts` |
+| `apps/studio/src/bff/index.test.ts` | `apps/studio/src/bff/index.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
+| `apps/studio/src/bff/memory/localMemoryService.test.ts` | `apps/studio/src/bff/memory/localMemoryService.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
+| `apps/studio/src/bff/outbox.test.ts` | `apps/studio/src/bff/outbox.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/bff/store/types.ts` |
+| `apps/studio/src/bff/storageFacts.test.ts` | `apps/studio/src/bff/storageFacts.ts`<br>`apps/studio/src/bff/store/indexedDbStore.ts`<br>`apps/studio/src/bff/store/memoryStore.ts` |
+| `apps/studio/src/bff/store/indexedDbStore.test.ts` | `apps/studio/src/bff/store/indexedDbStore.ts`<br>`apps/studio/src/bff/store/memoryStore.ts`<br>`apps/studio/src/bff/store/migrations.ts`<br>`apps/studio/src/bff/store/types.ts` |
+| `apps/studio/src/bff/store/migrations.test.ts` | `apps/studio/src/bff/store/migrations.ts` |
+| `apps/studio/src/bridge/desktopBridge.test.ts` | `apps/studio/src/bridge/desktopBridge.ts` |
+| `apps/studio/src/bridge/runtime.test.ts` | `apps/studio/src/bridge/runtime.ts` |
+| `apps/studio/src/components/BlockedReasonNote.test.tsx` | `apps/studio/src/components/BlockedReasonNote.tsx` |
+| `apps/studio/src/components/BootFailurePage.test.tsx` | `apps/studio/src/components/BootFailurePage.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/ChangelogModal.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/lib/changelogRead.ts` |
+| `apps/studio/src/components/FailurePanel.visual.test.tsx` | `apps/studio/src/components/FailurePanel.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/OdiMascot.test.tsx` | `apps/studio/src/components/OdiMascot.tsx` |
+| `apps/studio/src/components/SettingsPanel.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/lib/version.ts`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/ShareAction.test.tsx` | `apps/studio/src/components/ShareAction.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/ShareSheet.test.tsx` | `apps/studio/src/components/ShareSheet.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/SharedArtifact.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/components/SharedArtifact.tsx` |
+| `apps/studio/src/components/brief/BriefLens.test.tsx` | `apps/studio/src/components/brief/BriefLens.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/Dashboard.test.tsx` | `apps/studio/src/components/canvas/Dashboard.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/DirectCapture.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/DirectCapture.tsx` |
+| `apps/studio/src/components/canvas/EvidenceStream.test.tsx` | `apps/studio/src/components/canvas/EvidenceStream.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/JobMap.test.tsx` | `apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/domain/jobStages.ts` |
+| `apps/studio/src/components/canvas/MemoryPanel.test.tsx` | `apps/studio/src/components/canvas/MemoryPanel.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | `apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/lib/odi.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/OpportunityLandscapeFacet.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/OutcomeCard.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
+| `apps/studio/src/components/canvas/OutcomeCardAlternatives.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/OutcomeCard.tsx` |
+| `apps/studio/src/components/canvas/OutcomeCardBand.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/OutcomeCard.tsx` |
+| `apps/studio/src/components/canvas/OutcomeCardNote.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/canvas/OutcomeCard.tsx` |
+| `apps/studio/src/components/canvas/OutcomeCardSample.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
+| `apps/studio/src/components/canvas/SchedulePanel.test.tsx` | `apps/studio/src/components/canvas/SchedulePanel.tsx` |
+| `apps/studio/src/components/canvas/ScorePopover.test.tsx` | `apps/studio/src/components/canvas/ScorePopover.tsx`<br>`apps/studio/src/lib/odi.ts` |
+| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | `apps/studio/src/components/canvas/SegmentBoard.tsx`<br>`apps/studio/src/lib/odi.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/canvas/ThesisAction.test.tsx` | `apps/studio/src/components/canvas/OutcomeCard.tsx` |
+| `apps/studio/src/components/canvas/opportunityLandscape.perf.test.tsx` | `apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/ChatStage.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/ClaimCitation.test.tsx` | `apps/studio/src/components/chat/ClaimCitation.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/CommandPalette.test.tsx` | `apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/components/chat/Composer.test.tsx` | `apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/components/chat/Conversation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/lib/relativeTime.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/components/chat/Dictation.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/components/chat/Markdown.test.tsx` | `apps/studio/src/components/chat/Markdown.tsx` |
+| `apps/studio/src/components/chat/ModelPicker.test.tsx` | `apps/studio/src/components/chat/ModelPicker.tsx` |
+| `apps/studio/src/components/chat/PendingCalls.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/PendingCalls.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/PlanPanel.test.tsx` | `apps/studio/src/components/chat/PlanPanel.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/QueueLane.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/components/chat/QueueLane.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/components/chat/SelectionToolbar.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/SelectionToolbar.tsx` |
+| `apps/studio/src/components/chat/Speech.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/StallNotice.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/StallNotice.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/StarterCards.visual.test.tsx` | — no direct source pair |
+| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/composerParts.tsx`<br>`apps/studio/src/state/StudioContext.tsx` |
+| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/assistant/attachments.ts`<br>`apps/studio/src/components/chat/ThreadComposer.tsx`<br>`apps/studio/src/lib/commands.ts`<br>`apps/studio/src/lib/useFocusTrap.ts`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/chat/WorkBlock.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/chat/Conversation.tsx`<br>`apps/studio/src/components/chat/WorkBlock.tsx`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/components/chat/arrivalCount.test.ts` | `apps/studio/src/components/chat/arrivalCount.ts` |
+| `apps/studio/src/components/customize/ConnectorSuggestionModal.test.tsx` | `apps/studio/src/components/customize/ConnectorSuggestionModal.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/customize/CustomizePage.test.tsx` | `apps/studio/src/components/customize/CustomizePage.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/interview/InterviewCard.test.tsx` | `apps/studio/src/components/interview/InterviewCard.tsx`<br>`apps/studio/src/components/interview/types.ts`<br>`apps/studio/src/test/axe.ts` |
+| `apps/studio/src/components/interview/answered.test.ts` | `apps/studio/src/components/interview/answered.ts` |
+| `apps/studio/src/components/layout/StudioBar.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/layout/StudioBar.visual.test.tsx` | `apps/studio/src/components/layout/StudioBar.tsx` |
+| `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/components/notifications/__fixtures__/signals.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | — no direct source pair |
+| `apps/studio/src/components/records/RecordDetail.test.tsx` | `apps/studio/src/components/records/RecordDetail.tsx`<br>`apps/studio/src/components/records/RecordsPanel.tsx`<br>`apps/studio/src/lib/odi.ts`<br>`apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/records/RecordsPanel.test.tsx` | `apps/studio/src/components/records/RecordsPanel.tsx`<br>`apps/studio/src/lib/odi.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/records/RecordsTable.test.tsx` | `apps/studio/src/components/records/RecordsTable.tsx`<br>`apps/studio/src/lib/odi.ts`<br>`apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/AboutSection.test.tsx` | `apps/studio/src/components/settings/sections/AboutSection.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/settings/ConnectionsSection.test.tsx` | `apps/studio/src/components/settings/sections/ConnectionsSection.tsx`<br>`apps/studio/src/components/settings/sections/ModelSection.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/ContextSection.test.tsx` | `apps/studio/src/components/settings/sections/ContextSection.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/DataSection.test.tsx` | `apps/studio/src/components/settings/sections/DataSection.tsx` |
+| `apps/studio/src/components/settings/InstallSection.test.tsx` | `apps/studio/src/bridge/runtime.ts`<br>`apps/studio/src/components/settings/sections/InstallSection.tsx`<br>`apps/studio/src/install.ts` |
+| `apps/studio/src/components/settings/ModelSection.test.tsx` | `apps/studio/src/components/settings/sections/ModelSection.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/components/settings/SettingsLayout.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/settings/SettingsPanel.perFieldSave.test.tsx` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/settings/UpdatesSection.test.tsx` | `apps/studio/src/components/settings/sections/UpdatesSection.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/components/settings/saves.test.ts` | `apps/studio/src/components/settings/saves.ts`<br>`apps/studio/src/components/settings/validation.ts` |
+| `apps/studio/src/components/setup/IntroConversation.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx`<br>`apps/studio/src/lib/intro.ts` |
+| `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | `apps/studio/src/components/setup/IntroConversation.tsx` |
+| `apps/studio/src/components/status/StatusDot.test.tsx` | `apps/studio/src/components/status/StatusDot.tsx` |
+| `apps/studio/src/components/status/StatusDot.visual.test.tsx` | `apps/studio/src/components/icons.tsx`<br>`apps/studio/src/components/status/StatusDot.tsx` |
+| `apps/studio/src/components/workspace/WorkbenchRail.test.tsx` | `apps/studio/src/components/workspace/WorkbenchRail.tsx` |
+| `apps/studio/src/components/workspace/WorkspacePanel.test.tsx` | `apps/studio/src/components/workspace/WorkspacePanel.tsx` |
+| `apps/studio/src/components/workspace/panelContext.test.ts` | `apps/studio/src/components/workspace/panelContext.ts`<br>`apps/studio/src/domain/jobStages.ts` |
+| `apps/studio/src/components/workspace/panels.test.tsx` | `apps/studio/src/components/workspace/panels.tsx` |
+| `apps/studio/src/diagnostics/DiagnosticsModal.test.tsx` | `apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/diagnostics/DiagnosticsModal.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/diagnostics/bundle.test.ts` | `apps/studio/src/diagnostics/bundle.ts` |
+| `apps/studio/src/diagnostics/redact.test.ts` | `apps/studio/src/diagnostics/redact.ts` |
+| `apps/studio/src/features/flags.test.ts` | `apps/studio/src/features/flags.ts` |
+| `apps/studio/src/install.test.ts` | `apps/studio/src/install.ts` |
+| `apps/studio/src/lib/blockedReason.test.ts` | `apps/studio/src/lib/blockedReason.ts` |
+| `apps/studio/src/lib/boot.test.ts` | `apps/studio/src/lib/boot.ts` |
+| `apps/studio/src/lib/brandCopy.test.ts` | `apps/studio/src/lib/brand.ts` |
+| `apps/studio/src/lib/brief.test.ts` | `apps/studio/src/lib/brief.ts`<br>`apps/studio/src/lib/export.ts`<br>`apps/studio/src/lib/odi.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/canvasProvenance.test.ts` | `apps/studio/src/lib/canvasProvenance.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/changelogRead.test.ts` | `apps/studio/src/lib/changelogRead.ts` |
+| `apps/studio/src/lib/commands.test.ts` | `apps/studio/src/lib/commands.ts` |
+| `apps/studio/src/lib/dashboard.test.ts` | `apps/studio/src/lib/dashboard.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/download.test.ts` | `apps/studio/src/lib/download.ts` |
+| `apps/studio/src/lib/export.test.ts` | `apps/studio/src/lib/brief.ts`<br>`apps/studio/src/lib/export.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/lib/focus.test.ts` | `apps/studio/src/lib/focus.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/formula.test.ts` | — no direct source pair |
+| `apps/studio/src/lib/greeting.test.ts` | `apps/studio/src/lib/greeting.ts` |
+| `apps/studio/src/lib/guidance.test.ts` | `apps/studio/src/lib/guidance.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/intro.test.ts` | `apps/studio/src/lib/intro.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/modelEndpoint.test.ts` | `apps/studio/src/lib/modelEndpoint.ts` |
+| `apps/studio/src/lib/odi.test.ts` | `apps/studio/src/lib/odi.ts` |
+| `apps/studio/src/lib/offlinePage.test.ts` | — no direct source pair |
+| `apps/studio/src/lib/onlineStatus.test.tsx` | `apps/studio/src/lib/onlineStatus.ts` |
+| `apps/studio/src/lib/records.test.ts` | `apps/studio/src/lib/odi.ts`<br>`apps/studio/src/lib/records.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/lib/relativeTime.test.ts` | `apps/studio/src/lib/relativeTime.ts` |
+| `apps/studio/src/lib/sampleLoop.test.ts` | `apps/studio/src/lib/odi.ts`<br>`apps/studio/src/lib/sampleLoop.ts` |
+| `apps/studio/src/lib/scoreVocabulary.test.ts` | `apps/studio/src/lib/odi.ts`<br>`apps/studio/src/lib/records.ts` |
+| `apps/studio/src/lib/session.test.ts` | `apps/studio/src/lib/session.ts` |
+| `apps/studio/src/lib/setup.test.ts` | `apps/studio/src/lib/setup.ts` |
+| `apps/studio/src/lib/share.test.ts` | `apps/studio/src/lib/share.ts` |
+| `apps/studio/src/lib/swRouting.test.ts` | `apps/studio/src/lib/swRouting.ts` |
+| `apps/studio/src/lib/swUpdate.test.ts` | `apps/studio/src/lib/swUpdate.ts` |
+| `apps/studio/src/lib/theme.test.ts` | `apps/studio/src/lib/theme.ts` |
+| `apps/studio/src/lib/themeBootstrap.test.ts` | — no direct source pair |
+| `apps/studio/src/lib/useReducedMotion.test.tsx` | `apps/studio/src/lib/useReducedMotion.ts` |
+| `apps/studio/src/lib/version.test.ts` | `apps/studio/src/lib/version.ts` |
+| `apps/studio/src/lib/windowState.test.ts` | — no direct source pair |
+| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | `apps/studio/src/lib/sampleLoop.ts`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/onboarding/storage.ts` |
+| `apps/studio/src/onboarding/LandScene.test.tsx` | `apps/studio/src/lib/sampleLoop.ts`<br>`apps/studio/src/onboarding/LandScene.tsx` |
+| `apps/studio/src/onboarding/machine.test.ts` | `apps/studio/src/onboarding/machine.ts`<br>`apps/studio/src/onboarding/storage.ts` |
+| `apps/studio/src/onboarding/sampleCleanup.test.ts` | `apps/studio/src/lib/sampleLoop.ts`<br>`apps/studio/src/onboarding/sampleCleanup.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/state/StudioContext.test.tsx` | `apps/studio/src/assistant/queue.ts`<br>`apps/studio/src/bff/index.ts`<br>`apps/studio/src/lib/session.ts`<br>`apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/state/notices/NoticesContext.tsx`<br>`apps/studio/src/state/scheduleProbe.ts`<br>`apps/studio/src/state/settings/SettingsContext.tsx`<br>`apps/studio/src/test/renderCounts.tsx` |
+| `apps/studio/src/state/canvas/CanvasContext.test.tsx` | `apps/studio/src/state/canvas/CanvasContext.tsx`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/state/deviceStatus.test.ts` | `apps/studio/src/bff/capabilities/registry.ts`<br>`apps/studio/src/state/deviceStatus.ts` |
+| `apps/studio/src/state/probeBreaker.test.ts` | `apps/studio/src/api/studioApi.ts`<br>`apps/studio/src/state/probeBreaker.ts`<br>`apps/studio/src/types.ts` |
+| `apps/studio/src/state/regions.test.ts` | `apps/studio/src/state/regions.ts` |
+| `apps/studio/src/state/scheduleProbe.test.ts` | `apps/studio/src/state/scheduleProbe.ts` |
+| `apps/studio/src/state/settings/SettingsContext.test.ts` | `apps/studio/src/state/settings/SettingsContext.tsx` |
+| `apps/studio/src/styles/bootShell.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/brief.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/colors.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/mainstage.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/motion.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/print.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/theme.test.ts` | — no direct source pair |
+| `apps/studio/src/styles/tokens.test.ts` | — no direct source pair |
+| `apps/studio/src/test/a11y.test.tsx` | `apps/studio/src/assistant/StudioRuntime.tsx`<br>`apps/studio/src/components/ChangelogModal.tsx`<br>`apps/studio/src/components/SettingsPanel.tsx`<br>`apps/studio/src/components/brief/BriefLens.tsx`<br>`apps/studio/src/components/canvas/JobMap.tsx`<br>`apps/studio/src/components/canvas/OpportunityLandscape.tsx`<br>`apps/studio/src/components/chat/ChatStage.tsx`<br>`apps/studio/src/components/chat/Composer.tsx`<br>`apps/studio/src/components/notifications/CatchUpFeed.tsx`<br>`apps/studio/src/onboarding/FirstRunWizard.tsx`<br>`apps/studio/src/onboarding/OnboardingProvider.tsx`<br>`apps/studio/src/onboarding/context.ts`<br>`apps/studio/src/test/axe.ts`<br>`apps/studio/src/types.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/test/contrast.test.ts` | `apps/studio/src/test/contrast.ts` |
+| `apps/studio/src/test/e2eQuarantine.test.ts` | `apps/studio/e2e/quarantine.ts` |
+| `apps/studio/src/test/keyboard.test.tsx` | `apps/studio/src/App.tsx`<br>`apps/studio/src/lib/useFocusTrap.ts` |
+| `apps/studio/src/test/renderCounts.test.tsx` | `apps/studio/src/state/StudioContext.tsx`<br>`apps/studio/src/state/notices/NoticesContext.tsx`<br>`apps/studio/src/state/settings/SettingsContext.tsx`<br>`apps/studio/src/test/renderCounts.tsx` |
+| `apps/studio/src/ui/UiRenderer.test.tsx` | `apps/studio/src/ui/UiRenderer.tsx`<br>`apps/studio/src/ui/actions.ts`<br>`apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts`<br>`apps/studio/src/ui/registry.ts` |
+| `apps/studio/src/ui/protocol.test.ts` | `apps/studio/src/ui/catalog.ts`<br>`apps/studio/src/ui/protocol.ts` |
+| `apps/studio/src/updater/UpdateBanner.test.tsx` | `apps/studio/src/updater/UpdateBanner.tsx`<br>`apps/studio/src/updater/UpdateProvider.tsx`<br>`apps/studio/src/updater/service.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/updater/UpdateSettings.test.tsx` | `apps/studio/src/updater/UpdateProvider.tsx`<br>`apps/studio/src/updater/UpdateSettings.tsx`<br>`apps/studio/src/updater/service.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/updater/machine.test.ts` | `apps/studio/src/updater/machine.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/updater/service.test.ts` | `apps/studio/src/updater/service.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/updater/transport.test.ts` | `apps/studio/src/updater/transport.ts`<br>`apps/studio/src/updater/types.ts` |
+| `apps/studio/src/vendor/boundary.test.ts` | `apps/studio/src/assistant/plan.ts`<br>`apps/studio/src/vendor/boundary.ts`<br>`apps/studio/src/vendor/lib/utils.ts` |
+| `apps/studio/src/vendor/components/ui/dialog.test.tsx` | `apps/studio/src/vendor/components/ui/dialog.tsx` |
+| `apps/studio/src/vendor/ledger.test.ts` | — no direct source pair |
+| `apps/studio/src/vendor/vendor.test.tsx` | — no direct source pair |
+| `apps/studio-api/tests/test_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `apps/studio-api/tests/test_app_spa.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/main.py`<br>`packages/core/src/agentic_odi_core/messages.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `apps/studio-api/tests/test_boot_integrity.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/intent_store.py` |
+| `apps/studio-api/tests/test_capability_routes.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_probe_cache.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/probes.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
+| `apps/studio-api/tests/test_studio_alternatives.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_api.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/secrets.py` |
+| `apps/studio-api/tests/test_studio_approvals.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py` |
+| `apps/studio-api/tests/test_studio_auth.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_brief.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
+| `apps/studio-api/tests/test_studio_capabilities.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_chat_branches.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
+| `apps/studio-api/tests/test_studio_chat_prompt.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py` |
+| `apps/studio-api/tests/test_studio_chat_stream.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/approvals.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
+| `apps/studio-api/tests/test_studio_chat_ui.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
+| `apps/studio-api/tests/test_studio_claims.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/claims.py` |
+| `apps/studio-api/tests/test_studio_connectors.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py` |
+| `apps/studio-api/tests/test_studio_connectors_router.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py` |
+| `apps/studio-api/tests/test_studio_conversations.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/claims.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py` |
+| `apps/studio-api/tests/test_studio_csp.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `apps/studio-api/tests/test_studio_data_status.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/studio-api/tests/test_studio_diagnostics.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/studio-api/tests/test_studio_error_status_map.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `apps/studio-api/tests/test_studio_errors.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `apps/studio-api/tests/test_studio_evidence.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_focus.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/schemas.py` |
+| `apps/studio-api/tests/test_studio_funnel.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/chat.py`<br>`packages/core/src/agentic_odi_core/events.py`<br>`packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `apps/studio-api/tests/test_studio_llm_proxy.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_manual_crud.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_marketplace.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/connectors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/marketplace.py`<br>`packages/connectors/src/agentic_odi_connectors/marketplace.py` |
+| `apps/studio-api/tests/test_studio_mcp_data.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/mcp_data.py` |
+| `apps/studio-api/tests/test_studio_memory.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/migrations.py` |
+| `apps/studio-api/tests/test_studio_model_router.py` | — no direct source pair |
+| `apps/studio-api/tests/test_studio_models.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/probes.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
+| `apps/studio-api/tests/test_studio_observability.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/observability.py` |
+| `apps/studio-api/tests/test_studio_outcome_evidence_crud.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_paths.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/paths.py` |
+| `apps/studio-api/tests/test_studio_probes.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/probes.py` |
+| `apps/studio-api/tests/test_studio_proposals.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_router.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/studio-api/tests/test_studio_secrets.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/secrets.py` |
+| `apps/studio-api/tests/test_studio_segments.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/studio-api/tests/test_studio_sharing.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/sharing.py` |
+| `apps/studio-api/tests/test_studio_signals.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/errors.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py`<br>`packages/core/src/agentic_odi_core/remote.py` |
+| `apps/studio-api/tests/test_studio_studies.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py`<br>`apps/studio-api/src/agentic_odi_studio_api/studio/router.py` |
+| `apps/studio-api/tests/test_studio_traceability.py` | `apps/studio-api/src/agentic_odi_studio_api/app.py` |
+| `apps/studio-api/tests/test_studio_ui_spec.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/ui_spec.py` |
+| `brand/tests/test_brand_assets.py` | — no direct source pair |
+| `brand/tests/test_generated_sources.py` | — no direct source pair |
+| `packages/connectors/tests/test_catalog.py` | `packages/connectors/src/agentic_odi_connectors/catalog.py`<br>`packages/connectors/src/agentic_odi_connectors/factory.py`<br>`packages/connectors/src/agentic_odi_connectors/protocol.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py` |
+| `packages/connectors/tests/test_config_path.py` | `packages/connectors/src/agentic_odi_connectors/paths.py` |
+| `packages/connectors/tests/test_config_validation.py` | — no direct source pair |
+| `packages/connectors/tests/test_evidence_equivalence.py` | `packages/connectors/src/agentic_odi_connectors/mapping.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/connectors/tests/test_factory.py` | `packages/connectors/src/agentic_odi_connectors/factory.py`<br>`packages/connectors/src/agentic_odi_connectors/mcp/connector.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/protocol.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py`<br>`packages/connectors/src/agentic_odi_connectors/rest/connector.py` |
+| `packages/connectors/tests/test_http_client.py` | — no direct source pair |
+| `packages/connectors/tests/test_http_client_lifecycle.py` | — no direct source pair |
+| `packages/connectors/tests/test_mapping.py` | `packages/connectors/src/agentic_odi_connectors/mapping.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py` |
+| `packages/connectors/tests/test_marketplace.py` | `packages/connectors/src/agentic_odi_connectors/catalog.py`<br>`packages/connectors/src/agentic_odi_connectors/marketplace.py` |
+| `packages/connectors/tests/test_mcp_connector.py` | `packages/connectors/src/agentic_odi_connectors/mcp/connector.py`<br>`packages/connectors/src/agentic_odi_connectors/models.py` |
+| `packages/connectors/tests/test_no_prints.py` | `packages/connectors/src/agentic_odi_connectors/paths.py` |
+| `packages/connectors/tests/test_rate_limit.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rate_limit.py` |
+| `packages/connectors/tests/test_registry.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/registry.py` |
+| `packages/connectors/tests/test_rest_connector.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/protocol.py`<br>`packages/connectors/src/agentic_odi_connectors/rest/connector.py` |
+| `packages/connectors/tests/test_sink.py` | `packages/connectors/src/agentic_odi_connectors/models.py`<br>`packages/connectors/src/agentic_odi_connectors/rate_limit.py`<br>`packages/connectors/src/agentic_odi_connectors/sink.py` |
+| `packages/core/tests/test_alternatives.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_alternatives_presentation.py` | — no direct source pair |
+| `packages/core/tests/test_candidate_decision.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/review.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/spine_extraction.py` |
+| `packages/core/tests/test_capability_manifest.py` | `packages/core/src/agentic_odi_core/contract.py` |
+| `packages/core/tests/test_claim_check.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_claim_interview.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_connection.py` | `packages/core/src/agentic_odi_core/connection.py`<br>`packages/core/src/agentic_odi_core/errors.py` |
+| `packages/core/tests/test_consent_pause.py` | `packages/core/src/agentic_odi_core/consent.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `packages/core/tests/test_default_db_path.py` | `packages/core/src/agentic_odi_core/paths.py` |
+| `packages/core/tests/test_demo.py` | `packages/core/src/agentic_odi_core/demo.py`<br>`packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/factory.py` |
+| `packages/core/tests/test_errors.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_evaluation.py` | `packages/core/src/agentic_odi_core/evaluation.py` |
+| `packages/core/tests/test_evaluation_harness.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_events.py` | `packages/core/src/agentic_odi_core/intent_store.py` |
+| `packages/core/tests/test_evidence_not_found.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_extraction.py` | `packages/core/src/agentic_odi_core/extraction.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_funnel.py` | `packages/core/src/agentic_odi_core/events.py`<br>`packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_funnel_service.py` | `packages/core/src/agentic_odi_core/funnel.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_intent_store.py` | `packages/core/src/agentic_odi_core/intent_store.py` |
+| `packages/core/tests/test_interview.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`packages/core/src/agentic_odi_core/transcript.py` |
+| `packages/core/tests/test_job_validation.py` | `packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_logging.py` | `packages/core/src/agentic_odi_core/logging.py` |
+| `packages/core/tests/test_messages.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/messages.py` |
+| `packages/core/tests/test_migrations.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/migrations.py` |
+| `packages/core/tests/test_models.py` | `packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_n_advisory.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_opportunity_ranking.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_opportunity_score.py` | `packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_outcome_mapping.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/mapping.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_outcome_method.py` | `packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_outcome_trace_write.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/traceability.py` |
+| `packages/core/tests/test_outcome_validation.py` | `packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_pagination.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_perf_cold_open.py` | `packages/core/src/agentic_odi_core/corpus.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_persistence_parity.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_promotion_identity.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_proposals.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/factory.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_recovery.py` | `packages/core/src/agentic_odi_core/recovery.py` |
+| `packages/core/tests/test_remote.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_repository.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py` |
+| `packages/core/tests/test_repository_factory.py` | `packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_repository_health.py` | `packages/core/src/agentic_odi_core/factory.py` |
+| `packages/core/tests/test_review.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/review.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/spine_extraction.py` |
+| `packages/core/tests/test_router.py` | `packages/core/src/agentic_odi_core/router.py`<br>`packages/core/src/agentic_odi_core/steve_jobs.py` |
+| `packages/core/tests/test_schedule.py` | `packages/core/src/agentic_odi_core/schedule.py` |
+| `packages/core/tests/test_scheduled_work.py` | — no direct source pair |
+| `packages/core/tests/test_schema.py` | `packages/core/src/agentic_odi_core/schema.py` |
+| `packages/core/tests/test_schema_version.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/migrations.py` |
+| `packages/core/tests/test_score_history.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_segmentation.py` | `packages/core/src/agentic_odi_core/segmentation.py` |
+| `packages/core/tests/test_segments_service.py` | `packages/core/src/agentic_odi_core/errors.py` |
+| `packages/core/tests/test_segments_staleness.py` | `packages/core/src/agentic_odi_core/freshness.py`<br>`packages/core/src/agentic_odi_core/models.py` |
+| `packages/core/tests/test_service.py` | `packages/core/src/agentic_odi_core/evaluation.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_signal_inbox.py` | `packages/core/src/agentic_odi_core/services.py` |
+| `packages/core/tests/test_similarity.py` | `packages/core/src/agentic_odi_core/similarity.py` |
+| `packages/core/tests/test_spine.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/schema.py`<br>`packages/core/src/agentic_odi_core/spine.py` |
+| `packages/core/tests/test_spine_end_to_end.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/spine.py` |
+| `packages/core/tests/test_spine_extraction.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/spine_extraction.py` |
+| `packages/core/tests/test_spine_similarity.py` | `packages/core/src/agentic_odi_core/spine_similarity.py` |
+| `packages/core/tests/test_spine_stages.py` | `packages/core/src/agentic_odi_core/factory.py`<br>`packages/core/src/agentic_odi_core/spine_stages.py` |
+| `packages/core/tests/test_sqlite_integrity.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/integrity.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/recovery.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_sqlite_repository.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/intent_store.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_stats.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/stats.py` |
+| `packages/core/tests/test_steve_jobs.py` | `packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/steve_jobs.py` |
+| `packages/core/tests/test_strategy.py` | `packages/core/src/agentic_odi_core/strategy.py` |
+| `packages/core/tests/test_study.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/schema.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py` |
+| `packages/core/tests/test_survey.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/survey.py` |
+| `packages/core/tests/test_survey_input_retention.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`packages/core/src/agentic_odi_core/stats.py`<br>`packages/core/src/agentic_odi_core/trust.py` |
+| `packages/core/tests/test_traceability.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`packages/core/src/agentic_odi_core/traceability.py` |
+| `packages/core/tests/test_transcript.py` | `packages/core/src/agentic_odi_core/transcript.py` |
+| `packages/core/tests/test_trust_pillar.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`packages/core/src/agentic_odi_core/stats.py` |
+| `packages/core/tests/test_trust_seams.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/models.py`<br>`packages/core/src/agentic_odi_core/trust.py` |
+| `packages/core/tests/test_trust_service.py` | `packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `tests/contract/test_cli_contract.py` | `apps/cli/src/agentic_odi_cli/backend.py`<br>`packages/core/src/agentic_odi_core/contract.py` |
+| `tests/contract/test_contract_snapshot.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/schema.py` |
+| `tests/contract/test_contract_snapshot_drift.py` | `packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/schema.py` |
+| `tests/contract/test_mcp_contract.py` | `apps/mcp-server/src/agentic_odi_mcp_server/mcp_server.py`<br>`packages/core/src/agentic_odi_core/contract.py`<br>`packages/core/src/agentic_odi_core/errors.py`<br>`packages/core/src/agentic_odi_core/remote.py`<br>`packages/core/src/agentic_odi_core/repository.py`<br>`packages/core/src/agentic_odi_core/services.py` |
+| `tests/contract/test_no_unregistered_gitlinks.py` | — no direct source pair |
+| `tests/contract/test_protected_files.py` | — no direct source pair |
+| `tests/e2e/__init__.py` | — no direct source pair |
+| `tests/e2e/test_spine.py` | `packages/core/src/agentic_odi_core/factory.py` |
+| `tests/scripts/test_artifact_a11y.py` | `scripts/artifact_a11y.py` |
+| `tests/scripts/test_artifact_inventory.py` | `scripts/artifact_renderers.py` |
+| `tests/scripts/test_assistant_ui_ledger.py` | `scripts/doc_check.py` |
+| `tests/scripts/test_audit_ignore.py` | `scripts/audit_ignore.py` |
+| `tests/scripts/test_blind_excepts.py` | — no direct source pair |
+| `tests/scripts/test_bundle_budget.py` | — no direct source pair |
+| `tests/scripts/test_ci_release.py` | `scripts/ci_release.py` |
+| `tests/scripts/test_cli_docs.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `tests/scripts/test_coverage_floor.py` | `scripts/coverage_floor.py` |
+| `tests/scripts/test_coverage_map.py` | `scripts/coverage_map.py` |
+| `tests/scripts/test_dev.py` | `scripts/dev.py` |
+| `tests/scripts/test_dev_main.py` | — no direct source pair |
+| `tests/scripts/test_doc_check.py` | `scripts/doc_check.py` |
+| `tests/scripts/test_doc_churn.py` | `scripts/doc_churn.py` |
+| `tests/scripts/test_docs_index.py` | `scripts/docs_index.py` |
+| `tests/scripts/test_gen_corpus.py` | `packages/core/src/agentic_odi_core/corpus.py`<br>`packages/core/src/agentic_odi_core/sqlite_repository.py`<br>`scripts/gen_corpus.py` |
+| `tests/scripts/test_gen_job_stages.py` | `scripts/gen_job_stages.py` |
+| `tests/scripts/test_hosted_first_run_workflow.py` | — no direct source pair |
+| `tests/scripts/test_label_merge_conflicts.py` | `scripts/pr_labels.py` |
+| `tests/scripts/test_migrations_registry.py` | `apps/studio-api/src/agentic_odi_studio_api/studio/memory.py`<br>`packages/core/src/agentic_odi_core/migrations.py` |
+| `tests/scripts/test_pr_ai_authorize.py` | `scripts/pr_ai_authorize.py` |
+| `tests/scripts/test_pr_ai_merge.py` | `scripts/pr_ai_merge.py` |
+| `tests/scripts/test_pr_ai_merge_act.py` | — no direct source pair |
+| `tests/scripts/test_pr_ai_merge_workflow.py` | — no direct source pair |
+| `tests/scripts/test_pr_body_gate.py` | — no direct source pair |
+| `tests/scripts/test_pr_guards.py` | `scripts/pr_guards.py` |
+| `tests/scripts/test_pr_labeler_workflow.py` | — no direct source pair |
+| `tests/scripts/test_pr_labels.py` | `scripts/pr_labels.py`<br>`scripts/pr_provenance.py` |
+| `tests/scripts/test_pr_provenance.py` | `scripts/pr_provenance.py` |
+| `tests/scripts/test_pr_sweep.py` | `scripts/pr_sweep.py` |
+| `tests/scripts/test_pr_sweep_workflow.py` | — no direct source pair |
+| `tests/scripts/test_pr_triage.py` | `scripts/pr_triage.py` |
+| `tests/scripts/test_release_assets.py` | `scripts/release_assets.py` |
+| `tests/scripts/test_release_instructions.py` | `scripts/release_instructions.py` |
+| `tests/scripts/test_release_version_gate.py` | — no direct source pair |
+| `tests/scripts/test_release_workflow.py` | — no direct source pair |
+| `tests/scripts/test_settings_registry.py` | `packages/core/src/agentic_odi_core/settings.py` |
+| `tests/scripts/test_updater_proof_gate.py` | — no direct source pair |
+| `tests/scripts/test_vendor_policy.py` | `scripts/vendor_policy.py` |
+| `tests/scripts/test_verify.py` | `scripts/verify.py` |
+| `tests/scripts/test_verify_ci_parity.py` | `scripts/verify.py` |
+| `tests/scripts/test_verify_hosted_first_run.py` | — no direct source pair |
+| `tests/scripts/test_version_sync.py` | `apps/cli/src/agentic_odi_cli/_build_info.py`<br>`scripts/check_version_parity.py` |
+| `tests/scripts/test_workflow_triggers.py` | — no direct source pair |
+| `tests/test_adr_index.py` | — no direct source pair |
+| `tests/test_architecture.py` | — no direct source pair |
+| `tests/test_dev_entrypoint.py` | — no direct source pair |
+| `tests/test_docs_code_overview.py` | — no direct source pair |
+| `tests/test_docs_method.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `tests/test_guide_commands.py` | `apps/cli/src/agentic_odi_cli/cli.py` |
+| `tests/test_integration_example.py` | `packages/core/src/agentic_odi_core/contract.py` |
+| `tests/test_score_tolerance_parity.py` | `packages/core/src/agentic_odi_core/models.py` |
+| `tests/test_timeout_ceiling.py` | — no direct source pair |
+| `tests/test_tour.py` | `scripts/tour.py` |
+| `tests/test_underserved_threshold_parity.py` | `packages/core/src/agentic_odi_core/evaluation.py` |
+| `tests/test_worker_build_route.py` | — no direct source pair |
+| `tests/test_worker_capabilities_route.py` | — no direct source pair |
+| `tests/test_worker_csp_rationale.py` | — no direct source pair |
+| `tests/test_worker_deploy_route.py` | — no direct source pair |
+| `tests/test_worker_error_origin.py` | — no direct source pair |
+| `tests/test_worker_error_shape.py` | — no direct source pair |
+| `tests/test_worker_header_forwarding.py` | — no direct source pair |
+| `tests/test_worker_security_headers.py` | — no direct source pair |
+| `website/tests/site_support.py` | `website/tools/build_site.py` |
+| `website/tests/test_ci_required.py` | — no direct source pair |
+| `website/tests/test_content_sync.py` | `website/tools/build_sample.py`<br>`website/tools/extract.py` |
+| `website/tests/test_design_system.py` | `website/tools/extract.py` |
+| `website/tests/test_docs_render.py` | `scripts/artifact_a11y.py`<br>`website/tools/build_site.py`<br>`website/tools/markdown_render.py` |
+| `website/tests/test_generated.py` | `website/tools/build_site.py`<br>`website/tools/extract.py` |
+| `website/tests/test_make_og.py` | `website/tools/make_og.py` |
+| `website/tests/test_og_pages.py` | `website/tools/build_site.py`<br>`website/tools/make_og.py` |
+| `website/tests/test_pages_deploy.py` | — no direct source pair |
+| `website/tests/test_site.py` | `scripts/artifact_a11y.py`<br>`website/tools/extract.py` |
+| `website/tests/test_theme.py` | — no direct source pair |
+<!-- coverage-map:end -->
 
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the

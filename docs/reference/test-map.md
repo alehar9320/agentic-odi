@@ -440,6 +440,8 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_bundle_budget.py` | The cold-start bundle budget gate (#529). |
 | `tests/scripts/test_ci_release.py` | — |
 | `tests/scripts/test_cli_docs.py` | Assert that docs/cli.md stays synchronized with registered Typer CLI commands. |
+| `tests/scripts/test_coverage_floor.py` | Unit tests for scripts/coverage_floor.py (issue #88). |
+| `tests/scripts/test_coverage_map.py` | Unit tests for scripts/coverage_map.py (issue #88). |
 | `tests/scripts/test_dev.py` | — |
 | `tests/scripts/test_dev_main.py` | Tests for the launcher lifecycle: start, poll, and shut down both services. |
 | `tests/scripts/test_doc_check.py` | Unit tests for scripts/doc_check.py (issue #97). |

@@ -90,5 +90,14 @@ export default defineConfig({
     // would also collect the Playwright specs in `e2e/`. Scope it to the unit
     // tests so the two runners never overlap.
     include: ["src/**/*.test.{ts,tsx}"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      // Measured on the suite as it stands on 2026-11-21 (issue #88): 83.33
+      // statements, 75.93 branches, 83.57 functions, 83.38 lines. The floors
+      // are the integer step below those numbers. Raise them as the untested
+      // surfaces gain tests; never lower them to unblock a change.
+      thresholds: { statements: 83, branches: 75, functions: 83, lines: 83 },
+    },
   },
 });

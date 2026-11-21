@@ -77,7 +77,63 @@ entry whose handler is gone fails, so it can only shrink.
 
 ## Coverage
 
-CI runs the root suite on Python 3.10, 3.11, and 3.12, collects coverage for every `agentic_odi_*` distribution, and uploads `coverage.xml` from the 3.12 job. Codecov requires 90% project coverage; patch coverage is advisory. Python tests and `apps/studio/**` are excluded from the report by `codecov.yml`.
+The authoritative Python gate is the `test` job, not Codecov. Pytest runs with
+coverage on and `--cov-fail-under=89`, the same floor as
+`[tool.coverage.report] fail_under` in `pyproject.toml` — token-free, so it gates
+a fork PR the same way it gates `main`. On pull requests,
+`scripts/coverage_floor.py` refuses a `pyproject.toml` whose `fail_under` is
+lower than the base branch's, so the floor can only ratchet upward. The 3.12 job
+writes per-distribution percentages to the job summary and uploads
+`coverage.xml` to Codecov under the `python` flag; Codecov reports a 90% project
+target with a 1% dip (the same 89% minimum) and is not the gate. Patch coverage
+is advisory.
+
+Measured on 2026-11-21: **89.52%** combined (16,467 statements, 1,726 missed),
+split as:
+
+| Distribution | Coverage |
+|---|---|
+| `agentic_odi_cli` | 86.44% |
+| `agentic_odi_connectors` | 93.70% |
+| `agentic_odi_core` | 94.14% |
+| `agentic_odi_mcp_server` | 72.36% |
+| `agentic_odi_studio_api` | 89.07% |
+
+The Studio is gated by Vitest thresholds instead. `npm run test:coverage`
+enforces statements 83, branches 75, functions 83, and lines 83 in
+`apps/studio/vite.config.ts`; the values measured on 2026-11-21 are 83.3%,
+75.9%, 83.5%, and 83.4%. It writes `apps/studio/coverage/lcov.info`, uploaded
+to Codecov under the `studio` flag on a non-blocking basis. The Vitest thresholds
+are what gate the merge. `scripts/coverage_map.py --check` keeps the generated
+map in `docs/development.md` in sync with the test tree.
+
+### Known coverage gaps
+
+Recorded from issue #88 so the holes the coverage map exposes are not hidden.
+None of these are fixed by the coverage work itself; they are the next tests to
+write. The numbers are from the 2026-11-21 run.
+
+Python:
+
+- `apps/studio-api/.../studio/changelog.py` measures **30%**. The markdown
+  parser is reached only through `/api/changelog` against the real
+  `CHANGELOG.md`, and it is the least-covered Python module in the tree.
+- `packages/core/src/agentic_odi_core/intent_store.py` measures **75%**. Its
+  uncovered lines are concentrated in the remote-sync half of the store.
+- `apps/studio-api/.../studio/chat.py` measures **91%**. What remains uncovered
+  is the failure and fallback handling: model errors, a mid-stream stop, and the
+  catch-all turn handler.
+- `agentic_odi_mcp_server` is the lowest distribution at **72.36%**, more than
+  twenty points below `agentic_odi_core`.
+
+Studio:
+
+- `src/ui/catalog.ts` (**37.93%** lines, **10.34%** branches) and
+  `src/ui/primitives.tsx` (**26.82%** lines) are the least exercised modules.
+- `src/state/StudioContext.tsx` measures **76.82%** lines and **62.7%** branches
+  even with its own test file; `useMediaQuery` returns `false` under jsdom, so
+  the mobile branch never runs.
+- `src/ui/cards.tsx` measures **76.97%** lines.
 
 ## Frontend
 
@@ -85,6 +141,7 @@ CI runs the root suite on Python 3.10, 3.11, and 3.12, collects coverage for eve
 npm --prefix apps/studio run lint
 npm --prefix apps/studio run typecheck
 npm --prefix apps/studio test -- --run
+npm --prefix apps/studio run test:coverage
 npm --prefix apps/studio run build
 cd apps/studio/src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo check
 ```
