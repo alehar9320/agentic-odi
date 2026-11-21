@@ -164,3 +164,26 @@ describe("selection and caret", () => {
     expect(themeCss).toMatch(/caret-color:\s*var\(--accent\)/);
   });
 });
+
+describe("functional type floor", () => {
+  const FUNCTIONAL_TYPE = [
+    ".bar__health {",
+    ".composer__hint {",
+    ".composer__model-caret {",
+    ".composer__model-select {",
+    ".attach__meta {",
+    ".attach__remove {",
+    ".message__time {",
+    ".quiet-action {",
+  ];
+
+  it("keeps every functional label on the smallest readable step", () => {
+    for (const selector of FUNCTIONAL_TYPE) {
+      const declared = readBlock(selector).match(/font-size:\s*([^;]+);/)?.[1]?.trim();
+      expect(declared, `${selector} has no font-size`).toBeTruthy();
+      expect(["var(--text-sm)", "var(--text-base)"], `${selector} is below the floor`).toContain(
+        declared,
+      );
+    }
+  });
+});
