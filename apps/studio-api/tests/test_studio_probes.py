@@ -225,3 +225,28 @@ def test_load_profile_fallback_reads_utf8_non_ascii(monkeypatch, tmp_path) -> No
     loaded = probes._load_profile_fallback()
     assert loaded.get("model") == "münchen-7b"
     assert loaded.get("base_url") == "http://localhost:8001/v1"
+
+
+def test_the_profile_fallback_reads_the_one_config_directory(monkeypatch, tmp_path) -> None:
+    from pathlib import Path
+
+    from agentic_odi_core import settings
+
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    profile_file = probes._profile_file()
+
+    assert profile_file == Path(tmp_path) / ".config" / "agentic-odi" / "llm_profile.json"
+    assert profile_file.parent == settings.config_dir()
+
+
+def test_the_profile_fallback_reads_back_what_save_profile_writes(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    written = probes.save_profile({"model": "cli-written-7b"})
+
+    assert written["model"] == "cli-written-7b"
+    assert probes._load_profile_fallback()["model"] == "cli-written-7b"
+    assert probes._profile_file().exists()

@@ -426,3 +426,88 @@ def test_config_dir_is_absolute_when_home_is_unset(monkeypatch, tmp_path):
     monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
 
     assert profile.config_dir().is_absolute()
+
+
+# ---------------------------------------------------------------------------
+# One config directory: CLI, core settings, and the legacy migration
+# ---------------------------------------------------------------------------
+
+
+def test_profile_and_paths_agree_on_one_config_directory(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    assert profile.config_dir() == paths.config_dir()
+
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert profile.config_dir() == paths.config_dir()
+
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
+    assert profile.config_dir() == paths.config_dir()
+
+
+def test_the_cli_and_core_agree_on_one_config_directory(monkeypatch, tmp_path):
+    from agentic_odi_core import settings
+
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert profile.config_dir() == settings.config_dir() == tmp_path / ".config" / "agentic-odi"
+
+
+def test_a_legacy_baseline_is_moved_into_the_config_directory(monkeypatch, tmp_path):
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    legacy = tmp_path / "agentic-odi"
+    legacy.mkdir()
+    (legacy / "baseline.json").write_text('{"product_name": "Legacy"}', encoding="utf-8")
+
+    loaded = profile.load_baseline()
+
+    assert loaded is not None
+    assert loaded.product_name == "Legacy"
+    assert (tmp_path / ".config" / "agentic-odi" / "baseline.json").exists()
+    assert not (legacy / "baseline.json").exists()
+
+
+def test_a_legacy_baseline_never_overwrites_a_newer_one(monkeypatch, tmp_path):
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    legacy = tmp_path / "agentic-odi"
+    legacy.mkdir()
+    (legacy / "baseline.json").write_text('{"product_name": "Legacy"}', encoding="utf-8")
+    current = tmp_path / ".config" / "agentic-odi"
+    current.mkdir(parents=True)
+    (current / "baseline.json").write_text('{"product_name": "Current"}', encoding="utf-8")
+
+    loaded = profile.load_baseline()
+
+    assert loaded is not None
+    assert loaded.product_name == "Current"
+    assert (legacy / "baseline.json").exists()
+
+
+def test_a_legacy_llm_profile_is_moved_into_the_config_directory(monkeypatch, tmp_path):
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    legacy = tmp_path / "agentic-odi"
+    legacy.mkdir()
+    (legacy / "llm_profile.json").write_text('{"model": "legacy-7b"}', encoding="utf-8")
+
+    loaded = profile.load_llm_profile()
+
+    assert loaded is not None
+    assert loaded.model == "legacy-7b"
+    assert (tmp_path / ".config" / "agentic-odi" / "llm_profile.json").exists()
+    assert not (legacy / "llm_profile.json").exists()
+
+
+def test_an_explicit_xdg_root_is_not_guessed_at(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    legacy = tmp_path / "agentic-odi"
+    legacy.mkdir()
+    (legacy / "baseline.json").write_text('{"product_name": "Legacy"}', encoding="utf-8")
+
+    assert profile.migrate_legacy_config_files() == []
+    assert (legacy / "baseline.json").exists()
