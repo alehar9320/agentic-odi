@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useStudio } from "../../../state/StudioContext";
 import { getDataStatus, getStorageFacts, exportWorkspace, importWorkspace } from "../../../api/studioApi";
+import { downloadFile } from "../../../lib/download";
 import { exportFilename } from "../../../lib/export";
 import type { DataStoreStatus } from "../../../api/studioApi";
 
@@ -108,16 +109,7 @@ export function DataSection({ sidecarReachable }: DataSectionProps) {
     try {
       const json = await exportWorkspace();
       const filename = exportFilename(new Date()).replace(".md", ".json");
-      const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      downloadFile(json, filename, "application/json;charset=utf-8");
       pushToast("success", `Exported ${filename}`);
     } catch (err) {
       pushToast("error", `Export failed: ${err instanceof Error ? err.message : "Unknown error"}`);

@@ -9,7 +9,8 @@ unparseable statement into the store.
 
 Four verbs are four states, and none of them is deletion:
 
-* **accept** — create exactly one outcome, link it, flip the candidate.
+* **accept** — create exactly one outcome, link it, write its verbatim quote as
+  evidence, then flip the candidate.
 * **edit** — change the statement, then accept.
 * **merge** — fold into an existing outcome (``merged_into``), creating no new one.
 * **reject** — record a required non-empty reason; the candidate is kept.
@@ -20,6 +21,8 @@ about the extractor, and a merge is information about duplicates.
 
 from __future__ import annotations
 
+import logging
+
 from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import CandidateStatus, ExtractedCandidate, Outcome
 from agentic_odi_core.repository import Repository
@@ -29,6 +32,8 @@ from agentic_odi_core.services import (
     ODIService,
     OutcomeNotFoundError,
 )
+
+log = logging.getLogger(__name__)
 
 
 class CandidateAlreadyDecidedError(ValidationError):
@@ -52,6 +57,29 @@ def _require_proposed(repo: Repository, candidate_id: str) -> ExtractedCandidate
     return candidate
 
 
+def _record_quote_evidence(
+    service: ODIService,
+    repo: Repository,
+    candidate: ExtractedCandidate,
+    quote: str,
+    outcome: Outcome,
+) -> None:
+    """Write the candidate's verbatim quote as an evidence row on ``outcome``."""
+    interview = repo.get_interview(candidate.interview_id) if candidate.interview_id else None
+    raw = {"candidate_id": candidate.id, "quote_id": candidate.quote_id}
+    if candidate.interview_id is not None:
+        raw["interview_id"] = candidate.interview_id
+    service.add_evidence(
+        source_name=interview.title if interview is not None else "Interview quote",
+        source_kind="interview",
+        name="quote",
+        content=quote,
+        item_type="manual",
+        raw=raw,
+        outcome_id=outcome.id,
+    )
+
+
 def accept_candidate(
     service: ODIService,
     repo: Repository,
@@ -62,11 +90,14 @@ def accept_candidate(
     satisfaction: float,
     step_id: str | None = None,
 ) -> Outcome:
-    """Accept a proposed candidate, creating exactly one outcome.
+    """Accept a proposed candidate, creating exactly one outcome with its evidence.
 
     An edited ``statement`` replaces the proposed one; the outcome still passes
-    the format validator via :meth:`ODIService.add_outcome`. The candidate is
-    flipped to ``accepted`` with the new ``outcome_id``. The caller supplies the
+    the format validator via :meth:`ODIService.add_outcome`. The verbatim quote
+    is written as an ``Evidence`` row tied to that outcome *before* the
+    candidate is flipped, so a failure can never leave an accepted candidate
+    without the sentence that produced it. A candidate that lost its quote is
+    refused rather than accepted without provenance. The caller supplies the
     scores, because a person judges importance and satisfaction — the extractor
     does not invent them.
     """
@@ -77,6 +108,12 @@ def accept_candidate(
         )
     if repo.get_job(candidate.job_id) is None:
         raise JobNotFoundError(candidate.job_id)
+    quote = (candidate.quote_text or "").strip()
+    if not quote:
+        raise ValidationError(
+            f"Candidate {candidate_id} has no stored verbatim quote, so accepting it would "
+            "lose its evidence. Re-extract it from its quote first."
+        )
 
     resolved_statement = statement if statement is not None else candidate.statement
     outcome = service.add_outcome(
@@ -86,6 +123,18 @@ def accept_candidate(
         satisfaction=satisfaction,
         step_id=step_id if step_id is not None else candidate.step_id,
     )
+    try:
+        _record_quote_evidence(service, repo, candidate, quote, outcome)
+    except Exception as exc:
+        # An outcome with no evidence is the one state acceptance must never
+        # leave behind, so undo the write and let the caller see the failure.
+        log.warning(
+            "quote evidence could not be written; rolling back outcome %s (%s)",
+            outcome.id,
+            type(exc).__name__,
+        )
+        repo.delete_outcome(outcome.id)
+        raise
     repo.update_extracted_candidate(
         candidate_id,
         {

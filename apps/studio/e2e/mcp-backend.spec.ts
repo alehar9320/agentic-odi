@@ -38,7 +38,7 @@ test.describe("the Studio on the MCP backend", () => {
     // The job picker is rendered from the canvas. Only a canvas hydrated
     // from the MCP server knows about this job; the seed fallback does not.
     await page.getByRole("button", { name: "Capture an outcome" }).click();
-    const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    const panel = page.getByRole("complementary", { name: "Add what you heard" });
     await expect(panel.getByLabel("Job", { exact: true })).toContainText(JOB_NAME);
   });
 
@@ -46,7 +46,7 @@ test.describe("the Studio on the MCP backend", () => {
     await openStudio(page);
 
     await page.getByRole("button", { name: "Capture an outcome" }).click();
-    const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    const panel = page.getByRole("complementary", { name: "Add what you heard" });
     await expect(panel).toBeVisible();
 
     // The job the MCP server already holds is offered in the picker.
@@ -94,6 +94,6 @@ test.describe("the Studio on the MCP backend", () => {
     await openStudio(page);
 
     await page.getByRole("button", { name: "Map the job" }).click();
-    await expect(lens(page, "Universal job map")).toBeVisible();
+    await expect(lens(page, "Steps in the job")).toBeVisible();
   });
 });

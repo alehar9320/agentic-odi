@@ -1,3 +1,9 @@
+/**
+ * Storage facts, workspace export and import, and the error states around them.
+ *
+ * The export must go through the shared `downloadFile` helper, which owns the
+ * blob URL and its deferred revocation (see `lib/download.test.ts`).
+ */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +14,7 @@ const getDataStatus = vi.hoisted(() => vi.fn());
 const exportWorkspace = vi.hoisted(() => vi.fn());
 const importWorkspace = vi.hoisted(() => vi.fn());
 const pushToast = vi.hoisted(() => vi.fn());
+const downloadFile = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/studioApi", () => ({
   getStorageFacts,
@@ -15,6 +22,8 @@ vi.mock("../../api/studioApi", () => ({
   exportWorkspace,
   importWorkspace,
 }));
+
+vi.mock("../../lib/download", () => ({ downloadFile }));
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({ pushToast }),
@@ -134,6 +143,15 @@ describe("DataSection (storage)", () => {
       expect(exportWorkspace).toHaveBeenCalled();
       expect(pushToast).toHaveBeenCalledWith("success", expect.stringContaining("Exported"));
     });
+
+    // The export must go through the shared helper, which owns the download and
+    // its deferred revocation (lib/download.test.ts). Inlining the blob/anchor
+    // dance here instead is the regression this guards against.
+    expect(downloadFile).toHaveBeenCalledWith(
+      '{"jobs":[]}',
+      "agentic-odi-workspace-2026-01-01.json",
+      "application/json;charset=utf-8",
+    );
   });
 
   it("imports workspace and reloads on success", async () => {

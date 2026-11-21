@@ -232,3 +232,24 @@ async def test_spine_tools_name_a_missing_id_rather_than_fabricating():
         payload = json.loads(measurement.content[0].text)  # type: ignore[index]
         assert payload["error"]["code"] == "not_found"
         assert payload["error"]["message"] == "Bet with ID nope not found."
+
+
+@pytest.mark.asyncio
+async def test_acceptance_keeps_the_verbatim_quote_as_evidence():
+    """The outcome a person accepts carries the sentence that produced it."""
+    async with Client(mcp) as client:
+        job_id = await _job(client)
+        candidate_id = await _extract(client, job_id)
+        accepted = await client.call_tool(
+            "accept_candidate",
+            {"candidate_id": candidate_id, "importance": 9.0, "satisfaction": 4.0},
+        )
+        outcome_id = _id(accepted.content[0].text)  # type: ignore[index]
+
+        evidence = json.loads(
+            (await client.call_tool("list_evidence", {"outcome_id": outcome_id})).content[0].text  # type: ignore[index]
+        )
+
+    assert [item["content"] for item in evidence] == [VALID]
+    assert evidence[0]["source_kind"] == "interview"
+    assert evidence[0]["raw"]["candidate_id"] == candidate_id

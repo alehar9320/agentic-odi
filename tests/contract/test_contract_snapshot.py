@@ -1649,7 +1649,7 @@ def test_declared_tool_surface_snapshot() -> None:
                     "target_id",
                     "target_type",
                 ],
-                "effect": "write",
+                "effect": "read",
                 "required": [],
                 "returns": "A list of Link records.",
                 "stage": None,
@@ -2592,6 +2592,12 @@ required interview link.\
                         "description": "The source quote this candidate came from",
                         "title": "Quote Id",
                         "type": "string",
+                    },
+                    "quote_text": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The verbatim quote this candidate came from; acceptance writes it as evidence",
+                        "title": "Quote Text",
                     },
                     "rationale": {
                         "default": "",

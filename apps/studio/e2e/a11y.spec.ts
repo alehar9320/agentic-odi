@@ -107,7 +107,7 @@ async function installWalker(page: Page): Promise<void> {
 async function goto(page: Page, screen: Screen): Promise<void> {
   await openStudio(page);
   if (screen === "landscape" || screen === "records") {
-    const label = screen === "landscape" ? "Landscape" : "Records";
+    const label = screen === "landscape" ? "Where to focus" : "Records";
     await rail(page).getByRole("button", { name: new RegExp(`^${label},`) }).click();
   } else if (screen === "brief") {
     // The command is the keyboard route, and the only one that reaches the
@@ -115,7 +115,7 @@ async function goto(page: Page, screen: Screen): Promise<void> {
     await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
     await page.keyboard.press("Enter");
   } else if (screen === "catchup") {
-    await page.getByRole("button", { name: /^Signal inbox:/ }).click();
+    await page.getByRole("button", { name: /^What changed:/ }).click();
   } else if (screen === "settings") {
     await page.getByRole("button", { name: "Open settings" }).click();
   }

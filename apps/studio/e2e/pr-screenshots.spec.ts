@@ -118,12 +118,12 @@ test.describe("product screenshots", () => {
     await capture(page, "02-chat.png");
 
     // 03 — the job map, opened from the rail.
-    await openFromRail(page, /^Job map,/);
+    await openFromRail(page, /^Steps in the job,/);
     await capture(page, "03-job-map.png");
     await closeLens(page);
 
     // 04 — the opportunity landscape, opened from the rail.
-    await openFromRail(page, /^Landscape,/);
+    await openFromRail(page, /^Where to focus,/);
     await capture(page, "04-landscape.png");
     await closeLens(page);
 

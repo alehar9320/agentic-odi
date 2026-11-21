@@ -44,6 +44,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
 | `apps/cli/tests/test_demo_cli.py` | Tests for ``odi demo`` — the labelled sample workspace. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
+| `apps/cli/tests/test_doctor.py` | `odi doctor` explains why the Studio will not start, and never changes the machine. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
 | `apps/cli/tests/test_interviews_cli.py` | Tests for the interviews CLI group (A1). |
@@ -242,7 +243,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/settings/AboutSection.test.tsx` | The transport is supported, so the provider syncs currentVersion from the |
 | `apps/studio/src/components/settings/ConnectionsSection.test.tsx` | The failure-isolation contract: both sections are composed from props, |
 | `apps/studio/src/components/settings/ContextSection.test.tsx` | — |
-| `apps/studio/src/components/settings/DataSection.test.tsx` | — |
+| `apps/studio/src/components/settings/DataSection.test.tsx` | Storage facts, workspace export and import, and the error states around them. |
 | `apps/studio/src/components/settings/InstallSection.test.tsx` | #800: the desktop app is already its own window, so it cannot be installed. |
 | `apps/studio/src/components/settings/ModelSection.test.tsx` | The key control asks the sidecar for a key's state on mount; a unit test does |
 | `apps/studio/src/components/settings/SettingsLayout.test.tsx` | The updater's state stays in the Updates row. |
@@ -349,6 +350,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_sink.py` | — |
 | `packages/core/tests/test_alternatives.py` | What a customer uses today, recorded and asked about honestly (M2-07). |
 | `packages/core/tests/test_alternatives_presentation.py` | Presenting the alternatives inventory to a reader (M2-07.2, ALH-166). |
+| `packages/core/tests/test_candidate_decision.py` | Accepting a candidate keeps the sentence that produced it — ALH-191. |
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
@@ -383,6 +385,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_persistence_parity.py` | A field added on one persistence link must exist on all of them. |
 | `packages/core/tests/test_promotion_identity.py` | One customer quote must not become three opportunities. |
 | `packages/core/tests/test_proposals.py` | Tests for proposal lifecycle (issue #80). |
+| `packages/core/tests/test_recovery.py` | Tests for backup and restore (issue #1133). |
 | `packages/core/tests/test_remote.py` | Tests for the shared MCP tool-result error parser. |
 | `packages/core/tests/test_repository.py` | Tests for the in-memory Repository implementation. |
 | `packages/core/tests/test_repository_factory.py` | — |
