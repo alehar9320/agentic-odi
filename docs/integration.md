@@ -149,7 +149,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 
 <!-- BEGIN GENERATED TOOLS (scripts/integration_guide.py) -->
 
-94 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
+97 tools. Generated from the tool contract in `packages/core/src/agentic_odi_core/contract.py` and the server source; the effect column is the write contract, read from `TOOL_SPECS`.
 
 | Tool | Effect | Stage | Required arguments | Purpose |
 | ---- | ------ | ----- | ------------------ | ------- |
@@ -206,6 +206,9 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `get_candidate` | `read` | — | `candidate_id` | Fetch one proposed outcome by id. |
 | `update_candidate` | `write` | — | `candidate_id` | Update an outcome candidate's review state or statement. |
 | `delete_candidate` | `destructive` | — | `candidate_id` | Delete an OutcomeCandidate. |
+| `add_solution` | `write` | 2 | `title`, `hypothesis`, `outcome_ids` | See the MCP server source for details. |
+| `list_solutions` | `read` | — | — | See the MCP server source for details. |
+| `update_solution` | `write` | — | `solution_id` | See the MCP server source for details. |
 | `promote_evidence` | `write` | — | `evidence_id`, `target` | Promote a record into a Job, outcome, or customer outcome. |
 | `evaluate_outcome` | `read` | 2 | `statement` | Check a statement against the ODI format before saving it. |
 | `get_odi_schema` | `read` | — | — | Return the canonical JSON schema for every ODI entity. |

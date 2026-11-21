@@ -37,6 +37,7 @@ from agentic_odi_core.models import (
     Alternative,
     AlternativeLink,
     BusinessValue,
+    CandidateSolution,
     CandidateStatus,
     ClaimCheck,
     ClaimSkip,
@@ -1645,6 +1646,89 @@ class ODIService:
     def delete_candidate(self, candidate_id: str) -> None:
         if not self.repo.delete_outcome_candidate(candidate_id):
             raise CandidateNotFoundError(candidate_id)
+
+    def add_candidate_solution(
+        self,
+        title: str,
+        hypothesis: str,
+        outcome_ids: list[str],
+        strategy_path: str | None = None,
+        evidence_ids: list[str] | None = None,
+    ) -> CandidateSolution:
+        """Create a CandidateSolution that serves at least one underserved outcome."""
+        resolved_outcomes: list[Outcome] = []
+        for oid in outcome_ids:
+            outcome = self.get_outcome(oid)
+            if outcome is None:
+                raise OutcomeNotFoundError(oid)
+            resolved_outcomes.append(outcome)
+
+        underserved = [
+            o for o in resolved_outcomes if classify_opportunity(o.opportunity_score) == "underserved"
+        ]
+        if not underserved:
+            lines = []
+            for o in resolved_outcomes:
+                score = o.opportunity_score
+                bucket = classify_opportunity(score)
+                lines.append(f"  {o.id}: score={score}, bucket={bucket}")
+            raise ValidationError(
+                "a solution must serve at least one underserved outcome (opportunity score > 10)\n"
+                + "\n".join(lines)
+            )
+
+        candidate = CandidateSolution(
+            title=title,
+            hypothesis=hypothesis,
+            outcome_ids=outcome_ids,
+            status=CandidateStatus.PROPOSED,
+            strategy_path=strategy_path,
+            evidence_ids=evidence_ids or [],
+        )
+        return self.repo.add_candidate(candidate)
+
+    def list_candidate_solutions(
+        self,
+        job_id: str | None = None,
+        status: CandidateStatus | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[CandidateSolution]:
+        """List CandidateSolutions, optionally filtered by job and status."""
+        all_solutions = self.repo.list_candidates()
+
+        if status is not None:
+            all_solutions = [s for s in all_solutions if s.status == status]
+
+        if job_id is not None:
+            outcomes = self.get_outcomes(job_id=job_id)
+            outcome_ids = {o.id for o in outcomes}
+            all_solutions = [
+                s for s in all_solutions if set(s.outcome_ids) & outcome_ids
+            ]
+
+        return page(all_solutions, limit, offset)
+
+    def update_candidate_solution(
+        self,
+        candidate_id: str,
+        updates: dict[str, Any],
+    ) -> CandidateSolution:
+        """Update a CandidateSolution."""
+        if not updates:
+            raise ValidationError("update_solution requires at least one field to change")
+
+        if "status" in updates:
+            try:
+                updates["status"] = CandidateStatus(updates["status"])
+            except ValueError as exc:
+                valid = ", ".join(s.value for s in CandidateStatus)
+                raise ValidationError(f"unknown status: {updates['status']}. Valid: {valid}") from exc
+
+        candidate = self.repo.update_candidate(candidate_id, updates)
+        if candidate is None:
+            raise CandidateNotFoundError(candidate_id)
+        return candidate
 
     def promote_evidence(
         self,

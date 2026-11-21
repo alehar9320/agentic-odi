@@ -20,6 +20,7 @@ from agentic_odi_core.services import (
     ODIService,
     OutcomeNotFoundError,
     StepNotFoundError,
+    ValidationError,
     ValueOutOfRangeError,
 )
 from agentic_odi_core.sqlite_repository import SQLiteRepository
@@ -601,3 +602,172 @@ def test_clearing_both_ratings_reads_the_same_as_never_having_scored(tmp_path) -
             None,
         )
         assert classify_opportunity(outcome.opportunity_score) == "unscored"
+
+
+def test_add_candidate_solution_requires_underserved_outcome(service: ODIService) -> None:
+    """A solution must serve at least one underserved outcome (score > 10)."""
+    job = service.add_job("Test Job")
+
+    # Unscored outcome
+    unscored = service.add_outcome(
+        job.id,
+        "Minimize the time to complete the task when onboarding",
+    )
+
+    # Appropriate outcome (score = 10)
+    appropriate = service.add_outcome(
+        job.id,
+        "Minimize the time to complete the task when onboarding",
+        importance=5.0,
+        satisfaction=5.0,
+    )
+
+    # Overserved outcome (score < 10)
+    overserved = service.add_outcome(
+        job.id,
+        "Minimize the time to complete the task when onboarding",
+        importance=3.0,
+        satisfaction=8.0,
+    )
+
+    # Try with only unscored/appropriate/overserved - should fail
+    with pytest.raises(ValidationError) as exc:
+        service.add_candidate_solution(
+            title="Bad Solution",
+            hypothesis="This won't work",
+            outcome_ids=[unscored.id, appropriate.id, overserved.id],
+        )
+    assert "underserved outcome" in str(exc.value).lower()
+
+    # Underserved outcome (score > 10)
+    underserved = service.add_outcome(
+        job.id, "Minimize the time to complete the task when onboarding", importance=9.0, satisfaction=3.0
+    )
+    assert classify_opportunity(underserved.opportunity_score) == "underserved"
+
+    # Now it should succeed
+    solution = service.add_candidate_solution(
+        title="Good Solution",
+        hypothesis="This serves the underserved outcome",
+        outcome_ids=[underserved.id],
+    )
+    assert solution.title == "Good Solution"
+    assert solution.status.value == "proposed"
+    assert solution.outcome_ids == [underserved.id]
+
+    # Round-trip via get_candidate (repo method)
+    retrieved = service.repo.get_candidate(solution.id)
+    assert retrieved is not None
+    assert retrieved.title == "Good Solution"
+
+
+def test_add_candidate_solution_rejects_unknown_outcome_id(service: ODIService) -> None:
+    """Adding a solution with an unknown outcome ID raises OutcomeNotFoundError."""
+    job = service.add_job("Test Job")
+    service.add_outcome(
+        job.id,
+        "Minimize the time to complete the task when onboarding",
+        importance=8.0,
+        satisfaction=3.0,
+    )
+
+    with pytest.raises(OutcomeNotFoundError):
+        service.add_candidate_solution(
+            title="Solution",
+            hypothesis="Hypothesis",
+            outcome_ids=["unknown-outcome-id"],
+        )
+
+
+def test_list_candidate_solutions_filters_by_job(service: ODIService) -> None:
+    """list_candidate_solutions with job_id returns only solutions for that job's outcomes."""
+    job1 = service.add_job("Job One")
+    job2 = service.add_job("Job Two")
+
+    # Create underserved outcomes for both jobs
+    o1 = service.add_outcome(
+        job1.id, "Minimize the time to complete the task when onboarding", importance=9.0, satisfaction=3.0
+    )
+    o2 = service.add_outcome(
+        job2.id, "Minimize the time to complete the task when onboarding", importance=9.0, satisfaction=3.0
+    )
+
+    # Create solutions
+    s1 = service.add_candidate_solution("Solution 1", "Hypo 1", [o1.id])
+    s2 = service.add_candidate_solution("Solution 2", "Hypo 2", [o2.id])
+
+    # List all
+    all_solutions = service.list_candidate_solutions()
+    assert len(all_solutions) == 2
+
+    # Filter by job1
+    job1_solutions = service.list_candidate_solutions(job_id=job1.id)
+    assert len(job1_solutions) == 1
+    assert job1_solutions[0].id == s1.id
+
+    # Filter by job2
+    job2_solutions = service.list_candidate_solutions(job_id=job2.id)
+    assert len(job2_solutions) == 1
+    assert job2_solutions[0].id == s2.id
+
+    # Filter by status
+    from agentic_odi_core.models import CandidateStatus
+
+    proposed = service.list_candidate_solutions(status=CandidateStatus.PROPOSED)
+    assert len(proposed) == 2
+
+
+def test_update_candidate_solution_status_transition(service: ODIService) -> None:
+    """update_candidate_solution persists a status transition and returns updated record."""
+    from agentic_odi_core.models import CandidateStatus
+
+    job = service.add_job("Test Job")
+    outcome = service.add_outcome(
+        job.id, "Minimize the time to complete the task when onboarding", importance=9.0, satisfaction=3.0
+    )
+    solution = service.add_candidate_solution("Solution", "Hypothesis", [outcome.id])
+
+    # Update status
+    updated = service.update_candidate_solution(solution.id, {"status": "accepted"})
+    assert updated.id == solution.id
+    assert updated.status == CandidateStatus.ACCEPTED
+
+    # Verify it persists
+    retrieved = service.repo.get_candidate(solution.id)
+    assert retrieved is not None
+    assert retrieved.status == CandidateStatus.ACCEPTED
+
+
+def test_update_candidate_solution_rejects_unknown_status(service: ODIService) -> None:
+    """Unknown status string raises ValidationError with valid statuses listed."""
+    job = service.add_job("Test Job")
+    outcome = service.add_outcome(
+        job.id, "Minimize the time to complete the task when onboarding", importance=9.0, satisfaction=3.0
+    )
+    solution = service.add_candidate_solution("Solution", "Hypothesis", [outcome.id])
+
+    with pytest.raises(ValidationError) as exc:
+        service.update_candidate_solution(solution.id, {"status": "invalid_status"})
+    assert "unknown status" in str(exc.value).lower()
+    assert "proposed" in str(exc.value).lower()
+
+
+def test_update_candidate_solution_rejects_empty_update(service: ODIService) -> None:
+    """Empty update dict raises ValidationError."""
+    job = service.add_job("Test Job")
+    outcome = service.add_outcome(
+        job.id, "Minimize the time to complete the task when onboarding", importance=9.0, satisfaction=3.0
+    )
+    solution = service.add_candidate_solution("Solution", "Hypothesis", [outcome.id])
+
+    with pytest.raises(ValidationError) as exc:
+        service.update_candidate_solution(solution.id, {})
+    assert "at least one field" in str(exc.value).lower()
+
+
+def test_update_candidate_solution_raises_for_missing_id(service: ODIService) -> None:
+    """Updating a non-existent solution raises CandidateNotFoundError."""
+    from agentic_odi_core.services import CandidateNotFoundError
+
+    with pytest.raises(CandidateNotFoundError):
+        service.update_candidate_solution("missing-id", {"status": "accepted"})

@@ -1110,6 +1110,70 @@ class LocalBackend(Backend):
             raise BackendError(candidate_not_found(args["candidate_id"])) from None
         return args["candidate_id"]
 
+    def _add_solution(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import OutcomeNotFoundError, ValidationError
+
+        try:
+            candidate = self.service.add_candidate_solution(
+                title=args["title"],
+                hypothesis=args["hypothesis"],
+                outcome_ids=args["outcome_ids"],
+                strategy_path=args.get("strategy_path"),
+                evidence_ids=args.get("evidence_ids"),
+            )
+        except OutcomeNotFoundError:
+            raise BackendError(f"Outcome with ID {args['outcome_ids'][0]} not found.") from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return candidate.model_dump()
+
+    def _list_solutions(self, args: dict[str, Any]) -> list[dict[str, Any]]:
+        from agentic_odi_core import CandidateStatus, ValidationError
+
+        raw_status = args.get("status")
+        try:
+            status = CandidateStatus(raw_status) if raw_status is not None else None
+        except ValueError:
+            raise BackendError(f"Invalid candidate status '{raw_status}'.")
+        kwargs: dict[str, Any] = {}
+        if "job_id" in args:
+            kwargs["job_id"] = args["job_id"]
+        if status is not None:
+            kwargs["status"] = status
+        if "limit" in args:
+            kwargs["limit"] = args["limit"]
+        if "offset" in args:
+            kwargs["offset"] = args["offset"]
+        items = self.service.list_candidate_solutions(**kwargs)
+        return [item.model_dump(mode="json") for item in items]
+
+    def _update_solution(self, args: dict[str, Any]) -> dict[str, Any]:
+        from agentic_odi_core import CandidateNotFoundError, CandidateStatus, ValidationError
+
+        updates: dict[str, Any] = {}
+        if args.get("status") is not None:
+            try:
+                updates["status"] = CandidateStatus(args["status"])
+            except ValueError:
+                raise BackendError(f"Invalid candidate status '{args['status']}'.")
+        if args.get("title") is not None:
+            updates["title"] = args["title"]
+        if args.get("hypothesis") is not None:
+            updates["hypothesis"] = args["hypothesis"]
+        if args.get("strategy_path") is not None:
+            updates["strategy_path"] = args["strategy_path"]
+        if args.get("evidence_ids") is not None:
+            updates["evidence_ids"] = args["evidence_ids"]
+        if not updates:
+            raise BackendError("update_solution requires at least one field to change.")
+        try:
+            candidate = self.service.update_candidate_solution(args["solution_id"], updates)
+        except CandidateNotFoundError:
+            raise BackendError(f"CandidateSolution with ID {args['solution_id']} not found.") from None
+        except ValidationError as exc:
+            raise BackendError(str(exc)) from None
+        return candidate.model_dump(mode="json")
+
     def _evaluate_outcome(self, args: dict[str, Any]) -> str:
         from agentic_odi_core import job_not_found
         from agentic_odi_core.evaluation import (
@@ -1498,6 +1562,9 @@ _LOCAL_HANDLERS = {
     "list_candidates": LocalBackend._list_candidates,
     "update_candidate": LocalBackend._update_candidate,
     "delete_candidate": LocalBackend._delete_candidate,
+    "add_solution": LocalBackend._add_solution,
+    "list_solutions": LocalBackend._list_solutions,
+    "update_solution": LocalBackend._update_solution,
     "promote_evidence": LocalBackend._promote_evidence,
     "propose_outcome": LocalBackend._propose_outcome,
     "list_proposals": LocalBackend._list_proposals,

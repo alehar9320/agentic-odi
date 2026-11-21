@@ -22,6 +22,7 @@ from agentic_odi_core import (
     AlternativeNotFoundError,
     CandidateAlreadyDecidedError,
     CandidateNotFoundError,
+    CandidateSolution,
     CandidateStatus,
     ClaimCheckError,
     CustomerOutcomeNotFoundError,
@@ -1350,10 +1351,13 @@ def get_candidate(candidate_id: str) -> str:
     if candidate is None:
         extracted = get_repository().get_extracted_candidate(candidate_id)
         if extracted is None:
-            return _fail(
-                CandidateNotFoundError(candidate_id),
-                f"Error: Candidate with ID {candidate_id} not found.",
-            )
+            solution = get_repository().get_candidate(candidate_id)
+            if solution is None:
+                return _fail(
+                    CandidateNotFoundError(candidate_id),
+                    f"Error: Candidate with ID {candidate_id} not found.",
+                )
+            return solution.model_dump_json()
         return extracted.model_dump_json()
     return candidate.model_dump_json()
 
@@ -1393,6 +1397,88 @@ def delete_candidate(candidate_id: str) -> str:
     except CandidateNotFoundError:
         return _candidate_not_found(candidate_id)
     return f"Candidate deleted successfully: {candidate_id}"
+
+
+@mcp.tool
+def add_solution(
+    title: str,
+    hypothesis: str,
+    outcome_ids: list[str],
+    strategy_path: str | None = None,
+    evidence_ids: list[str] | None = None,
+) -> str:
+    """Add a CandidateSolution that must serve at least one underserved outcome."""
+    try:
+        candidate = get_service().add_candidate_solution(
+            title=title,
+            hypothesis=hypothesis,
+            outcome_ids=outcome_ids,
+            strategy_path=strategy_path,
+            evidence_ids=evidence_ids,
+        )
+    except OutcomeNotFoundError as exc:
+        return _outcome_not_found(exc.resource_id)
+    except CoreValidationError as exc:
+        return _fail(exc)
+    except ValidationError as exc:
+        return _fail(CoreValidationError(str(exc)))
+    return f"Solution created successfully: {candidate.model_dump_json()}"
+
+
+@mcp.tool
+def list_solutions(
+    job_id: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> str:
+    """List CandidateSolutions, optionally filtered by job and status."""
+    try:
+        resolved_status = CandidateStatus(status) if status is not None else None
+    except ValueError:
+        return _fail(ValueError(f"unknown candidate status: {status}"))
+    items = get_service().list_candidate_solutions(
+        job_id=job_id, status=resolved_status, limit=limit, offset=offset
+    )
+    return json.dumps([item.model_dump(mode="json") for item in items])
+
+
+@mcp.tool
+def update_solution(
+    solution_id: str,
+    status: str | None = None,
+    title: str | None = None,
+    hypothesis: str | None = None,
+    strategy_path: str | None = None,
+    evidence_ids: list[str] | None = None,
+) -> str:
+    """Update a CandidateSolution's status or other fields."""
+    updates: dict[str, Any] = {}
+    if status is not None:
+        try:
+            updates["status"] = CandidateStatus(status)
+        except ValueError:
+            return _fail(ValueError(f"unknown candidate status: {status}"))
+    if title is not None:
+        updates["title"] = title
+    if hypothesis is not None:
+        updates["hypothesis"] = hypothesis
+    if strategy_path is not None:
+        updates["strategy_path"] = strategy_path
+    if evidence_ids is not None:
+        updates["evidence_ids"] = evidence_ids
+    try:
+        candidate = get_service().update_candidate_solution(solution_id, updates)
+    except CandidateNotFoundError:
+        return _fail(
+            CandidateNotFoundError(solution_id),
+            f"Error: CandidateSolution with ID {solution_id} not found.",
+        )
+    except CoreValidationError as exc:
+        return _fail(exc)
+    except ValidationError as exc:
+        return _fail(CoreValidationError(str(exc)))
+    return candidate.model_dump_json()
 
 
 @mcp.tool

@@ -66,6 +66,9 @@ class ToolName(str, Enum):
     GET_CANDIDATE = "get_candidate"
     UPDATE_CANDIDATE = "update_candidate"
     DELETE_CANDIDATE = "delete_candidate"
+    ADD_SOLUTION = "add_solution"
+    LIST_SOLUTIONS = "list_solutions"
+    UPDATE_SOLUTION = "update_solution"
     PROMOTE_EVIDENCE = "promote_evidence"
     EVALUATE_OUTCOME = "evaluate_outcome"
     GET_ODI_SCHEMA = "get_odi_schema"
@@ -669,6 +672,30 @@ TOOL_SPECS: dict[str, ToolSpec] = {
         arguments=("candidate_id",),
         required=("candidate_id",),
         returns="The deleted candidate ID.",
+    ),
+    ToolName.ADD_SOLUTION.value: ToolSpec(
+        name="add_solution",
+        summary="Add a CandidateSolution that must serve at least one underserved outcome (score > 10).",
+        effect=_derive_effect("add_solution"),
+        arguments=("title", "hypothesis", "outcome_ids", "strategy_path", "evidence_ids"),
+        required=("title", "hypothesis", "outcome_ids"),
+        returns="The created CandidateSolution.",
+        stage="2",
+    ),
+    ToolName.LIST_SOLUTIONS.value: ToolSpec(
+        name="list_solutions",
+        summary="List CandidateSolutions, optionally filtered by job and status.",
+        effect=_derive_effect("list_solutions"),
+        arguments=("job_id", "status", "limit", "offset"),
+        returns="A list of CandidateSolutions.",
+    ),
+    ToolName.UPDATE_SOLUTION.value: ToolSpec(
+        name="update_solution",
+        summary="Update a CandidateSolution's status or other fields.",
+        effect=_derive_effect("update_solution"),
+        arguments=("solution_id", "status", "title", "hypothesis", "strategy_path", "evidence_ids"),
+        required=("solution_id",),
+        returns="The updated CandidateSolution.",
     ),
     ToolName.PROMOTE_EVIDENCE.value: ToolSpec(
         name="promote_evidence",

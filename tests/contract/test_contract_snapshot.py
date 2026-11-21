@@ -22,11 +22,21 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from agentic_odi_core import InMemoryRepository
 from agentic_odi_core.contract import TOOL_SPECS
 from agentic_odi_core.schema import odi_schema
+from agentic_odi_mcp_server import mcp_server
 from agentic_odi_mcp_server.mcp_server import mcp
 from fastmcp import Client
 from inline_snapshot import snapshot
+
+
+@pytest.fixture(autouse=True)
+def configured_server() -> None:
+    mcp_server.configure(InMemoryRepository())
+    yield
+    mcp_server._repo = None
+    mcp_server._service = None
 
 
 def _normalize(value: Any) -> Any:
@@ -225,6 +235,24 @@ async def test_live_registry_snapshot() -> None:
                     "text": {"type": "string"},
                 },
                 "required": ["interview_id", "text"],
+                "type": "object",
+            },
+            "add_solution": {
+                "additionalProperties": False,
+                "properties": {
+                    "evidence_ids": {
+                        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
+                        "default": None,
+                    },
+                    "hypothesis": {"type": "string"},
+                    "outcome_ids": {"items": {"type": "string"}, "type": "array"},
+                    "strategy_path": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "title": {"type": "string"},
+                },
+                "required": ["hypothesis", "outcome_ids", "title"],
                 "type": "object",
             },
             "add_step": {
@@ -784,6 +812,16 @@ async def test_live_registry_snapshot() -> None:
                 },
                 "type": "object",
             },
+            "list_solutions": {
+                "additionalProperties": False,
+                "properties": {
+                    "job_id": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "limit": {"anyOf": [{"type": "integer"}, {"type": "null"}], "default": None},
+                    "offset": {"default": 0, "type": "integer"},
+                    "status": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
+                "type": "object",
+            },
             "list_studies": {
                 "additionalProperties": False,
                 "properties": {
@@ -1073,6 +1111,28 @@ async def test_live_registry_snapshot() -> None:
                 "required": ["outcome_id"],
                 "type": "object",
             },
+            "update_solution": {
+                "additionalProperties": False,
+                "properties": {
+                    "evidence_ids": {
+                        "anyOf": [{"items": {"type": "string"}, "type": "array"}, {"type": "null"}],
+                        "default": None,
+                    },
+                    "hypothesis": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "solution_id": {"type": "string"},
+                    "status": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                    "strategy_path": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                    },
+                    "title": {"anyOf": [{"type": "null"}, {"type": "string"}], "default": None},
+                },
+                "required": ["solution_id"],
+                "type": "object",
+            },
             "update_step": {
                 "additionalProperties": False,
                 "properties": {
@@ -1198,6 +1258,20 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The created InterviewQuote.",
                 "stage": None,
                 "summary": "Append a verbatim quote to an interview.",
+            },
+            "add_solution": {
+                "arguments": [
+                    "evidence_ids",
+                    "hypothesis",
+                    "outcome_ids",
+                    "strategy_path",
+                    "title",
+                ],
+                "effect": "write",
+                "required": ["hypothesis", "outcome_ids", "title"],
+                "returns": "The created CandidateSolution.",
+                "stage": "2",
+                "summary": "Add a CandidateSolution that must serve at least one underserved outcome (score > 10).",
             },
             "add_step": {
                 "arguments": ["allow_empty_job_map", "job_id", "name", "order", "stage"],
@@ -1743,6 +1817,14 @@ def test_declared_tool_surface_snapshot() -> None:
                 "stage": None,
                 "summary": "List signals the store recorded — real changes worth attention.",
             },
+            "list_solutions": {
+                "arguments": ["job_id", "limit", "offset", "status"],
+                "effect": "read",
+                "required": [],
+                "returns": "A list of CandidateSolutions.",
+                "stage": None,
+                "summary": "List CandidateSolutions, optionally filtered by job and status.",
+            },
             "list_studies": {
                 "arguments": ["job_id"],
                 "effect": "read",
@@ -1953,6 +2035,21 @@ def test_declared_tool_surface_snapshot() -> None:
                 "returns": "The updated Outcome.",
                 "stage": "2",
                 "summary": "Update an Outcome's statement or scores.",
+            },
+            "update_solution": {
+                "arguments": [
+                    "evidence_ids",
+                    "hypothesis",
+                    "solution_id",
+                    "status",
+                    "strategy_path",
+                    "title",
+                ],
+                "effect": "write",
+                "required": ["solution_id"],
+                "returns": "The updated CandidateSolution.",
+                "stage": None,
+                "summary": "Update a CandidateSolution's status or other fields.",
             },
             "update_step": {
                 "arguments": ["name", "order", "step_id"],
