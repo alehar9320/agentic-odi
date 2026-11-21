@@ -165,6 +165,17 @@ def test_with_stored_key_uses_request_key_when_present(monkeypatch: pytest.Monke
     assert _with_stored_key("sk-client", "http://evil:1/v1") == "sk-client"
 
 
+def test_with_stored_key_withholds_the_configured_key_from_a_foreign_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
+    monkeypatch.setenv("AGENTIC_ODI_API_KEY", "sk-operator-DO-NOT-LEAK")
+    _patch_load_model_key(monkeypatch, None)
+    # The profile's own key is a credential too: a caller that supplies a foreign
+    # base_url must not receive it either.
+    assert _with_stored_key("", "http://evil:1/v1") == ""
+
+
 def test_with_stored_key_falls_back_to_default_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGENTIC_ODI_BASE_URL", "http://configured:9/v1")
     _patch_load_model_key(monkeypatch, None)

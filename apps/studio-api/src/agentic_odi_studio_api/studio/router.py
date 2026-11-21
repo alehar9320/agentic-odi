@@ -455,16 +455,17 @@ def _with_stored_key(value: str, base_url: str) -> str:
     """
     if value:
         return value
+    # Both credentials the sidecar holds -- the key the browser wrote to the
+    # write-only store and the key an operator configured -- obey one rule, so
+    # neither can be harvested by pointing ``base_url`` at a server the caller
+    # controls. A custom or foreign origin gets only what the request supplies.
+    if _origin(base_url) != _configured_provider_origin():
+        return ""
     try:
         stored = load_model_key()
     except SecretStoreError:
         stored = None
-    if not stored:
-        return defaults().get("api_key", "")
-    if _origin(base_url) == _configured_provider_origin():
-        return stored
-    # Custom or foreign origin: never send the stored key there.
-    return ""
+    return stored or defaults().get("api_key", "")
 
 
 @router.post("/health/llm", response_model=LlmHealthResponse)
