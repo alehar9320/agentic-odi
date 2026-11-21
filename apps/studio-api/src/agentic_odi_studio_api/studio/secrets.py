@@ -15,6 +15,7 @@ import json
 import os
 import stat
 import tempfile
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -61,17 +62,20 @@ def _write(payload: dict[str, Any]) -> None:
         # only after the write completes, and the temp file is removed on any
         # failure so a partial write can never be mistaken for the store.
         fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+        installed = False
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as tmp:
                 tmp.write(json.dumps(payload))
             os.chmod(tmp_name, stat.S_IRUSR | stat.S_IWUSR)
             os.replace(tmp_name, path)
-        except BaseException:
-            try:
-                os.unlink(tmp_name)
-            except OSError:
-                pass
-            raise
+            installed = True
+        finally:
+            # Best effort on any failure, including cancellation: the write is
+            # already being abandoned, so a cleanup that cannot unlink must not
+            # mask the original error.
+            if not installed:
+                with suppress(OSError):
+                    os.unlink(tmp_name)
     except OSError as exc:
         raise SecretStoreError("The secret store is not writable.") from exc
 
