@@ -192,7 +192,7 @@ def test_links_remove_removes_the_link(tmp_path):
     # Remove the link
     removed = runner.invoke(
         app,
-        ["--db", db, "links", "remove", link_id, "--json"],
+        ["--db", db, "links", "remove", "--link-id", link_id, "--json"],
     )
     assert removed.exit_code == 0, removed.output
     removed_data = json.loads(removed.output)
@@ -209,7 +209,7 @@ def test_links_remove_unknown_id_reports_error(tmp_path):
     db = str(tmp_path / "odi.db")
     runner = CliRunner()
 
-    result = runner.invoke(app, ["--db", db, "links", "remove", "unknown-id"])
+    result = runner.invoke(app, ["--db", db, "links", "remove", "--link-id", "unknown-id"])
     assert result.exit_code != 0
     assert "No link with id" in result.output
 

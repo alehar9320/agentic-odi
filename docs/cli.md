@@ -756,7 +756,7 @@ agentic-odi links list --source-id <id> --json
 agentic-odi links list --relationship-type references --limit 10 --offset 0
 
 # Remove a link by ID
-agentic-odi links remove <link-id>
+agentic-odi links remove --link-id <link-id>
 ```
 
 ## Connectors

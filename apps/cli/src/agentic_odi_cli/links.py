@@ -124,7 +124,7 @@ def list_links(
 
 @links_app.command("remove")
 def remove(
-    link_id: str = typer.Argument(..., help="Link ID to remove"),
+    link_id: str = typer.Option(..., "--link-id", help="Link ID to remove"),
     json_output: bool = JSON_OPTION,
 ) -> None:
     """Remove a link by ID."""
