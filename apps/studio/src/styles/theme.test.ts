@@ -164,3 +164,31 @@ describe("selection and caret", () => {
     expect(themeCss).toMatch(/caret-color:\s*var\(--accent\)/);
   });
 });
+
+describe("touch reveal and target size", () => {
+  it("declares the touch reveal after the rules that hide the actions", () => {
+    const hideAt = themeCss.indexOf(".message__actions--user {");
+    expect(hideAt, "missing .message__actions--user").toBeGreaterThanOrEqual(0);
+
+    const touchBlocks = Array.from(
+      themeCss.matchAll(/@media \(hover: none\) \{[\s\S]*?\n\}/g),
+    ).filter((block) => block[0].includes(".message__actions"));
+
+    expect(touchBlocks.length, "no touch reveal for the message actions").toBeGreaterThan(0);
+    for (const block of touchBlocks) {
+      expect(block.index ?? -1, "the touch reveal is declared before the rule it overrides")
+        .toBeGreaterThan(hideAt);
+      expect(block[0], "the touch reveal misses the user row").toContain(".message__actions--user");
+    }
+  });
+
+  it("gives every small control a 24px minimum target", () => {
+    for (const selector of [".attach__remove {", ".branch-picker__step {"]) {
+      expect(readBlock(selector), `${selector} is under 24px wide`).toMatch(/min-width:\s*24px/);
+      expect(readBlock(selector), `${selector} is under 24px tall`).toMatch(/min-height:\s*24px/);
+    }
+    for (const selector of [".composer__model-select {", ".quiet-action {"]) {
+      expect(readBlock(selector), `${selector} is under 24px tall`).toMatch(/min-height:\s*24px/);
+    }
+  });
+});
