@@ -1,14 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { ChatMessage } from "../types";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec, type UiNode } from "../ui/protocol";
-import {
-  conversationToMarkdown,
-  downloadFile,
-  downloadMarkdown,
-  exportFilename,
-} from "./export";
+import { conversationToMarkdown, exportFilename } from "./export";
 
 const exportedAt = new Date("2026-10-24T12:00:00Z");
 
@@ -457,59 +452,50 @@ describe("conversationToMarkdown", () => {
     expect(markdown.match(/Ticket 812 backs it up/g)).toHaveLength(1);
   });
 
+  it("prints a claim that is a prefix of another printed sentence", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [
+          {
+            kind: "claims",
+            content: "Rotation costs two engineer-days and a review. [[ev:e1]]",
+            claims: [
+              {
+                index: 0,
+                text: "Rotation costs two engineer-days and a review.",
+                status: "cited",
+                evidence: [
+                  { id: "e1", name: "Call with Acme", source_name: "Gong" },
+                ],
+              },
+              {
+                index: 1,
+                text: "Rotation costs",
+                status: "uncited",
+                evidence: [],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = conversationToMarkdown(messages, exportedAt);
+
+    // Both the full sentence and the prefix claim should appear
+    expect(markdown).toContain(
+      "Rotation costs two engineer-days and a review. (per Gong · Call with Acme, record e1)",
+    );
+    expect(markdown).toContain("Rotation costs (Uncited)");
+  });
+
   it("dates the export in the filename", () => {
     expect(exportFilename(exportedAt)).toBe(
       "agentic-odi-conversation-2026-10-24.md",
     );
-  });
-});
-
-describe("downloadFile", () => {
-  let createObjectURL: ReturnType<typeof vi.fn>;
-  let revokeObjectURL: ReturnType<typeof vi.fn>;
-  let click: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    createObjectURL = vi.fn(() => "blob:export");
-    revokeObjectURL = vi.fn();
-    Object.defineProperty(window, "URL", {
-      value: { ...window.URL, createObjectURL, revokeObjectURL },
-      configurable: true,
-    });
-    click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  async function released() {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-
-  it("hands the text over under the name and type the caller asks for", async () => {
-    downloadFile("Name\r\nJobs", "table.csv", "text/csv;charset=utf-8");
-
-    const blob = createObjectURL.mock.calls[0][0] as Blob;
-    expect(blob.type).toBe("text/csv;charset=utf-8");
-    expect(await blob.text()).toBe("Name\r\nJobs");
-    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
-    expect(anchor.download).toBe("table.csv");
-    expect(anchor.isConnected).toBe(false);
-
-    await released();
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:export");
-  });
-
-  // Two surfaces already hand-rolled this dance. One behaviour means one function, so the
-  // Markdown export the bar has always done now goes through the same door.
-  it("is the download that downloadMarkdown performs", async () => {
-    downloadMarkdown("# thread", "agentic-odi-conversation-2026-10-24.md");
-
-    const blob = createObjectURL.mock.calls[0][0] as Blob;
-    expect(blob.type).toBe("text/markdown;charset=utf-8");
-    expect(await blob.text()).toBe("# thread");
-    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
-    expect(anchor.download).toBe("agentic-odi-conversation-2026-10-24.md");
   });
 });

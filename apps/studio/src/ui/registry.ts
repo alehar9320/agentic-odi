@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import {
   DecisionRecord,
   EvidenceQuote,
+  FindingCard,
   ImpactSimulation,
   JobMap,
   OpportunityBoard,
@@ -45,6 +46,7 @@ export const NODE_COMPONENTS: Record<string, ComponentType<NodeProps>> = {
   "opportunity-thesis": OpportunityThesis,
   "impact-simulation": ImpactSimulation,
   "evidence-quote": EvidenceQuote,
+  "finding-card": FindingCard,
   "job-map": JobMap,
   "decision-record": DecisionRecord,
   "segment-card": SegmentCard,

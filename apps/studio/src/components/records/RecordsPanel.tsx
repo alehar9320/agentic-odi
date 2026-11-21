@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 import { canvasStatus } from "../../lib/canvasProvenance";
-import { downloadFile } from "../../lib/export";
+import { downloadFile } from "../../lib/download";
 import { buildRecords, toCsv } from "../../lib/records";
 import { useStudio } from "../../state/StudioContext";
 import { RecordDetail } from "./RecordDetail";

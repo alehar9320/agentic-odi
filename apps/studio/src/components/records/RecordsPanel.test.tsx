@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { UNSCORED_LABEL } from "../../lib/odi";
 import type { CanvasData } from "../../types";
 import { RecordsPanel } from "./RecordsPanel";
 
@@ -53,7 +54,7 @@ describe("RecordsPanel export", () => {
     const blob = createObjectURL.mock.calls[0][0] as Blob;
     expect(blob.type).toBe("text/csv;charset=utf-8");
     expect(await blob.text()).toBe(
-      "Name,Description,Id\r\nJobs\r\nActivation,—,J-1\r\nDesired outcomes\r\n—,8,4,unscored,J-1,O-1",
+      `Name,Description,Id\r\nJobs\r\nActivation,—,J-1\r\nDesired outcomes\r\n—,8,4,${UNSCORED_LABEL},J-1,O-1`,
     );
     const anchor = click.mock.contexts[0] as HTMLAnchorElement;
     expect(anchor.download).toBe("records.csv");

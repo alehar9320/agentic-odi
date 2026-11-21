@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasData, Segment } from "../../types";
+import { UNSCORED_LABEL } from "../../lib/odi";
 import { SegmentBoard } from "./SegmentBoard";
 
 const CANVAS: CanvasData = {
@@ -107,7 +108,7 @@ describe("SegmentBoard", () => {
       within(card).getByText("Mean opportunity 16.0 across 1 scored · 1 not scored"),
     ).toBeInTheDocument();
     // The unscored member still appears, with no invented score.
-    expect(within(card).getByText("N/A")).toBeInTheDocument();
+    expect(within(card).getByText(UNSCORED_LABEL)).toBeInTheDocument();
   });
 
   it("renders Not scored for an all-unscored segment, never a fake zero", () => {
@@ -116,7 +117,9 @@ describe("SegmentBoard", () => {
     render(<SegmentBoard />);
 
     const card = screen.getByLabelText("Segment: Platform engineers, secrets rotation");
-    expect(within(card).getByText("Not scored")).toBeInTheDocument();
+    // Both the member score and the segment mean use the single "Not scored"
+    // phrase — never an invented zero.
+    expect(within(card).getAllByText(UNSCORED_LABEL)).toHaveLength(2);
     expect(within(card).queryByText("0.0")).toBeNull();
     expect(within(card).queryByText(/NaN/)).toBeNull();
   });

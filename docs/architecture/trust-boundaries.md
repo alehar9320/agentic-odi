@@ -52,9 +52,12 @@ LLM directly; the sidecar is its only backend.
   the browser" is the LLM key described above.
 - **Sidecar → MCP:** JSON-RPC tool calls, carrying the same token.
 - **Sidecar → LLM:** OpenAI-compatible HTTP chat completions.
-- **Worker → sidecar:** the worker forwards `/api/*`, including the client's
-  `Authorization` header, to `SIDECAR_URL` (`infra/cloudflare/worker.ts:190-232`).
-  It does not authenticate the client itself.
+- **Worker → sidecar:** the worker forwards `/api/*` to `SIDECAR_URL`
+  (`infra/cloudflare/worker.ts:349-369`). It forwards an explicit allowlist —
+  `Authorization`, `Content-Type`, `Accept`, `Accept-Language`, and
+  `X-Request-ID` — and nothing else: no `Cookie`, `Origin`, `Referer`, or
+  custom header a browser extension adds. It does not authenticate the client
+  itself.
 - **Tauri → GitHub releases:** fetches `latest.json`, verifies the artifact
   signature against the key pinned in `tauri.conf.json`, and stages an update
   only after verification.
@@ -68,7 +71,11 @@ LLM directly; the sidecar is its only backend.
   `Authorization: Bearer <token>` with the issued key. `/health` and the static
   shell stay open, because the deployment's readiness probe and the browser's
   first request need them. The comparison is constant-time, and the token is
-  never read from a URL or a query string.
+  never read from a URL or a query string. The token file at
+  `~/.config/agentic-odi/studio-token` is written with mode `0o600` inside a
+  `0o700` directory regardless of the process umask, and a token that was
+  issued before that fix is tightened on read without being rotated
+  (`paths.py:TOKEN_FILE_MODE`, `paths.py:_tighten`).
 - **CORS allow-list.** The sidecar accepts `tauri://localhost`,
   `localhost:5173`, `127.0.0.1:5173`, `localhost:8100`, and `127.0.0.1:8100`,
   without credentials (`app.py:38-45`, `:211-213`).

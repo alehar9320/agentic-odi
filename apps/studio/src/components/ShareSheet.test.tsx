@@ -12,6 +12,7 @@ function link(overrides: Partial<ShareLink> = {}): ShareLink {
     token: "odi_sh_abc123",
     url: "http://127.0.0.1:8100/s/odi_sh_abc123",
     expires_at: new Date(Date.now() + 7 * DAY).toISOString(),
+    shareable: true,
     ...overrides,
   };
 }
@@ -37,6 +38,14 @@ describe("ShareSheet", () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("exposes an accessible name through the dialog role", () => {
+    render(<ShareSheet isOpen onClose={() => undefined} onCreate={vi.fn()} />);
+
+    expect(
+      screen.getByRole("dialog", { name: "Share a read-only link" }),
+    ).toBeInTheDocument();
   });
 
   it("mints a link for the chosen duration and offers it to copy", async () => {
@@ -83,6 +92,20 @@ describe("ShareSheet", () => {
     expect(await screen.findByText(/no longer works/i)).toBeInTheDocument();
   });
 
+  it("says the link only opens on this machine when it is not shareable, and keeps the copy button", async () => {
+    const onCreate = vi.fn(async () => link({ shareable: false }));
+    render(<ShareSheet isOpen onClose={() => undefined} onCreate={onCreate} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /create link/i }));
+
+    expect(
+      await screen.findByText(/This link only opens on this machine/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /copy link/i }),
+    ).toBeInTheDocument();
+  });
+
   it("reports a failure instead of promising a link it did not mint", async () => {
     const onCreate = vi.fn(async () => {
       throw new Error("The sidecar is unreachable.");
@@ -99,7 +122,9 @@ describe("ShareSheet", () => {
     const onClose = vi.fn();
     render(<ShareSheet isOpen onClose={onClose} onCreate={vi.fn()} />);
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    // The primitive dismisses on a keydown it receives from the document,
+    // which is where a real Escape lands before it bubbles to the window.
+    fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalled();
   });

@@ -475,6 +475,59 @@ export const CATALOG: readonly UiCatalogEntry[] = [
     },
     ["kind", "thesis", "rejected"],
   ),
+  entry(
+    "finding-card",
+    "leaf",
+    "One finding the PM should act on: a headline claim, the impact band, the measured number behind it, and the step it happens on. Use it when one sentence matters more than the rest of the reply — and give it one detail action labelled \"View breakdown\" pointing at the record it is about, so the line opens on the right instead of costing a turn.",
+    {
+      kind: {
+        enum: ["key_finding", "risk", "opportunity"],
+        description:
+          "What sort of finding this is. Defaults to key_finding. Omit it rather than guessing.",
+      },
+      headline: {
+        type: "string",
+        description:
+          "One claim per line, tied to a number, a step, or a named actor. No hedging, no qualifiers, no \"we believe\".",
+      },
+      impact: {
+        enum: ["high", "medium", "low"],
+        description:
+          "The impact band, shown beside the number. Omit it when the evidence does not support one.",
+      },
+      detail: {
+        type: "string",
+        description:
+          "What is happening, in two plain sentences. Explain the number; do not restate it.",
+      },
+      metric: {
+        type: "object",
+        properties: {
+          label: {
+            type: "string",
+            description: "What the number measures, e.g. \"Drop-off at Step 2\".",
+          },
+          value: {
+            type: "string",
+            description:
+              "The measured number, pre-formatted with its unit and copied from the data. Never a number the agent did not measure.",
+          },
+          delta: {
+            type: "string",
+            description:
+              "An optional comparison against an earlier measurement, in the words the data already uses.",
+          },
+        },
+        required: ["label", "value"],
+      },
+      step: {
+        type: "string",
+        description:
+          "The Step.name this happens on, copied from canvas.steps. Omit it when the finding is not about one step; never invent a step.",
+      },
+    },
+    ["headline", "detail", "metric"],
+  ),
 ];
 
 const CATALOG_TYPES = new Set(CATALOG.map((component) => component.type));

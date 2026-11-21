@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
-import { openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { openStudio, rail, seedOutcomes } from "./helpers";
 
 /**
  * The Opportunity Landscape is where scored outcomes are read. These tests
@@ -22,10 +22,6 @@ const SERVED = {
 };
 
 test.describe("the opportunity landscape", () => {
-  test.beforeEach(async ({ request }) => {
-    await resetRepository(request);
-  });
-
   test("reports the number of jobs and outcomes", async ({ page, request }) => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);

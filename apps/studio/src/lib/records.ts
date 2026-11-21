@@ -1,4 +1,5 @@
 import type { CanvasData, Evidence, Job, Outcome, Step } from "../types";
+import { UNSCORED_LABEL } from "./odi";
 
 /**
  * The kinds the canvas actually carries. Thesis, Segment and Strategy are not
@@ -56,7 +57,7 @@ export function text(value: string | number | null | undefined): string {
 
 /** A score is the number the sidecar returned, or the word for having none. */
 export function score(value: number | null | undefined): string {
-  return value === null || value === undefined ? "unscored" : String(value);
+  return value === null || value === undefined ? UNSCORED_LABEL : String(value);
 }
 
 /**
@@ -149,7 +150,8 @@ function csvField(value: string | undefined): string {
  *
  * One header line, then every section the screen would show, each introduced by the same
  * label, in the same order — the shape of the table is the shape of the file. Cells are the
- * stored strings, so `unscored` exports as the word `unscored`.
+ * stored strings, so an outcome with no score exports the same label the lens prints
+ * (`Not scored`), never a number.
  *
  * Rows are exported whole rather than at the screen's `MAX_ROWS`, because the cap exists to
  * keep one render cheap and a spreadsheet is exactly where the remainder belongs.

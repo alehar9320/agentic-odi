@@ -2,7 +2,8 @@ name: PR AI merge authorize
 
 # Labels a pull request ``ai-merge-authorized`` when every gate passes:
 #   * ``ai-merge-safe`` (trust label from pr-ai-merge.yml)
-#   * CI green (combined status of the head commit is ``success``)
+#   * CI green (the head commit's check runs are complete and green; the legacy
+#     combined commit status is not consulted -- see ADR 0009)
 #   * ``ready-for-merge`` (no merge conflicts)
 #   * open pull request targeting main, not a draft
 #
@@ -13,7 +14,11 @@ name: PR AI merge authorize
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  check_suite:
+  # `check_suite` does not fire for suites GitHub Actions created itself, so it
+  # could never see `CI green` or `PR guardrails` finish. `workflow_run` is the
+  # trigger that follows an Actions workflow to completion.
+  workflow_run:
+    workflows: ["CI", "PR guardrails"]
     types: [completed]
   schedule:
     - cron: '0 */6 * * *'
@@ -49,7 +54,7 @@ jobs:
         run: echo "::notice::Skipping AI merge authorize labels for a fork pull request (read-only token)."
 
       # Resolve which pull request(s) to process. On pull_request events we
-      # have a PR number. On check_suite we have the head SHA but need to map
+      # have a PR number. On workflow_run we have the head SHA but need to map
       # it to a PR number. On schedule / workflow_dispatch we re-scan every
       # open PR targeting main so labels stay eventually consistent.
       - name: Resolve pull request numbers to process
@@ -60,14 +65,16 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "${{ github.event.pull_request.number }}" > "$RUNNER_TEMP/pr-numbers.txt"
-          elif [ "${{ github.event_name }}" = "check_suite" ]; then
-            head_sha="${{ github.event.check_suite.head_sha }}"
-            gh pr list --repo "$REPO" --base main --state open --json number,headRefOid \
-              -q '.[] | select(.headRefOid == "'"$head_sha"'") | .number' \
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            head_sha="${{ github.event.workflow_run.head_sha }}"
+            # `gh pr list` caps at 30 rows before a local filter runs; ask the
+            # commit which pull requests contain it instead.
+            gh api "repos/$REPO/commits/$head_sha/pulls" --paginate \
+              --jq '.[] | select(.state == "open") | .number' \
               > "$RUNNER_TEMP/pr-numbers.txt" || true
           else
-            gh pr list --repo "$REPO" --base main \
-              --state open --json number -q '.[].number' \
+            gh pr list --repo "$REPO" --base main --state open --limit 1000 \
+              --json number -q '.[].number' \
               > "$RUNNER_TEMP/pr-numbers.txt"
           fi
 
@@ -83,11 +90,24 @@ jobs:
             --description "CI green and trust label present; AI agent may auto-merge" \
             --repo "$REPO" --force
 
+      # The gate below runs scripts/pr_ai_authorize.py, so the job has to have
+      # the repository on disk. Without this checkout that step died with exit
+      # code 2 and every pull request in the repository showed a red label job.
+      # Pin the base ref for the same reason as the other labelers: the default
+      # pull_request ref is the merge commit, and actions/checkout runs
+      # `git submodule foreach` while stripping its auth header, which exits 128
+      # on a branch carrying a stray gitlink.
+      - uses: actions/checkout@v7
+        if: ${{ ! github.event.pull_request.head.repo.fork }}
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
+
       - name: Process each pull request
         if: ${{ ! github.event.pull_request.head.repo.fork }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          AGENTIC_ODI_E2E_BLOCKING: ${{ vars.AGENTIC_ODI_E2E_BLOCKING }}
         run: |
           while IFS= read -r PR_NUMBER; do
             [ -z "$PR_NUMBER" ] && continue
@@ -97,13 +117,19 @@ jobs:
               --json author,body,headRefName,baseRefName,isDraft,state,labels \
               > "$RUNNER_TEMP/meta-$PR_NUMBER.json"
 
-            # Combined status of the head commit: "success" means CI is green.
+            # The head commit's check suite. The legacy combined commit status
+            # carries only third-party statuses (Chromatic here), so it reads
+            # success while every Actions job is still queued -- that is what
+            # armed auto-merge on #1100 minutes after a push (ADR 0009).
             HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid -q '.headRefOid')"
-            STATUS="$(gh api "repos/$REPO/commits/$HEAD_SHA/status" -q '.state' 2>/dev/null || echo pending)"
+            if ! gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100&filter=latest" \
+              > "$RUNNER_TEMP/checks-$PR_NUMBER.json" 2>/dev/null; then
+              echo '{"check_runs": []}' > "$RUNNER_TEMP/checks-$PR_NUMBER.json"
+            fi
 
             jq -n \
               --slurpfile meta "$RUNNER_TEMP/meta-$PR_NUMBER.json" \
-              --arg status "$STATUS" \
+              --slurpfile checks "$RUNNER_TEMP/checks-$PR_NUMBER.json" \
               '{
                 author: $meta[0].author,
                 branch: $meta[0].headRefName,
@@ -114,7 +140,7 @@ jobs:
                 state: $meta[0].state,
                 draft: $meta[0].isDraft,
                 base: $meta[0].baseRefName,
-                status: $status
+                checks: ($checks[0].check_runs // [])
               }' \
               > "$RUNNER_TEMP/facts-$PR_NUMBER.json"
 

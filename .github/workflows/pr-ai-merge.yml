@@ -50,10 +50,18 @@ jobs:
         if: ${{ github.event.pull_request.head.repo.fork }}
         run: echo "::notice::Skipping AI merge trust labels for a fork pull request (read-only token)."
 
+      # Check out the base ref, not the pull request head. This job only runs
+      # scripts/pr_ai_merge.py; it never reads pull request code, and a workflow
+      # holding a write token must not execute it. The explicit ref also avoids
+      # a real failure mode: the default ref for a pull_request event is the
+      # merge commit, and actions/checkout runs `git submodule foreach` while it
+      # strips its auth header -- that exits 128 on a branch carrying a stray
+      # gitlink, failing the step before any of this job's commands run.
       - name: Checkout base branch
         if: ${{ ! github.event.pull_request.head.repo.fork }}
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
           persist-credentials: false
 
       # The label did not exist, so --add-label failed with

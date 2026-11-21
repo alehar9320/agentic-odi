@@ -56,6 +56,21 @@ export interface StoredTurn extends ConversationTurn {
   parent_id: string | null;
 }
 
+/**
+ * A half-finished interview, kept so a reload resumes it (#402).
+ *
+ * This is the storage shape, not a domain type: it holds the answers the
+ * conductor collected and the question it was on, and nothing about what an
+ * answer means. `jobId` scopes it — a draft for another job is never shown.
+ */
+export interface InterviewDraft {
+  id: string;
+  jobId: string;
+  answers: Record<string, string | number>;
+  index: number;
+  updatedAt: string;
+}
+
 export type OutboxKind = "create" | "update" | "delete";
 export type OutboxEntity = "job" | "step" | "outcome" | "evidence";
 export type OutboxState =
@@ -171,16 +186,24 @@ export interface LocalStore {
   getConversation(id: string): Promise<StoredConversation | undefined>;
   putConversation(conversation: StoredConversation): Promise<void>;
   setConversationHead(id: string, headId: string | null): Promise<StoredConversation>;
+  /** Give a thread a new name. An unknown id throws rather than writing a row. */
+  renameConversation(id: string, title: string): Promise<StoredConversation>;
   listTurns(conversationId: string): Promise<ConversationTurn[]>;
   /** How much a conversation holds, without reading every turn. */
   countTurns(conversationId: string): Promise<number>;
   appendTurn(turn: Omit<StoredTurn, "id">): Promise<StoredTurn>;
   clearTurns(conversationId: string): Promise<void>;
+  /** Remove a conversation and its turns together, as one unit. */
+  deleteConversation(id: string): Promise<void>;
   conversationTree(conversationId: string): Promise<{
     conversation: StoredConversation;
     messages: StoredTurn[];
     head_id: string | null;
   }>;
+  listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]>;
+  getInterviewDraft(id: string): Promise<InterviewDraft | undefined>;
+  putInterviewDraft(draft: InterviewDraft): Promise<void>;
+  deleteInterviewDraft(id: string): Promise<void>;
   /** Serialize every stored workspace record for export. */
   snapshot(): Promise<WorkspaceSnapshot>;
   /** Replace every stored workspace record with the imported snapshot. */
