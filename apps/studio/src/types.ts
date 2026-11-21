@@ -350,6 +350,30 @@ export interface ShareLink {
   shareable: boolean;
 }
 
+/**
+ * A stored relationship between two records. `relationship_type` names how the
+ * source relates to the target; entity types are kept as strings (not `any`)
+ * so a newly recorded relationship never breaks the client. `external_system`
+ * and `external_id` name the foreign system when the target lives outside ODI,
+ * and `preview` carries a best-effort cached title/url for the badge — the
+ * studio never fetches it.
+ */
+export interface Link {
+  id: string;
+  source_type: string;
+  source_id: string;
+  target_type: string;
+  target_id: string;
+  relationship_type: string;
+  /** The foreign system that holds the target, when it is outside ODI. */
+  external_system?: string;
+  /** The target's id within the foreign system. */
+  external_id?: string;
+  /** Best-effort cached title/url for the target, never fetched by the studio. */
+  preview?: { title?: string; url?: string } | null;
+  created_at: string;
+}
+
 export type StudioTheme = "light" | "dark";
 
 export interface StudioConfig {
