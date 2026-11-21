@@ -215,7 +215,8 @@ export function exportFilename(exportedAt: Date = new Date()): string {
 
 const NOT_RECORDED = "Not recorded.";
 
-// Prose dates follow the reader's locale; filenames stay ISO because a filename is a sort key.
+// Prose dates follow the reader's locale; filenames stay ISO because a filename
+// is a sort key. Nothing else in this file formats a human-facing date.
 const DOCUMENT_DATE = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
   month: "long",

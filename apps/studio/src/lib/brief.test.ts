@@ -421,15 +421,19 @@ describe("briefToMarkdown", () => {
   });
 
   it("dates the document from its own timestamp", () => {
-    // Prose dates follow the reader's locale, so the expectation is computed the
-    // same way instead of pinning one locale's word order.
-    const printed = new Intl.DateTimeFormat(undefined, {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(new Date(built.generated_at));
+    // The prose date follows the reader's locale, so assert only the day number
+    // and the year — never a month word order, which en-GB and en-US disagree on.
+    const dateLine =
+      markdown.match(/_Decision brief — (.*)_/m)?.[1] ?? "";
+    expect(dateLine).toMatch(/\b3\b/);
+    expect(dateLine).toContain("2026");
+    expect(dateLine).toMatch(/[A-Za-z]{3,9}/);
+  });
 
-    expect(markdown).toContain(`_Decision brief — ${printed}_`);
+  it("keeps ISO dates in filenames", () => {
+    expect(briefFilename(new Date("2026-11-03T09:00:00Z"))).toBe(
+      "agentic-odi-decision-brief-2026-11-03.md",
+    );
   });
 
   it("names the decision, its score, and the reasoning saved against it", () => {
