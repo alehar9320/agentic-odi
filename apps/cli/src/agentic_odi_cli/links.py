@@ -13,27 +13,23 @@ import typer
 from agentic_odi_cli.backend import run_tool
 from agentic_odi_cli.render import render_deleted, render_link_list, render_saved
 
+
+#: Relationship vocabulary mirrored from ``agentic_odi_core.models.RelationshipType``.
+#: Kept as a local ``Enum`` (not an import) so importing the CLI does not pull in the
+#: heavy core domain layer at startup (see apps/cli/tests/test_startup_perf.py).
+#: Core's enum is closed to exactly these five values, enforced by
+#: tests/scripts/test_models.py, so this mirror stays stable.
+class RelationshipType(str, Enum):
+    EVIDENCE_FOR = "evidence_for"
+    OUTCOME_OF = "outcome_of"
+    BLOCKED_BY = "blocked_by"
+    DUPLICATES = "duplicates"
+    RELATES_TO = "relates_to"
+
+
 links_app = typer.Typer(help="Manage typed links between ODI entities.")
 
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
-
-
-class RelationshipType(str, Enum):
-    REFERENCES = "references"
-    SERVES = "serves"
-    BLOCKED_BY = "blocked_by"
-    BLOCKING = "blocking"
-    DUPLICATES = "duplicates"
-    RELATES_TO = "relates_to"
-    IMPLEMENTS = "implements"
-    VALIDATES = "validates"
-    EVIDENCE_FOR = "evidence_for"
-    OUTCOME_OF = "outcome_of"
-    EXTERNAL_JIRA = "external_jira"
-    EXTERNAL_LINEAR = "external_linear"
-    EXTERNAL_JPD = "external_jpd"
-    EXTERNAL_GITHUB = "external_github"
-    EXTERNAL_NOTION = "external_notion"
 
 
 def _fail(message: str) -> None:

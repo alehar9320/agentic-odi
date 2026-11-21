@@ -75,7 +75,7 @@ def test_links_add_creates_a_link_and_prints_id(tmp_path):
             "--target-id",
             job2_id,
             "--relationship-type",
-            "references",
+            "relates_to",
             "--json",
         ],
     )
@@ -85,7 +85,7 @@ def test_links_add_creates_a_link_and_prints_id(tmp_path):
     assert link["source_id"] == job1_id
     assert link["target_type"] == "job"
     assert link["target_id"] == job2_id
-    assert link["relationship_type"] == "references"
+    assert link["relationship_type"] == "relates_to"
 
 
 def test_links_list_shows_the_link(tmp_path):
@@ -113,7 +113,7 @@ def test_links_list_shows_the_link(tmp_path):
             "--target-id",
             job2_id,
             "--relationship-type",
-            "references",
+            "relates_to",
             "--json",
         ],
     )
@@ -128,7 +128,7 @@ def test_links_list_shows_the_link(tmp_path):
     assert listed[0]["source_id"] == job1_id
     assert listed[0]["target_type"] == "job"
     assert listed[0]["target_id"] == job2_id
-    assert listed[0]["relationship_type"] == "references"
+    assert listed[0]["relationship_type"] == "relates_to"
 
     # Filter by source_id
     filtered = _json(runner, ["--db", db, "links", "list", "--source-id", job1_id, "--json"])
@@ -144,7 +144,7 @@ def test_links_list_shows_the_link(tmp_path):
     # Filter by relationship_type
     by_rel = _json(
         runner,
-        ["--db", db, "links", "list", "--relationship-type", "references", "--json"],
+        ["--db", db, "links", "list", "--relationship-type", "relates_to", "--json"],
     )
     assert isinstance(by_rel, list)
     assert len(by_rel) == 1
@@ -152,7 +152,7 @@ def test_links_list_shows_the_link(tmp_path):
     # Filter by non-matching relationship_type returns empty
     empty_rel = _json(
         runner,
-        ["--db", db, "links", "list", "--relationship-type", "serves", "--json"],
+        ["--db", db, "links", "list", "--relationship-type", "evidence_for", "--json"],
     )
     assert isinstance(empty_rel, list)
     assert len(empty_rel) == 0
@@ -183,7 +183,7 @@ def test_links_remove_removes_the_link(tmp_path):
             "--target-id",
             job2_id,
             "--relationship-type",
-            "references",
+            "relates_to",
             "--json",
         ],
     )
@@ -240,7 +240,7 @@ def test_duplicate_link_add_returns_error(tmp_path):
             "--target-id",
             job2_id,
             "--relationship-type",
-            "references",
+            "relates_to",
             "--json",
         ],
     )
@@ -262,7 +262,7 @@ def test_duplicate_link_add_returns_error(tmp_path):
             "--target-id",
             job2_id,
             "--relationship-type",
-            "references",
+            "relates_to",
         ],
     )
     assert result.exit_code != 0
@@ -297,7 +297,7 @@ def test_links_list_accepts_limit_and_offset(tmp_path):
             "--target-id",
             job2_id,
             "--relationship-type",
-            "references",
+            "relates_to",
             "--json",
         ],
     )
@@ -317,7 +317,7 @@ def test_links_list_accepts_limit_and_offset(tmp_path):
             "--target-id",
             job3_id,
             "--relationship-type",
-            "serves",
+            "blocked_by",
             "--json",
         ],
     )
