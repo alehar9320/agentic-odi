@@ -101,8 +101,8 @@ split as:
 
 The Studio is gated by Vitest thresholds instead. `npm run test:coverage`
 enforces statements 83, branches 75, functions 83, and lines 83 in
-`apps/studio/vite.config.ts`; the values measured on 2026-11-21 are 83.33%,
-75.93%, 83.57%, and 83.38%. It writes `apps/studio/coverage/lcov.info`, uploaded
+`apps/studio/vite.config.ts`; the values measured on 2026-11-21 are 83.3%,
+75.9%, 83.5%, and 83.4%. It writes `apps/studio/coverage/lcov.info`, uploaded
 to Codecov under the `studio` flag on a non-blocking basis. The Vitest thresholds
 are what gate the merge. `scripts/coverage_map.py --check` keeps the generated
 map in `docs/development.md` in sync with the test tree.

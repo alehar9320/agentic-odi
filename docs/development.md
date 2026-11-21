@@ -698,7 +698,7 @@ new code lands.
 The Studio is gated separately. `npm run test:coverage` runs Vitest with the V8
 provider, writes `apps/studio/coverage/lcov.info`, and fails the `studio` job
 below statements **83%**, branches **75%**, functions **83%**, and lines **83%**.
-Measured on 2026-11-21: 83.33%, 75.93%, 83.57%, 83.38%. The lcov file is
+Measured on 2026-11-21: 83.3%, 75.9%, 83.5%, 83.4%. The lcov file is
 uploaded to Codecov under the `studio` flag, also non-blocking — the Vitest
 thresholds are what gate the merge.
 
