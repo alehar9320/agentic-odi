@@ -5,6 +5,7 @@ import re
 from uuid import uuid4
 
 import pytest
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
 from agentic_odi_mcp_server import mcp, mcp_server
 from fastmcp import Client
 from mcp_failures import failure, sentence
@@ -436,3 +437,110 @@ def test_no_handler_returns_a_bare_prose_error():
                 offenders.append(f"mcp_server.py:{returned.lineno} {node.name} -> {unparsed}")
 
     assert not offenders, "bare prose error returns, which carry no code:\n" + "\n".join(offenders)
+
+
+@pytest.mark.asyncio
+async def test_links_add_then_list_returns_the_created_link():
+    async with Client(mcp) as client:
+        add_res = await client.call_tool(
+            "links_add",
+            {
+                "source_type": "evidence",
+                "source_id": "ev-1",
+                "target_type": "outcome",
+                "target_id": "out-1",
+                "relationship_type": "evidence_for",
+            },
+        )
+        link = json.loads(add_res.content[0].text)
+        assert link["source_id"] == "ev-1"
+        assert link["target_id"] == "out-1"
+        assert link["relationship_type"] == "evidence_for"
+
+        list_res = await client.call_tool("links_list", {})
+        links = json.loads(list_res.content[0].text)
+        assert [item["id"] for item in links] == [link["id"]]
+
+
+@pytest.mark.asyncio
+async def test_links_add_duplicate_pair_returns_conflict_and_keeps_one():
+    async with Client(mcp) as client:
+        args = {
+            "source_type": "evidence",
+            "source_id": "ev-1",
+            "target_type": "outcome",
+            "target_id": "out-1",
+            "relationship_type": "evidence_for",
+        }
+        first = await client.call_tool("links_add", args)
+        assert "error" not in json.loads(first.content[0].text)
+
+        dup = await client.call_tool("links_add", args)
+        text = dup.content[0].text
+        assert failure(text).code.value == "conflict"
+
+        list_res = await client.call_tool("links_list", {})
+        links = json.loads(list_res.content[0].text)
+        assert len(links) == 1
+
+
+@pytest.mark.asyncio
+async def test_links_remove_then_list_is_empty():
+    async with Client(mcp) as client:
+        add_res = await client.call_tool(
+            "links_add",
+            {
+                "source_type": "evidence",
+                "source_id": "ev-1",
+                "target_type": "outcome",
+                "target_id": "out-1",
+                "relationship_type": "evidence_for",
+            },
+        )
+        link_id = json.loads(add_res.content[0].text)["id"]
+
+        remove_res = await client.call_tool("links_remove", {"link_id": link_id})
+        assert json.loads(remove_res.content[0].text) is True
+
+        list_res = await client.call_tool("links_list", {})
+        assert json.loads(list_res.content[0].text) == []
+
+
+@pytest.mark.asyncio
+async def test_links_remove_unknown_id_returns_false():
+    async with Client(mcp) as client:
+        res = await client.call_tool("links_remove", {"link_id": str(uuid4())})
+        assert json.loads(res.content[0].text) is False
+
+
+@pytest.mark.asyncio
+async def test_links_list_filters_by_relationship_type():
+    async with Client(mcp) as client:
+        await client.call_tool(
+            "links_add",
+            {
+                "source_type": "evidence",
+                "source_id": "ev-1",
+                "target_type": "outcome",
+                "target_id": "out-1",
+                "relationship_type": "evidence_for",
+            },
+        )
+        await client.call_tool(
+            "links_add",
+            {
+                "source_type": "evidence",
+                "source_id": "ev-2",
+                "target_type": "outcome",
+                "target_id": "out-2",
+                "relationship_type": "relates_to",
+            },
+        )
+
+        res = await client.call_tool("links_list", {"relationship_type": "relates_to"})
+        links = json.loads(res.content[0].text)
+        assert [link["source_id"] for link in links] == ["ev-2"]
+
+
+def test_links_list_is_a_read_tool():
+    assert TOOL_SPECS["links_list"].effect is ToolEffect.READ

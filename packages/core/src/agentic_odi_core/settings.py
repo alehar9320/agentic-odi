@@ -25,6 +25,7 @@ DEFAULT_MCP_KEEPALIVE = 15.0
 
 TIMEOUT_ENV = "AGENTIC_ODI_MCP_TIMEOUT"
 KEEPALIVE_ENV = "AGENTIC_ODI_MCP_KEEPALIVE"
+API_KEY_ENV = "AGENTIC_ODI_API_KEY"
 XDG_CONFIG_HOME_ENV = "XDG_CONFIG_HOME"
 
 
@@ -87,6 +88,20 @@ def config_dir() -> Path:
     if xdg:
         return Path(xdg) / "agentic-odi"
     return Path.home() / ".config" / "agentic-odi"
+
+
+def api_key() -> str | None:
+    """The provider key the process would use, or ``None`` when it is unset."""
+    return _raw(API_KEY_ENV)
+
+
+def present_variable_names(prefix: str = "AGENTIC_ODI_") -> list[str]:
+    """Every environment variable present with ``prefix``, sorted by name.
+
+    A diagnostic may report *which* overrides are set; this returns names only,
+    so a value can never be logged by accident.
+    """
+    return sorted(name for name in os.environ if name.startswith(prefix))
 
 
 class MCPConnectionSettings(BaseModel):

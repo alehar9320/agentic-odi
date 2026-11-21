@@ -1,6 +1,6 @@
 # The Signal Inbox
 
-"Catch up" reads the store. A **Signal** is a record of something that actually
+"What changed" reads the store. A **Signal** is a record of something that actually
 changed in the ODI data, produced by `ODIService` at the moment it changed, and
 read back by every surface — CLI, MCP client, Studio.
 

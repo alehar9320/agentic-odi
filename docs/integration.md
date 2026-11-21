@@ -245,7 +245,7 @@ the MCP endpoint, catch `OdiError` and use `error_status` to translate.
 | `open_study` | `write` | — | `job_id`, `name`, `wave` | Open a named study pass over a Job at a given wave number. |
 | `list_studies` | `read` | — | — | List the studies opened for a Job. |
 | `links_add` | `write` | — | `source_type`, `source_id`, `target_type`, `target_id`, `relationship_type` | Create a typed link between two agentic-odi entities. |
-| `links_list` | `write` | — | — | List links, optionally filtered by source, target, or relationship type. |
+| `links_list` | `read` | — | — | List links, optionally filtered by source, target, or relationship type. |
 | `links_remove` | `write` | — | `link_id` | Remove a link by ID. |
 
 <!-- END GENERATED TOOLS -->

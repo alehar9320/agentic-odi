@@ -7,6 +7,7 @@ from datetime import datetime
 import pytest
 from agentic_odi_core import Link as RootLink
 from agentic_odi_core import RelationshipType as RootRelationshipType
+from agentic_odi_core.errors import ValidationError
 from agentic_odi_core.models import (
     LINK_RELATIONSHIP_TYPES,
     BusinessImpactCategory,
@@ -14,12 +15,14 @@ from agentic_odi_core.models import (
     CustomerOutcome,
     CustomerValue,
     Direction,
+    EntityType,
     Evidence,
+    ExternalSystem,
     Link,
     RelationshipType,
     ValueMetric,
 )
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 
 def _customer_value(**overrides: object) -> CustomerValue:
@@ -87,7 +90,7 @@ def test_evidence_accepts_explicit_impact_and_confidence() -> None:
 
 
 def test_evidence_rejects_unknown_impact_and_confidence() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(PydanticValidationError):
         Evidence(
             source_name="demo",
             source_kind="demo",
@@ -95,7 +98,7 @@ def test_evidence_rejects_unknown_impact_and_confidence() -> None:
             content="A captured quote",
             impact="extreme",
         )
-    with pytest.raises(ValidationError):
+    with pytest.raises(PydanticValidationError):
         Evidence(
             source_name="demo",
             source_kind="demo",
@@ -107,26 +110,26 @@ def test_evidence_rejects_unknown_impact_and_confidence() -> None:
 
 def test_link_round_trips_with_relationship_type() -> None:
     link = Link(
-        source_type="evidence",
+        source_type=EntityType.EVIDENCE,
         source_id="evidence-1",
-        target_type="outcome",
+        target_type=EntityType.OUTCOME,
         target_id="outcome-1",
-        relationship_type=RelationshipType.serves,
-        external_system="jira",
+        relationship_type=RelationshipType.EVIDENCE_FOR,
+        external_system=ExternalSystem.JIRA,
         external_id="EXT-42",
         preview={"title": "Resolved faster"},
     )
-    assert link.relationship_type == RelationshipType.serves
-    assert link.relationship_type.value == "serves"
-    assert link.source_type == "evidence"
-    assert link.target_type == "outcome"
+    assert link.relationship_type is RelationshipType.EVIDENCE_FOR
+    assert link.relationship_type.value == "evidence_for"
+    assert link.source_type is EntityType.EVIDENCE
+    assert link.target_type is EntityType.OUTCOME
     assert isinstance(link.created_at, datetime)
     assert link.id is not None
 
     restored = Link.model_validate_json(link.model_dump_json())
     assert restored == link
-    assert restored.relationship_type is RelationshipType.serves
-    assert restored.external_system == "jira"
+    assert restored.relationship_type is RelationshipType.EVIDENCE_FOR
+    assert restored.external_system is ExternalSystem.JIRA
     assert restored.external_id == "EXT-42"
     assert restored.preview == {"title": "Resolved faster"}
 
@@ -136,71 +139,21 @@ def test_link_is_exported_at_package_root() -> None:
     assert RootRelationshipType is RelationshipType
 
 
-def test_link_relationship_type_has_all_values() -> None:
-    expected = {
-        "references",
-        "serves",
-        "blocked_by",
-        "blocking",
-        "duplicates",
-        "relates_to",
-        "implements",
-        "validates",
+def test_relationship_type_is_closed_to_five_values() -> None:
+    assert {member.value for member in RelationshipType} == {
         "evidence_for",
         "outcome_of",
-        "external_jira",
-        "external_linear",
-        "external_jpd",
-        "external_github",
-        "external_notion",
+        "blocked_by",
+        "duplicates",
+        "relates_to",
     }
-    assert {member.value for member in RelationshipType} == expected
-
-
-def test_relationship_type_is_str_enum() -> None:
-    assert RelationshipType.references == "references"
-    assert isinstance(RelationshipType.references, str)
 
 
 def test_link_relationship_type_constant_matches_enum() -> None:
-    assert LINK_RELATIONSHIP_TYPES == [m.value for m in RelationshipType]
-    assert "external_notion" in LINK_RELATIONSHIP_TYPES
+    assert LINK_RELATIONSHIP_TYPES == [member.value for member in RelationshipType]
 
 
-def test_link_defaults_are_populated() -> None:
-    link = Link(
-        source_type="evidence",
-        source_id="ev-1",
-        target_type="outcome",
-        target_id="out-1",
-        relationship_type=RelationshipType.evidence_for,
-    )
-
-    assert link.id
-    assert link.external_system is None
-    assert link.external_id is None
-    assert link.preview is None
-    assert link.created_at is not None
-
-
-def test_link_accepts_external_system_and_preview() -> None:
-    link = Link(
-        source_type="outcome",
-        source_id="out-1",
-        target_type="linear_issue",
-        target_id="LIN-1",
-        relationship_type=RelationshipType.external_linear,
-        external_system="linear",
-        external_id="LIN-1",
-        preview={"title": "Implement onboarding", "state": "In Progress"},
-    )
-
-    assert link.external_system == "linear"
-    assert link.external_id == "LIN-1"
-    assert link.preview == {"title": "Implement onboarding", "state": "In Progress"}
-
-
-def test_link_relationship_type_accepts_string_value() -> None:
+def test_link_relationship_type_accepts_a_string_value() -> None:
     link = Link(
         source_type="job",
         source_id="job-1",
@@ -209,4 +162,90 @@ def test_link_relationship_type_accepts_string_value() -> None:
         relationship_type="duplicates",
     )
 
-    assert link.relationship_type is RelationshipType.duplicates
+    assert link.relationship_type is RelationshipType.DUPLICATES
+
+
+def test_entity_type_has_no_candidate_member() -> None:
+    assert {member.value for member in EntityType} == {
+        "job",
+        "step",
+        "outcome",
+        "evidence",
+        "segment",
+        "strategy",
+    }
+
+
+def test_a_self_link_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="cannot point at itself"):
+        Link(
+            source_type=EntityType.EVIDENCE,
+            source_id="evidence-1",
+            target_type=EntityType.EVIDENCE,
+            target_id="evidence-1",
+            relationship_type=RelationshipType.EVIDENCE_FOR,
+        )
+
+
+def test_an_out_of_matrix_pair_is_rejected_naming_the_allowed_targets() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        Link(
+            source_type=EntityType.OUTCOME,
+            source_id="outcome-1",
+            target_type=EntityType.EVIDENCE,
+            target_id="evidence-1",
+            relationship_type=RelationshipType.EVIDENCE_FOR,
+        )
+    message = str(excinfo.value)
+    assert "evidence_for" in message
+    assert "outcome" in message
+    assert "evidence" in message
+    assert "allowed targets" in message
+
+
+def test_a_duplicate_link_must_join_the_same_entity_type() -> None:
+    with pytest.raises(ValidationError, match="same entity type"):
+        Link(
+            source_type=EntityType.OUTCOME,
+            source_id="outcome-1",
+            target_type=EntityType.JOB,
+            target_id="job-1",
+            relationship_type=RelationshipType.DUPLICATES,
+        )
+
+
+def test_a_one_sided_external_reference_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="external_system and external_id"):
+        Link(
+            source_type=EntityType.EVIDENCE,
+            source_id="evidence-1",
+            target_type=EntityType.OUTCOME,
+            target_id="outcome-1",
+            relationship_type=RelationshipType.EVIDENCE_FOR,
+            external_system=ExternalSystem.JIRA,
+        )
+
+
+def test_a_two_sided_external_reference_validates() -> None:
+    link = Link(
+        source_type=EntityType.OUTCOME,
+        source_id="outcome-1",
+        target_type=EntityType.JOB,
+        target_id="job-1",
+        relationship_type=RelationshipType.RELATES_TO,
+        external_system=ExternalSystem.LINEAR,
+        external_id="LIN-7",
+    )
+    assert link.external_system is ExternalSystem.LINEAR
+    assert link.external_id == "LIN-7"
+
+
+def test_a_blocked_by_link_accepts_any_pair() -> None:
+    link = Link(
+        source_type=EntityType.SEGMENT,
+        source_id="segment-1",
+        target_type=EntityType.STRATEGY,
+        target_id="strategy-1",
+        relationship_type=RelationshipType.BLOCKED_BY,
+    )
+    assert link.relationship_type is RelationshipType.BLOCKED_BY

@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, Field, ValidationError, computed_field, model_validator
+
+from agentic_odi_core.errors import ValidationError as DomainValidationError
 
 
 class Direction(str, Enum):
@@ -576,6 +578,12 @@ class ExtractedCandidate(BaseModel):
     status: CandidateStatus = Field(
         CandidateStatus.PROPOSED, description="Where this candidate sits in review"
     )
+    quote_text: str | None = Field(
+        None,
+        description=(
+            "The verbatim quote this candidate came from; acceptance writes it as evidence"
+        ),
+    )
     interview_id: str | None = Field(None, description="The interview record, if known")
     job_id: str | None = Field(
         None, description="The Job this candidate would become an outcome of"
@@ -985,28 +993,81 @@ class ScheduledWork(BaseModel):
     result_summary: str | None = Field(None, description="Execution outcome or error summary")
 
 
-class RelationshipType(str, Enum):
-    """Typed relationship between two domain entities.
+class EntityType(str, Enum):
+    """The kinds of ODI entity a link can point at.
 
-    Mirrors Jira-style issue links but is AI-native: links carry structured
-    metadata that LLMs can traverse without guessing.
+    Closed on purpose: an open string lets one writer say ``serves`` and
+    another ``implements`` for the same meaning, and the graph stops being
+    queryable. There is no ``candidate`` member — no such model exists.
     """
 
-    references = "references"
-    serves = "serves"
-    blocked_by = "blocked_by"
-    blocking = "blocking"
-    duplicates = "duplicates"
-    relates_to = "relates_to"
-    implements = "implements"
-    validates = "validates"
-    evidence_for = "evidence_for"
-    outcome_of = "outcome_of"
-    external_jira = "external_jira"
-    external_linear = "external_linear"
-    external_jpd = "external_jpd"
-    external_github = "external_github"
-    external_notion = "external_notion"
+    JOB = "job"
+    STEP = "step"
+    OUTCOME = "outcome"
+    EVIDENCE = "evidence"
+    SEGMENT = "segment"
+    STRATEGY = "strategy"
+
+
+class RelationshipType(str, Enum):
+    """The closed vocabulary of typed edges between two ODI entities.
+
+    Five values, no more. An external target (a Jira ticket, a Linear issue)
+    is ``relates_to`` plus ``external_system`` and ``external_id``, not a
+    relationship value of its own.
+    """
+
+    EVIDENCE_FOR = "evidence_for"
+    OUTCOME_OF = "outcome_of"
+    BLOCKED_BY = "blocked_by"
+    DUPLICATES = "duplicates"
+    RELATES_TO = "relates_to"
+
+
+class ExternalSystem(str, Enum):
+    """A system outside Agentic ODI that a link can point at."""
+
+    JIRA = "jira"
+    LINEAR = "linear"
+    JPD = "jpd"
+    GITHUB = "github"
+    NOTION = "notion"
+
+
+_ANY_ENTITY: frozenset[EntityType] = frozenset(EntityType)
+
+# The single source of truth for which (source, target) entity pairs each
+# relationship permits. ``LINK_SAME_TYPE_RELATIONSHIPS`` refines the entries
+# whose target must be the source's own type rather than any entity.
+LINK_PAIR_RULES: dict[RelationshipType, tuple[frozenset[EntityType], frozenset[EntityType]]] = {
+    RelationshipType.EVIDENCE_FOR: (
+        frozenset({EntityType.EVIDENCE}),
+        frozenset({EntityType.OUTCOME, EntityType.STEP, EntityType.JOB}),
+    ),
+    RelationshipType.OUTCOME_OF: (
+        frozenset({EntityType.OUTCOME}),
+        frozenset({EntityType.STEP, EntityType.JOB}),
+    ),
+    RelationshipType.BLOCKED_BY: (_ANY_ENTITY, _ANY_ENTITY),
+    RelationshipType.DUPLICATES: (_ANY_ENTITY, _ANY_ENTITY),
+    RelationshipType.RELATES_TO: (_ANY_ENTITY, _ANY_ENTITY),
+}
+
+LINK_SAME_TYPE_RELATIONSHIPS: frozenset[RelationshipType] = frozenset({RelationshipType.DUPLICATES})
+
+
+def _unwrap_domain_validation_error(exc: ValidationError) -> DomainValidationError | None:
+    """Recover the domain error Pydantic wrapped, or ``None`` if it did not.
+
+    Pydantic folds any ``ValueError`` raised in a validator into its own
+    ``ValidationError``. The domain error is a ``ValueError`` subclass, so its
+    identity is carried in ``ctx['error']`` and has to be pulled back out.
+    """
+    for error in exc.errors():
+        inner = error.get("ctx", {}).get("error")
+        if isinstance(inner, DomainValidationError):
+            return inner
+    return None
 
 
 #: The full set of relationship kinds, as plain strings, for consumers that do
@@ -1015,25 +1076,65 @@ LINK_RELATIONSHIP_TYPES: list[str] = [member.value for member in RelationshipTyp
 
 
 class Link(BaseModel):
-    """A first-class typed link between two agentic-odi entities.
+    """A first-class typed edge between two ODI entities.
 
-    Links connect jobs, steps, outcomes, evidence, candidates, segments, and
-    strategies without changing ODI scoring or segmentation logic. A human
-    must approve each link before it is written (human-in-the-loop).
+    A link says "this evidence supports that outcome" or "this outcome is a
+    step of that job" as structured data a query can answer, instead of prose
+    a reader has to interpret. A human approves each link before it is
+    written; this model owns only the invariants it can check alone.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    source_type: str = Field(..., description="The type of the source entity")
+    source_type: EntityType = Field(..., description="The type of the source entity")
     source_id: str = Field(..., description="The ID of the source entity")
-    target_type: str = Field(..., description="The type of the target entity")
+    target_type: EntityType = Field(..., description="The type of the target entity")
     target_id: str = Field(..., description="The ID of the target entity")
     relationship_type: RelationshipType = Field(..., description="The type of relationship")
-    external_system: str | None = Field(
-        None, description="External system that originated the link, if any"
+    external_system: ExternalSystem | None = Field(
+        None, description="External system the target lives in, if any"
     )
-    external_id: str | None = Field(None, description="External ID in the origin system, if any")
-    preview: dict | None = Field(None, description="Cached preview of the target entity")
+    external_id: str | None = Field(None, description="Target ID inside that external system")
+    preview: dict[str, Any] | None = Field(None, description="Cached preview of the target entity")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="When the link was created",
     )
+
+    def __init__(self, **data: Any) -> None:
+        try:
+            super().__init__(**data)
+        except ValidationError as exc:
+            domain_error = _unwrap_domain_validation_error(exc)
+            if domain_error is None:
+                raise
+            raise domain_error from None
+
+    @model_validator(mode="after")
+    def _link_is_closed_and_honest(self) -> Link:
+        if self.source_type is self.target_type and self.source_id == self.target_id:
+            raise DomainValidationError(
+                f"A link cannot point at itself: {self.source_type.value} {self.source_id}"
+            )
+
+        allowed_sources, allowed_targets = LINK_PAIR_RULES[self.relationship_type]
+        if self.source_type not in allowed_sources or self.target_type not in allowed_targets:
+            targets = ", ".join(sorted(t.value for t in allowed_targets))
+            raise DomainValidationError(
+                f"{self.relationship_type.value} cannot link "
+                f"{self.source_type.value} to {self.target_type.value}; "
+                f"allowed targets are: {targets}"
+            )
+
+        if self.relationship_type in LINK_SAME_TYPE_RELATIONSHIPS and (
+            self.target_type is not self.source_type
+        ):
+            raise DomainValidationError(
+                f"{self.relationship_type.value} requires both ends to be the same "
+                f"entity type; got {self.source_type.value} and {self.target_type.value}"
+            )
+
+        if (self.external_system is None) != (self.external_id is None):
+            raise DomainValidationError(
+                "external_system and external_id must be set together or both omitted"
+            )
+        return self

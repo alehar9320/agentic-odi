@@ -17,7 +17,7 @@ test.describe("capturing an outcome", () => {
     // The offline notice offers a way into the capture panel.
     await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
 
-    const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    const panel = page.getByRole("complementary", { name: "Add what you heard" });
     await expect(panel).toBeVisible();
 
     // A job first: an outcome is always a metric for a job.
@@ -33,8 +33,8 @@ test.describe("capturing an outcome", () => {
     await expect(banners(page).filter({ hasText: "Outcome captured" })).toBeVisible();
 
     // The outcome is now part of the canvas.
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
     await expect(landscape).toBeVisible();
     await expect(landscape).toContainText("Minimize the time to deploy a service");
   });
@@ -43,7 +43,7 @@ test.describe("capturing an outcome", () => {
     await openStudio(page);
     await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
 
-    const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    const panel = page.getByRole("complementary", { name: "Add what you heard" });
     // The preview sentence is the panel's own readout: "Opportunity 13.5
     // underserved". The regex anchors both numbers, so "13.50" cannot pass as
     // "13.5" the way a substring check would.
@@ -65,7 +65,7 @@ test.describe("capturing an outcome", () => {
     await openStudio(page);
     await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
 
-    const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    const panel = page.getByRole("complementary", { name: "Add what you heard" });
     await panel.getByLabel(/^Importance/).fill("4");
     await panel.getByLabel(/^Current satisfaction/).fill("9");
 
@@ -78,7 +78,7 @@ test.describe("capturing an outcome", () => {
     await openStudio(page);
     await offlineNotice(page).getByRole("button", { name: "Capture an outcome" }).click();
 
-    const panel = page.getByRole("complementary", { name: "Capture by hand" });
+    const panel = page.getByRole("complementary", { name: "Add what you heard" });
     // An outcome always belongs to a job, so the repository starts empty here.
     await panel.getByLabel("Job name").fill("Ship a service to production");
     await panel.getByRole("button", { name: "Add job" }).click();

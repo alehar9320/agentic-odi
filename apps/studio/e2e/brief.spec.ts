@@ -112,5 +112,5 @@ test.describe("the decision brief", () => {
 function railLandscape(page: Page) {
   return page
     .getByRole("navigation", { name: "Your work" })
-    .getByRole("button", { name: /^Landscape,/ });
+    .getByRole("button", { name: /^Where to focus,/ });
 }

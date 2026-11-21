@@ -105,7 +105,7 @@ describe("Catch Up reads the signal inbox", () => {
     serveFeed([signal()]);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
 
     expect(await screen.findByRole("heading", { name: /while you were away/i })).toBeInTheDocument();
     expect(screen.getByText("Outcome rescored: minimize deploy time")).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("Catch Up reads the signal inbox", () => {
 
   it("exposes the feed as a named region for landmark navigation", async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: no unread signals" }));
 
     expect(await screen.findByRole("region", { name: "Signal inbox" })).toBeInTheDocument();
   });
@@ -125,7 +125,7 @@ describe("Catch Up reads the signal inbox", () => {
     serveFeed([signal(), signal({ id: "sig-2", read_at: new Date().toISOString() })], 3);
 
     render(<App />);
-    const bell = await screen.findByRole("button", { name: "Signal inbox: 3 unread" });
+    const bell = await screen.findByRole("button", { name: "What changed: 3 unread" });
 
     expect(within(bell).getByText("3")).toBeInTheDocument();
     expect(fetchUnreadSignalCount).toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe("Catch Up reads the signal inbox", () => {
     ]);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
     await screen.findByText("Outcome rescored: minimize deploy time");
 
     expect(screen.queryByRole("tablist")).toBeNull();
@@ -173,20 +173,20 @@ describe("Catch Up reads the signal inbox", () => {
     ]);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
     const card = await screen.findByRole("button", { name: /^Job added: "Deploy services"\./i });
 
     fireEvent.click(card);
 
     await waitFor(() => expect(markSignalRead).toHaveBeenCalledWith("sig-1", MCP_URL));
-    expect(await screen.findByRole("heading", { name: /universal job map/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /steps in the job/i })).toBeInTheDocument();
   });
 
   it("makes the card itself a native button so Enter and Space activate it", async () => {
     serveFeed([signal({ kind: "job_added", subject_kind: "job", subject_id: "JOB-1" })]);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
     const card = await screen.findByRole("button", { name: /^Outcome rescored: minimize deploy time\./i });
 
     expect(card.tagName).toBe("BUTTON");
@@ -205,7 +205,7 @@ describe("Catch Up reads the signal inbox", () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
     await screen.findByText("Outcome rescored: minimize deploy time");
 
     fireEvent.click(screen.getByRole("button", { name: /^Dismiss/i }));
@@ -218,7 +218,7 @@ describe("Catch Up reads the signal inbox", () => {
 
   it("has no simulate control and offers a real next step when empty", async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: no unread signals" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: no unread signals" }));
     await screen.findByText(/nothing happened while you were away/i);
 
     expect(screen.queryByRole("button", { name: /simulate/i })).toBeNull();
@@ -229,7 +229,7 @@ describe("Catch Up reads the signal inbox", () => {
     serveFeed(DEMO_SIGNALS);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 3 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 3 unread" }));
 
     expect(
       await screen.findByText("Opportunity score crossed 10 (up): validation rules"),
@@ -243,7 +243,7 @@ describe("Catch Up reads the signal inbox", () => {
     serveFeed([signal({ created_at: created })]);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Signal inbox: 1 unread" }));
+    fireEvent.click(await screen.findByRole("button", { name: "What changed: 1 unread" }));
 
     const time = await screen.findByText(/ago|just now/i, { selector: "time" });
     expect(time).toHaveAttribute("dateTime", created);

@@ -44,6 +44,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
 | `apps/cli/tests/test_demo_cli.py` | Tests for ``odi demo`` — the labelled sample workspace. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
+| `apps/cli/tests/test_doctor.py` | `odi doctor` explains why the Studio will not start, and never changes the machine. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
 | `apps/cli/tests/test_interviews_cli.py` | Tests for the interviews CLI group (A1). |
@@ -238,11 +239,12 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/notifications/CatchUpFeed.test.tsx` | Point the mocked store at a feed; `unread` defaults to what the feed shows. */ |
 | `apps/studio/src/components/notifications/noFabricatedSignals.test.ts` | The signal inbox is evidence-first: every card is a change the store |
 | `apps/studio/src/components/records/RecordDetail.test.tsx` | The detail as the lens renders it: a real row out of the real builder, so a field the |
+| `apps/studio/src/components/records/RecordsPanel.test.tsx` | The file a person opens in a spreadsheet, asserted from the bytes the button hands over. |
 | `apps/studio/src/components/records/RecordsTable.test.tsx` | — |
 | `apps/studio/src/components/settings/AboutSection.test.tsx` | The transport is supported, so the provider syncs currentVersion from the |
 | `apps/studio/src/components/settings/ConnectionsSection.test.tsx` | The failure-isolation contract: both sections are composed from props, |
 | `apps/studio/src/components/settings/ContextSection.test.tsx` | — |
-| `apps/studio/src/components/settings/DataSection.test.tsx` | — |
+| `apps/studio/src/components/settings/DataSection.test.tsx` | Storage facts, workspace export and import, and the error states around them. |
 | `apps/studio/src/components/settings/InstallSection.test.tsx` | #800: the desktop app is already its own window, so it cannot be installed. |
 | `apps/studio/src/components/settings/ModelSection.test.tsx` | The key control asks the sidecar for a key's state on mount; a unit test does |
 | `apps/studio/src/components/settings/SettingsLayout.test.tsx` | The updater's state stays in the Updates row. |
@@ -281,7 +283,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/odi.test.ts` | The fixture is the contract between the Python service and the TypeScript |
 | `apps/studio/src/lib/offlinePage.test.ts` | #546: the offline shell is a page, not a React route, so the only way to keep |
 | `apps/studio/src/lib/onlineStatus.test.tsx` | jsdom's `navigator.onLine` is a plain property; redefine it per test and put |
-| `apps/studio/src/lib/records.test.ts` | — |
+| `apps/studio/src/lib/records.test.ts` | The shape the person opening the file in a spreadsheet sees: one header, then each |
 | `apps/studio/src/lib/relativeTime.test.ts` | — |
 | `apps/studio/src/lib/sampleLoop.test.ts` | Bundled sample data, never the person's live canvas. |
 | `apps/studio/src/lib/scoreVocabulary.test.ts` | — |
@@ -311,7 +313,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/styles/colors.test.ts` | The raw-colour gate (issue #543, parent #331). |
 | `apps/studio/src/styles/mainstage.test.ts` | Guards for the mainstage stylesheet (#737). |
 | `apps/studio/src/styles/motion.test.ts` | The motion budget, asserted against the stylesheet itself. |
-| `apps/studio/src/styles/print.test.ts` | The brief sheet marks the body while the print dialog is open, so the page |
+| `apps/studio/src/styles/print.test.ts` | The records lens is the surface a person takes to a meeting: its headings and tables |
 | `apps/studio/src/styles/theme.test.ts` | Colour and token guards for the theme. |
 | `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation, asserted from the stylesheet source |
 | `apps/studio/src/test/a11y.test.tsx` | The accessibility gate for every surface that ships. |
@@ -349,6 +351,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_sink.py` | — |
 | `packages/core/tests/test_alternatives.py` | What a customer uses today, recorded and asked about honestly (M2-07). |
 | `packages/core/tests/test_alternatives_presentation.py` | Presenting the alternatives inventory to a reader (M2-07.2, ALH-166). |
+| `packages/core/tests/test_candidate_decision.py` | Accepting a candidate keeps the sentence that produced it — ALH-191. |
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
@@ -383,6 +386,7 @@ isolation, and coverage rules stay in
 | `packages/core/tests/test_persistence_parity.py` | A field added on one persistence link must exist on all of them. |
 | `packages/core/tests/test_promotion_identity.py` | One customer quote must not become three opportunities. |
 | `packages/core/tests/test_proposals.py` | Tests for proposal lifecycle (issue #80). |
+| `packages/core/tests/test_recovery.py` | Tests for backup and restore (issue #1133). |
 | `packages/core/tests/test_remote.py` | Tests for the shared MCP tool-result error parser. |
 | `packages/core/tests/test_repository.py` | Tests for the in-memory Repository implementation. |
 | `packages/core/tests/test_repository_factory.py` | — |

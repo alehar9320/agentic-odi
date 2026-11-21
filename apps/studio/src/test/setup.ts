@@ -63,3 +63,23 @@ if (typeof globalThis.ResizeObserver === "undefined") {
     writable: true,
   });
 }
+
+// jsdom 31 does not implement object URLs. Node's `URL.createObjectURL` is still
+// reachable and looks callable, but it reads a Node `Blob`'s internal buffer and
+// throws on jsdom's `Blob` ("Cannot read properties of undefined (reading
+// '_buffer')"), so a `typeof` guard in the component cannot detect it. Give the
+// environment a working pair; tests that assert on downloads stub these
+// themselves and `vi.unstubAllGlobals()` restores this pair afterwards.
+let objectUrlCount = 0;
+
+Object.defineProperty(globalThis.URL, "createObjectURL", {
+  value: () => `blob:jsdom/${++objectUrlCount}`,
+  configurable: true,
+  writable: true,
+});
+
+Object.defineProperty(globalThis.URL, "revokeObjectURL", {
+  value: () => {},
+  configurable: true,
+  writable: true,
+});

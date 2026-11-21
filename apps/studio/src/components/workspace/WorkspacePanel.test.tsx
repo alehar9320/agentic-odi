@@ -116,12 +116,12 @@ describe("WorkspacePanel", () => {
   it("renders the view as a lens, not a takeover", () => {
     render(<Stage />);
 
-    const lens = screen.getByRole("complementary", { name: /opportunity landscape/i });
+    const lens = screen.getByRole("complementary", { name: /where to focus/i });
     expect(lens).toBeInTheDocument();
     expect(screen.getByText(/a lens on the conversation, not a separate place/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /opportunity landscape/i }),
-    ).toHaveAccessibleName(/opportunity landscape/i);
+      screen.getByRole("heading", { name: /where to focus/i }),
+    ).toHaveAccessibleName(/where to focus/i);
   });
 
   it("returns to the conversation through a question, not a menu", () => {
@@ -149,7 +149,7 @@ describe("WorkspacePanel", () => {
 
     expect(screen.getByText("Pricing research")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /opportunity landscape/i }),
+      screen.getByRole("heading", { name: /where to focus/i }),
     ).toBeInTheDocument();
   });
 
@@ -157,10 +157,14 @@ describe("WorkspacePanel", () => {
     const { rerender } = render(<Stage />);
 
     const siblingNav = screen.getByRole("navigation", { name: /other views|siblings/i });
-    expect(within(siblingNav).getByRole("button", { name: /job map.*1/i })).toBeInTheDocument();
-    expect(within(siblingNav).getByRole("button", { name: /evidence.*1/i })).toBeInTheDocument();
+    expect(
+      within(siblingNav).getByRole("button", { name: /steps in the job.*1/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(siblingNav).getByRole("button", { name: /what customers said.*1/i }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(within(siblingNav).getByRole("button", { name: /job map/i }));
+    fireEvent.click(within(siblingNav).getByRole("button", { name: /steps in the job/i }));
 
     expect(studio.openPanel).toHaveBeenCalledWith("jobmap");
     expect(studio.closePanel).not.toHaveBeenCalled();
@@ -169,10 +173,10 @@ describe("WorkspacePanel", () => {
     rerender(<Stage />);
 
     expect(
-      screen.getByRole("complementary", { name: /universal job map/i }),
+      screen.getByRole("complementary", { name: /steps in the job/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /universal job map/i }),
+      screen.getByRole("heading", { name: /steps in the job/i }),
     ).toBeInTheDocument();
   });
 
@@ -184,7 +188,7 @@ describe("WorkspacePanel", () => {
 
     const { rerender } = render(<Stage />);
     expect(
-      screen.getByRole("heading", { name: /opportunity landscape/i }),
+      screen.getByRole("heading", { name: /where to focus/i }),
     ).toHaveFocus();
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -206,7 +210,7 @@ describe("WorkspacePanel", () => {
 
     const { rerender } = render(<Stage />);
 
-    const heading = screen.getByRole("heading", { name: /opportunity landscape/i });
+    const heading = screen.getByRole("heading", { name: /where to focus/i });
     expect(heading).toHaveFocus();
     expect(heading).toHaveAttribute("tabindex", "-1");
 
@@ -320,7 +324,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
   it("opens as a modal dialog with focus inside it", () => {
     render(<Stage />);
 
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to focus/i });
     expect(dialog).toHaveAttribute("data-state", "open");
     expect(document.querySelector('[data-slot="sheet-overlay"]')).not.toBeNull();
     expect(dialog.contains(document.activeElement)).toBe(true);
@@ -329,7 +333,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
   it("keeps Tab inside the sheet and wraps at both ends", () => {
     render(<Stage />);
 
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to focus/i });
     const buttons = within(dialog).getAllByRole("button");
     const first = buttons[0];
     const last = buttons[buttons.length - 1];
@@ -364,7 +368,7 @@ describe("WorkspacePanel as a mobile sheet", () => {
     trigger.focus();
 
     const { rerender } = render(<Stage />);
-    const dialog = screen.getByRole("dialog", { name: /opportunity landscape/i });
+    const dialog = screen.getByRole("dialog", { name: /where to focus/i });
     expect(dialog.contains(document.activeElement)).toBe(true);
 
     studio.activePanel = null;
