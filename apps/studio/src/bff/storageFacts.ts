@@ -38,6 +38,7 @@ export const APP_STORAGE_KEYS: readonly string[] = [
   "studio.intro",
   "studio.lensWidth",
   "studio.onboarding",
+  "studio.pwa.installDismissed",
   "studio.session",
   "studio.settings",
   "studio.setupDraft",

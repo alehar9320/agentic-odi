@@ -33,6 +33,10 @@ PALETTE: Final[dict[str, str]] = {
 
 HEAD_W_BUST: Final[int] = 20
 HEAD_W_ICON: Final[int] = 22
+# Maskable icons may be cropped to a circle, so the character is drawn smaller
+# than the app-icon mark to stay inside the safe zone. 16 px wide keeps the
+# outline within the inner 80% of the tile (see `maskable_raster`).
+HEAD_W_MASKABLE: Final[int] = 16
 
 _Color = str | None
 _RGBA = tuple[int, int, int, int]
@@ -234,6 +238,21 @@ def mark_raster() -> Raster:
     raster = Raster()
     raster.fill_round_rect(0, 0, GRID, GRID, 7, "tile")
     raster.composite(head_raster(HEAD_W_ICON))
+    return raster
+
+
+def maskable_raster() -> Raster:
+    """Draw the maskable mark: Odi's head, full-bleed on the tile.
+
+    A ``purpose: "maskable"`` icon may be cropped to a circle, a squircle, or a
+    rounded square, so the character has to sit inside the inner 80% of the
+    tile — the safe zone. The head is drawn smaller than in :func:`mark_raster`
+    (16 px wide rather than 22) so its outline stays inside that circle, and the
+    tile fills the whole grid because the operating system supplies the mask.
+    """
+    raster = Raster()
+    raster.fill_rect(0, 0, GRID, GRID, "tile")
+    raster.composite(head_raster(HEAD_W_MASKABLE, center_y=GRID / 2))
     return raster
 
 

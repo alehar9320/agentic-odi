@@ -13,6 +13,7 @@ import { ChatStage } from "./components/chat/ChatStage";
 import { ConnectorSuggestionModal } from "./components/customize/ConnectorSuggestionModal";
 import { CustomizePage } from "./components/customize/CustomizePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { InstallProvider } from "./components/layout/InstallPill";
 import { SharedArtifact } from "./components/SharedArtifact";
 import { StudioBar } from "./components/layout/StudioBar";
 import { WorkbenchRail } from "./components/workspace/WorkbenchRail";
@@ -233,8 +234,10 @@ export default function App() {
           <BannerProvider>
             <StudioRuntimeProvider>
               <OnboardingProvider>
-                <StudioShell />
-                <FirstRunWizard />
+                <InstallProvider>
+                  <StudioShell />
+                  <FirstRunWizard />
+                </InstallProvider>
               </OnboardingProvider>
             </StudioRuntimeProvider>
           </BannerProvider>
