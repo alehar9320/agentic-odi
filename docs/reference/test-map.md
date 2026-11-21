@@ -432,6 +432,7 @@ isolation, and coverage rules stay in
 | `tests/scripts/test_audit_ignore.py` | The accepted-advisory ledger is the gate's memory (#1090). |
 | `tests/scripts/test_blind_excepts.py` | Every broad ``except`` must say what it swallowed (issue #1091). |
 | `tests/scripts/test_bundle_budget.py` | The cold-start bundle budget gate (#529). |
+| `tests/scripts/test_ci_label.py` | The CI Label workflow: `ci-pending` while CI runs, and only that label. |
 | `tests/scripts/test_ci_release.py` | — |
 | `tests/scripts/test_cli_docs.py` | Assert that docs/cli.md stays synchronized with registered Typer CLI commands. |
 | `tests/scripts/test_dev.py` | — |
