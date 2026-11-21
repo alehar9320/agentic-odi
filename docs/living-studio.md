@@ -43,6 +43,8 @@ SPA never contacts MCP or the LLM directly.
 
 The Studio opens as a conversation, not a dashboard.
 
+Functional type never goes below `--text-sm` (0.78rem). Anything a person must read to use a control — the model name, the composer hint, attachment details, action labels, the message clock, the health chip — sits at that step or larger. `--text-xs` and `--text-2xs` are for decoration, never for a label.
+
 | Surface | What it does |
 |---|---|
 | **First paint** | The window opens already the right colour. `apps/studio/index.html` carries an inline `<style>` with the background and the shell grid (bar, rail, stage) and a short inline script that resolves the theme — the stored `studio.settings` choice, or `prefers-color-scheme` when nothing is stored — and sets the class on `<html>` before the module bundle parses. React replaces the shell on its first commit, so there is no white flash and no dark-then-light flip. The inline colours are copies of `--bg` and `--line` in `src/styles/theme.css`, and `src/styles/bootShell.test.ts` fails if the two drift apart. |
