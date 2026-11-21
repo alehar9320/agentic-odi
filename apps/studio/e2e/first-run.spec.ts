@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
+
+import { dismissConnectorSuggestion } from "./helpers";
 
 const COMPOSER = "Message the studio";
 
@@ -7,26 +9,21 @@ const COMPOSER = "Message the studio";
  * agent asks five questions, and the answers become a brief that survives in
  * local storage. No model is reachable during the run, which is the point: the
  * introduction finishes without one.
+ *
+ * The Studio restores its most recent conversation on boot, so a previous
+ * spec's thread would open in place of the first-run hero. `e2e/fixtures.ts`
+ * clears that memory before every test — this spec used to be the only one that
+ * did, which made every other spec depend on it having run.
  */
 test.describe("the first-run introduction", () => {
-  test.beforeEach(async ({ request }) => {
-    // The sidecar is shared by the whole run, and the Studio restores its most
-    // recent conversation on boot. A previous spec's thread would open in place
-    // of the first-run hero, so the memory is emptied the way a first visit is.
-    await request.delete("/api/memory");
-  });
-
-  test("asks five questions and saves the brief in the person's words", async ({ page }) => {
+  test("asks five questions and saves the brief in the person's words", { tag: "@smoke" }, async ({
+    page,
+  }) => {
     await page.goto("/?flags=firstRunWizard:off");
 
     // A fresh studio with no connectors offers one in a modal. That is real
     // product behavior, so it is dismissed the way a person would.
-    const suggestion = page.getByRole("dialog", { name: "Connector suggestion" });
-    await suggestion.waitFor({ state: "visible", timeout: 2_000 }).catch(() => {});
-    if (await suggestion.isVisible()) {
-      await suggestion.getByRole("button", { name: "Not now" }).click();
-      await expect(suggestion).toBeHidden();
-    }
+    await dismissConnectorSuggestion(page);
 
     await page.getByRole("button", { name: "Start with you and your team" }).click();
 

@@ -18,6 +18,9 @@ REQUIRED_HEADERS = {
     "X-Frame-Options",
     "Referrer-Policy",
     "Permissions-Policy",
+    "Strict-Transport-Security",
+    "Cross-Origin-Opener-Policy",
+    "Cross-Origin-Resource-Policy",
 }
 
 REQUIRED_CSP_DIRECTIVES = {
@@ -40,6 +43,31 @@ def test_every_required_header_is_declared() -> None:
         assert f'"{name}"' in source, f"{name} is missing from the Worker"
 
 
+def test_hsts_is_https_only_with_a_year_max_age_and_no_preload() -> None:
+    source = _source()
+    assert '"Strict-Transport-Security": "max-age=31536000; includeSubDomains"' in source
+    assert (
+        "preload"
+        not in source.split('"Strict-Transport-Security"')[1].split('"Cross-Origin-Opener-Policy"')[
+            0
+        ]
+    ), "HSTS must not commit to preload"
+
+
+def test_coop_and_corp_are_same_origin() -> None:
+    source = _source()
+    assert '"Cross-Origin-Opener-Policy": "same-origin"' in source
+    assert '"Cross-Origin-Resource-Policy": "same-origin"' in source
+
+
+def test_coep_is_deliberately_absent() -> None:
+    source = _source()
+    assert '"Cross-Origin-Embedder-Policy"' not in source, (
+        "COEP must not be added: it would break the model-endpoint fetches "
+        "allowed by connect-src and the blob/image handling in img-src"
+    )
+
+
 def test_the_declared_values_match_the_policy() -> None:
     source = _source()
     assert '"X-Content-Type-Options": "nosniff"' in source
@@ -56,12 +84,13 @@ def test_the_content_security_policy_covers_the_studio() -> None:
 
 def test_every_response_path_applies_the_headers() -> None:
     source = _source()
-    # Assets, local capabilities, the configured-sidecar error, the proxy, the
-    # unreachable error, the two `/api/build` answers (the version, and the 405 for
-    # any other method), and the two `/api/deploy` answers (#612: the identity, and
-    # the 405 for any other method). The count is the point: a new return path has
-    # to be named here before it can ship unwrapped.
-    assert source.count("return secure(") == 9
+    # Assets, local capabilities, the capabilities 405 (#1160), the
+    # configured-sidecar error, the proxy, the unreachable error, the two
+    # `/api/build` answers (the version, and the 405 for any other method), and
+    # the two `/api/deploy` answers (#612: the identity, and the 405 for any
+    # other method). The count is the point: a new return path has to be named
+    # here before it can ship unwrapped.
+    assert source.count("return secure(") == 10
     assert source.count("secure(\n        await fetch(") == 1
     assert "new Response(response.body, {" in source, (
         "the header helper must reuse the body stream so SSE keeps streaming"

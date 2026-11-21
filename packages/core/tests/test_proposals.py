@@ -109,6 +109,7 @@ def test_propose_edit_on_approve(tmp_path):
         name="Q3 call",
         content="The rotation of the secret is too slow before the next deploy.",
         job_id=job.id,
+        confidence="verified",
     )
     proposal = service.propose_outcome_from_evidence(ev.id)
 
@@ -118,6 +119,7 @@ def test_propose_edit_on_approve(tmp_path):
         proposal.id, statement=edited, importance=9.0, satisfaction=2.0
     )
     assert outcome.statement == edited
+    #: The evidence is verified, so the operator's inputs are stored unchanged.
     assert outcome.importance == 9.0
     assert outcome.satisfaction == 2.0
 

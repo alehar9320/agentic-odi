@@ -95,6 +95,26 @@ a different model. Studio memory observations do carry confidence (default
 0.5–0.6, out-of-range values rejected rather than clamped), but that is the PM
 memory store, not evidence.
 
+### Confidence weights the inputs, not the score
+
+An outcome derived from a single evidence record is discounted by that record's
+`confidence` before the shared scorer runs. `confidence_weighted_inputs`
+(`models.py`) scales the evidence-derived importance and satisfaction by
+`CONFIDENCE_WEIGHTS` — `verified` weighs 1.0 and `claimed` weighs 0.5 — and
+clamps each to the model's 1.0 floor. The weighted values are what the outcome
+stores, and `compute_opportunity_score` then runs over them unchanged, so the
+stored `opportunity_score` still equals
+`compute_opportunity_score(stored importance, stored satisfaction)` and the
+evaluation harness stays green.
+
+The rule applies only where an outcome is derived from one evidence record that
+carries a confidence: `promote_evidence(target="outcome")` and
+`approve_proposal` (whose proposal resolves to its source record). A
+directly-scored outcome with no backing evidence is unaffected — there is no
+confidence to weigh. The effect is that on otherwise identical raw inputs a
+`verified` outcome outranks a `claimed` one, and only `verified` inputs can
+cross a score of 10.
+
 ## What the alternatives were
 
 - **Map inside each connector.** Rejected: every vendor would grow its own

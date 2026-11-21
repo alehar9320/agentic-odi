@@ -50,6 +50,7 @@ function Dialog({ open, onOpenChange, title, children, footer }: DialogProps) {
           )}
         />
         <DialogPrimitive.Content
+          aria-modal="true"
           onOpenAutoFocus={() => {
             const active = document.activeElement;
             returnFocusRef.current = active instanceof HTMLElement ? active : null;

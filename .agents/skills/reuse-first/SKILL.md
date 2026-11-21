@@ -46,6 +46,61 @@ Provenance: <ledger entry added | n/a — nothing copied>
 A near-duplicate — same logic, slightly different shape — is a refactor-to-share,
 not a second copy. Two callers and one behaviour means one function.
 
+## UI component selection
+
+When the task is to build or change a Studio surface, decide the component's
+home before writing any JSX. Work down this ranking and stop at the first rung
+that serves the interaction:
+
+1. **An existing Studio component.** Search `apps/studio/src` by behaviour
+   (dialog, menu, command suggestions, notifications, canvas surfaces) before
+   by filename. The canonical owners are in `docs/architecture/reuse.md`;
+   four hand-built `role="dialog"` surfaces and `useFocusTrap.ts` are known
+   strays waiting for the declared `radix-ui` dialog, not new ones.
+2. **A dependency the workspace already declares.** Foundations for behaviour
+   and accessibility, specialists for a focused interaction, and designed
+   component sources for presentation. Read `apps/studio/package.json` first —
+   a declared package that nothing imports is a cost already paid.
+3. **Reviewed presentation copy-in, with provenance.** Only presentation is
+   vendored (behaviour primitives stay dependencies). Copy the file into
+   `apps/studio/src/vendor/`, add a `vendored:` header, and record it in
+   `apps/studio/vendor.lock.json`. See `docs/architecture/vendor.md`.
+4. **Custom behaviour.** Only when rungs 1–3 do not fit. Say which rung failed
+   and why, in the `Reuses:` block.
+
+### Library categories
+
+- **Foundations** — behaviour and accessibility primitives: `radix-ui`
+  (dialog, focus trap, toast stack), `assistant-ui` (thread, composer,
+  transcript, attachments). These own interaction; do not re-implement them.
+- **Specialists** — a focused interaction with one job: `cmdk` for command
+  palettes, `sonner` for toasts, `vaul` for drawers. Reach for the specialist
+  when the custom code is doing that one job badly, not when it is doing
+  something the library does not offer.
+- **Designed component sources** — presentation: shadcn/ui, Base UI, Sonner,
+  Vaul, cmdk, NumberFlow, Beautiful UI, Rare UI, Magic UI, Aceternity, and
+  21st.dev. These ship styling as well as markup.
+
+### The restraint rule
+
+At most one highly decorative or animated standout moment per page. A page
+gets one hero; everything else is quiet.
+
+### Branding when using designed sources
+
+A component copied from a designed source keeps its upstream styling unless
+the copy says otherwise. Adapt it to Studio's colors, typography, and radii —
+the `local edits:` note in the provenance header is where that adaptation is
+recorded, not hidden.
+
+### Not required dependencies
+
+The library list above is a menu of examples, not a shopping list. Do not add a
+library merely because it is listed; the ladder decides. The existing boundaries
+for `assistant-ui`, behaviour dependencies, the vendor ledger, and dependency
+review in `docs/architecture/vendor.md` and
+`.agents/skills/reuse-first/references/foss-adoption.md` still apply.
+
 ## Where the ladder is bounded
 
 - `website/` makes zero third-party requests and loads no webfonts. Rung 2 is closed

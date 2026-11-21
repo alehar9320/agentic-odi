@@ -1,6 +1,8 @@
+import sys
 from pathlib import Path
 
-from agentic_odi_cli import profile
+import pytest
+from agentic_odi_cli import paths, profile
 
 
 def _isolate(monkeypatch, tmp_path):
@@ -16,7 +18,7 @@ def test_config_dir_uses_xdg_config_home(monkeypatch, tmp_path):
 def test_config_dir_defaults_to_home(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert profile.config_dir() == Path(tmp_path) / "agentic-odi"
+    assert profile.config_dir() == tmp_path / ".config" / "agentic-odi"
 
 
 def test_baseline_file_location(monkeypatch, tmp_path):
@@ -27,7 +29,7 @@ def test_baseline_file_location(monkeypatch, tmp_path):
 def test_baseline_file_defaults_to_home(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    assert profile.baseline_file() == Path(tmp_path) / "agentic-odi" / "baseline.json"
+    assert profile.baseline_file() == tmp_path / ".config" / "agentic-odi" / "baseline.json"
 
 
 def test_baseline_exists_returns_false_when_no_file(monkeypatch, tmp_path):
@@ -66,9 +68,109 @@ def test_load_baseline_rejects_corrupt_json(monkeypatch, tmp_path):
     try:
         profile.load_baseline()
     except ValueError as exc:
-        assert "Failed to parse baseline file" in str(exc)
+        assert str(target) in str(exc)
+        assert "not valid JSON" in str(exc)
     else:  # pragma: no cover - corrupt JSON must raise
         raise AssertionError("expected ValueError")
+
+
+def test_an_unreadable_file_names_permissions_not_parsing(monkeypatch, tmp_path):
+    if sys.platform == "win32":  # pragma: no cover - chmod does not deny reads on Windows
+        pytest.skip("chmod cannot deny reads on Windows")
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"product_name": "Acme"}')
+    target.chmod(0o000)
+
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        message = str(exc)
+        assert "Could not read" in message
+        assert str(target) in message
+        assert "parse" not in message.lower()
+    else:  # pragma: no cover - unreadable file must raise
+        raise AssertionError("expected ProfileFileError")
+    finally:
+        target.chmod(0o600)
+
+
+def test_malformed_json_names_the_line_and_column(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"a": 1,}')
+
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        message = str(exc)
+        assert "line" in message
+        assert "column" in message
+    else:  # pragma: no cover - malformed JSON must raise
+        raise AssertionError("expected ProfileFileError")
+
+
+def test_the_path_appears_in_both_messages(monkeypatch, tmp_path):
+    if sys.platform == "win32":  # pragma: no cover - chmod does not deny reads on Windows
+        pytest.skip("chmod cannot deny reads on Windows")
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text("{not json")
+
+    messages = []
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        messages.append(str(exc))
+
+    target.chmod(0o000)
+    try:
+        profile.load_baseline()
+    except profile.ProfileFileError as exc:
+        messages.append(str(exc))
+    finally:
+        target.chmod(0o600)
+
+    assert len(messages) == 2
+    for message in messages:
+        assert str(target) in message
+
+
+def test_profile_file_error_is_a_value_error(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text("{not json")
+
+    try:
+        profile.load_baseline()
+    except ValueError as exc:
+        assert isinstance(exc, profile.ProfileFileError)
+    else:  # pragma: no cover - malformed JSON must raise
+        raise AssertionError("expected ValueError")
+
+
+def test_from_dict_rejects_unknown_keys(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    try:
+        profile.Baseline.from_dict({"product_name": "Acme", "made_up_field": 1})
+    except ValueError as exc:
+        assert "made_up_field" in str(exc)
+        assert "valid fields" in str(exc)
+    else:  # pragma: no cover - unknown keys must raise
+        raise AssertionError("expected ValueError for unknown keys")
+
+
+def test_from_dict_accepts_known_keys(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    b = profile.Baseline.from_dict({"product_name": "Acme", "schema_version": 1, "source": "url"})
+    assert b.product_name == "Acme"
+    assert b.schema_version == 1
+    assert b.source == "url"
+    assert b.inferred is False
 
 
 def test_save_sets_created_at_when_missing(monkeypatch, tmp_path):
@@ -92,6 +194,39 @@ def test_save_preserves_an_explicit_created_at(monkeypatch, tmp_path):
     assert loaded.created_at == "2026-01-01T00:00:00Z"
 
 
+def test_inferred_survives_a_save_and_load(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(
+        profile.Baseline(schema_version=1, source="wizard", product_name="Acme", inferred=True)
+    )
+    loaded = profile.load_baseline()
+    assert loaded is not None
+    assert loaded.inferred is True
+    assert loaded.schema_version == 1
+
+
+def test_inferred_defaults_to_false_through_a_save_and_load(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(profile.Baseline(product_name="Acme"))
+    loaded = profile.load_baseline()
+    assert loaded is not None
+    assert loaded.inferred is False
+
+
+def test_a_baseline_written_before_inferred_existed_still_loads(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    target = profile.baseline_file()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"schema_version": 1, "product_name": "Acme"}')
+
+    loaded = profile.load_baseline()
+
+    assert loaded is not None
+    assert loaded.product_name == "Acme"
+    assert loaded.inferred is False
+    assert loaded.schema_version == 1
+
+
 def test_backup_baseline_returns_none_without_a_file(monkeypatch, tmp_path):
     _isolate(monkeypatch, tmp_path)
 
@@ -108,6 +243,67 @@ def test_backup_baseline_copies_the_current_file(monkeypatch, tmp_path):
     assert backup.exists()
     assert backup.name.startswith("baseline.json.bak-")
     assert backup.read_text() == profile.baseline_file().read_text()
+
+
+def _make_backups(monkeypatch, tmp_path, stamps: list[str]) -> list[Path]:
+    """Write one backup per stamp and return the paths, oldest first."""
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(profile.Baseline(product_name="Acme"))
+    cfg = profile.config_dir()
+    cfg.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for stamp in stamps:
+        p = cfg / f"baseline.json.bak-{stamp}"
+        p.write_text("{}")
+        paths.append(p)
+    return paths
+
+
+def test_prune_keeps_the_newest_n(monkeypatch, tmp_path):
+    stamps = [f"2026010{i}T000000Z" for i in range(1, 9)]
+    _make_backups(monkeypatch, tmp_path, stamps)
+
+    removed = profile.prune_baseline_backups(keep=3)
+
+    remaining = sorted(p.name for p in profile.config_dir().glob("baseline.json.bak-*"))
+    assert len(remaining) == 3
+    assert remaining == sorted(f"baseline.json.bak-{s}" for s in stamps[-3:])
+    assert sorted(p.name for p in removed) == sorted(f"baseline.json.bak-{s}" for s in stamps[:5])
+
+
+def test_prune_never_removes_the_new_copy(monkeypatch, tmp_path):
+    _isolate(monkeypatch, tmp_path)
+    profile.save_baseline(profile.Baseline(product_name="Acme"))
+
+    for i in range(1, 9):
+        monkeypatch.setattr(profile, "_backup_timestamp", lambda i=i: f"2026060{i}T000000Z")
+        profile.backup_baseline()
+
+    newest = profile.config_dir() / "baseline.json.bak-20260608T000000Z"
+    assert newest.exists()
+    assert len(list(profile.config_dir().glob("baseline.json.bak-*"))) == (
+        profile.BASELINE_BACKUP_KEEP
+    )
+
+
+def test_a_failed_unlink_does_not_raise(monkeypatch, tmp_path):
+    stamps = [f"2026010{i}T000000Z" for i in range(1, 9)]
+    _make_backups(monkeypatch, tmp_path, stamps)
+
+    def boom(self, *args, **kwargs):
+        raise OSError("locked")
+
+    monkeypatch.setattr(Path, "unlink", boom)
+
+    assert profile.prune_baseline_backups(keep=3) == []
+
+
+def test_keep_zero_is_a_no_op(monkeypatch, tmp_path):
+    stamps = [f"2026010{i}T000000Z" for i in range(1, 9)]
+    _make_backups(monkeypatch, tmp_path, stamps)
+
+    assert profile.prune_baseline_backups(keep=0) == []
+    assert len(list(profile.config_dir().glob("baseline.json.bak-*"))) == 8
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +345,8 @@ def test_llm_profile_handles_corrupt_file(monkeypatch, tmp_path):
     try:
         profile.load_llm_profile()
     except ValueError as exc:
-        assert "Failed to parse LLM profile file" in str(exc)
+        assert str(target) in str(exc)
+        assert "not valid JSON" in str(exc)
     else:  # pragma: no cover - corrupt JSON must raise
         raise AssertionError("expected ValueError")
 
@@ -198,3 +395,34 @@ def test_chat_config_from_env_falls_back_to_profile(monkeypatch, tmp_path):
     assert config.api_key == "profile-key"
     assert config.model == "profile-model"
     assert config.mcp_url == "http://profile-mcp:7000/mcp"
+
+
+def test_llm_profile_round_trips_non_ascii(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    profile.save_llm_profile(
+        profile.LLMProfile(model="münchen-7b", base_url="http://localhost:8001/v1")
+    )
+    assert profile.load_llm_profile().model == "münchen-7b"
+
+
+def test_config_dir_uses_appdata_on_windows(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
+
+    assert profile.config_dir() == tmp_path / "roaming" / "agentic-odi"
+
+
+def test_config_dir_falls_back_to_appdata_home_on_windows(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths.sys, "platform", "win32")
+    monkeypatch.delenv("APPDATA", raising=False)
+    monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
+
+    assert profile.config_dir() == tmp_path / "AppData" / "Roaming" / "agentic-odi"
+
+
+def test_config_dir_is_absolute_when_home_is_unset(monkeypatch, tmp_path):
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("HOME", raising=False)
+    monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
+
+    assert profile.config_dir().is_absolute()

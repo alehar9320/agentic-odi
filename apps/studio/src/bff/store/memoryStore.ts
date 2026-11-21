@@ -4,6 +4,7 @@ import {
   byCreated,
   bySeq,
   type DrainLease,
+  type InterviewDraft,
   type LocalStore,
   type OutboxRecord,
   type StoredConversation,
@@ -27,6 +28,7 @@ export class MemoryLocalStore implements LocalStore {
   private readonly observations = new Map<string, Observation>();
   private readonly conversations = new Map<string, StoredConversation>();
   private readonly turns: StoredTurn[] = [];
+  private readonly drafts = new Map<string, InterviewDraft>();
   private readonly outbox = new Map<string, OutboxRecord>();
   private lease: DrainLease | null = null;
 
@@ -219,6 +221,20 @@ export class MemoryLocalStore implements LocalStore {
     return next;
   }
 
+  async renameConversation(id: string, title: string): Promise<StoredConversation> {
+    const conversation = this.conversations.get(id);
+    if (!conversation) {
+      throw new Error(`Conversation ${id} not found`);
+    }
+    const next: StoredConversation = {
+      ...conversation,
+      title,
+      updated_at: nowIso(),
+    };
+    this.conversations.set(id, next);
+    return next;
+  }
+
   async listTurns(conversationId: string): Promise<StoredTurn[]> {
     return this.turns
       .filter((turn) => turn.conversation_id === conversationId)
@@ -266,6 +282,24 @@ export class MemoryLocalStore implements LocalStore {
         this.turns.splice(index, 1);
       }
     }
+  }
+
+  async listInterviewDrafts(jobId?: string): Promise<InterviewDraft[]> {
+    return [...this.drafts.values()]
+      .filter((draft) => !jobId || draft.jobId === jobId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async getInterviewDraft(id: string): Promise<InterviewDraft | undefined> {
+    return this.drafts.get(id);
+  }
+
+  async putInterviewDraft(draft: InterviewDraft): Promise<void> {
+    this.drafts.set(draft.id, draft);
+  }
+
+  async deleteInterviewDraft(id: string): Promise<void> {
+    this.drafts.delete(id);
   }
 
   async deleteConversation(id: string): Promise<void> {
@@ -340,6 +374,7 @@ export class MemoryLocalStore implements LocalStore {
     this.observations.clear();
     this.conversations.clear();
     this.turns.length = 0;
+    this.drafts.clear();
     this.outbox.clear();
     this.lease = null;
     this.seq = 0;

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from agentic_odi_studio_api.studio.observability import log_turn, redact
 
@@ -86,6 +87,74 @@ def test_log_turn_records_the_error_code_of_a_failed_turn(caplog) -> None:
     assert payload["error_code"] == "mcp_unreachable"
 
 
+def test_log_turn_records_token_counts_and_model(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(
+            request_id="req-1",
+            model="m",
+            rounds=1,
+            tool_calls=0,
+            tool_errors=0,
+            duration_ms=10,
+            outcome="completed",
+            prompt_tokens=120,
+            completion_tokens=40,
+            total_tokens=160,
+        )
+
+    payload = json.loads(caplog.records[0].getMessage())
+    assert payload["prompt_tokens"] == 120
+    assert payload["completion_tokens"] == 40
+    assert payload["total_tokens"] == 160
+    assert payload["model"] == "m"
+
+
+def test_log_turn_allows_a_null_token_count(caplog) -> None:
+    """A backend that reports no usage leaves the counts null, never guessed."""
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(
+            request_id="req-1",
+            model="m",
+            rounds=1,
+            tool_calls=0,
+            tool_errors=0,
+            duration_ms=10,
+            outcome="completed",
+            prompt_tokens=None,
+            completion_tokens=None,
+            total_tokens=None,
+        )
+
+    payload = json.loads(caplog.records[0].getMessage())
+    assert payload["prompt_tokens"] is None
+    assert payload["completion_tokens"] is None
+    assert payload["total_tokens"] is None
+
+
+def test_log_turn_never_writes_a_bearer_token_with_token_counts(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(
+            request_id="req-1",
+            model="m",
+            rounds=1,
+            tool_calls=0,
+            tool_errors=0,
+            duration_ms=10,
+            outcome="completed",
+            prompt_tokens=1,
+            completion_tokens=2,
+            total_tokens=3,
+            authorization="Bearer sk-live-secret",
+            api_key="sk-live-secret",
+        )
+
+    text = "\n".join(record.getMessage() for record in caplog.records)
+    assert "sk-live-secret" not in text
+    assert "authorization" not in text
+    assert "api_key" not in text
+    assert "total_tokens" in text
+
+
 def test_log_turn_redacts_nested_values(caplog) -> None:
     with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
         log_turn(
@@ -102,3 +171,42 @@ def test_log_turn_redacts_nested_values(caplog) -> None:
     payload = json.loads(caplog.records[0].getMessage())
     assert payload["context"]["api_key"] == "[redacted]"
     assert payload["context"]["name"] == "studio"
+
+
+def test_a_list_of_mappings_is_redacted(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(request_id="req-1", messages=[{"api_key": "CANARY"}])
+
+    assert "CANARY" not in caplog.text
+
+
+def test_deep_nesting_is_redacted() -> None:
+    redacted = redact({"a": {"b": {"c": {"token": "CANARY"}}}})
+
+    assert "CANARY" not in json.dumps(redacted)
+
+
+def test_a_nested_quote_is_redacted() -> None:
+    redacted = redact({"evidence": {"quote": "CANARY WORDS"}})
+
+    assert "CANARY" not in json.dumps(redacted)
+
+
+def test_a_nested_token_in_a_logged_mapping_is_redacted(caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="agentic_odi_studio_api.studio.observability"):
+        log_turn(request_id="req-1", context={"request": {"authorization": "Bearer CANARY"}})
+
+    assert "CANARY" not in caplog.text
+
+
+def test_a_non_sensitive_nested_value_survives() -> None:
+    redacted = redact({"context": {"model": "m", "rounds": 2}})
+
+    assert redacted["context"] == {"model": "m", "rounds": 2}
+
+
+def test_a_cyclic_mapping_does_not_hang() -> None:
+    cyclic: dict[str, Any] = {}
+    cyclic["self"] = cyclic
+
+    assert redact(cyclic) is not None

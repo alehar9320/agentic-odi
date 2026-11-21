@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScorePopover } from "./ScorePopover";
+import { opportunityScore } from "../../lib/odi";
 
 const harness = vi.hoisted(() => ({
   state: {
@@ -38,7 +39,7 @@ function serverRecompute(
     ...outcome,
     importance,
     satisfaction,
-    opportunity_score: importance + Math.max(importance - satisfaction, 0),
+    opportunity_score: opportunityScore(importance, satisfaction),
   });
 }
 

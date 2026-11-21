@@ -29,6 +29,35 @@ uv run --directory website mypy .
 uv run bandit -c pyproject.toml -r apps packages website/
 ```
 
+Bandit reads code patterns. It cannot say that a pinned version has a known
+advisory, so a separate `dependencies` CI job asks the advisory databases
+directly, for the Python runtime export, the Studio's npm packages, and the
+Tauri `Cargo.lock`. Run the same three commands locally:
+
+```bash
+uv export --all-packages --format requirements-txt --no-hashes --no-dev > /tmp/req.txt
+uvx pip-audit==2.7.3 -r /tmp/req.txt --skip-editable
+npm --prefix apps/studio audit --omit=dev --audit-level=high
+cargo audit --file apps/studio/src-tauri/Cargo.lock
+```
+
+An advisory the repository accepts rather than fixes is recorded in
+`security/audit-ignore.toml` with a reason and an `expires` date no more than 90
+days out; `scripts/audit_ignore.py` reads that ledger, builds the tools' ignore
+arguments, filters `npm audit` (which has no ignore flag), and fails the job when
+an entry is expired. Validate the ledger and preview the arguments with:
+
+```bash
+uv run python scripts/audit_ignore.py --check
+uv run python scripts/audit_ignore.py --pip-args
+uv run python scripts/audit_ignore.py --cargo-args
+```
+
+The audit is not part of `scripts/verify.py --changed`: it needs the lockfiles
+rather than the diff, and its result does not depend on which files a pull
+request touched. See
+[ADR 0008](architecture/adr/0008-dependency-advisories-are-a-gate.md).
+
 ## Documentation Checks
 
 `scripts/doc_check.py` keeps the living docs honest against the code:
@@ -37,9 +66,10 @@ uv run bandit -c pyproject.toml -r apps packages website/
 uv run python scripts/doc_check.py
 ```
 
-`docs/roadmap.md` is a pointer page; its three lists point at the sources that
-own the facts (the changelog, the open pull-request list, and the ready-for-dev
-issue filter). No check requires a new capability to edit it.
+`docs/roadmap.md` is a pointer page, not a register. It keeps no shipped,
+in-flight, or queued lists of its own — those facts live in `CHANGELOG.md` and
+Releases, the open-pull-request list, and the `ready-for-dev` issue filter — so
+no capability change has to edit a roadmap file to land.
 
 It checks that documented CLI commands exist in the Typer tree, documented paths
 exist on disk, documented `/api` routes are served by the Studio router,
@@ -136,62 +166,9 @@ The agent-composed surfaces, first-minute guidance, and the product tour are
 covered at these levels. `ChatStage.test.tsx` covers the jump-to-latest control
 while following a streamed turn — the arrival count, the polite announcement, the
 return to the live end, and the keyboard path — and `arrivalCount.test.ts` holds
-the pure count arithmetic:
-
-| File | What it covers |
-|---|---|
-| `apps/studio/src/ui/protocol.test.ts` | Spec parsing: prop types, enums, ranges, required props, depth/node/size ceilings, unknown types |
-| `apps/studio/src/vendor/vendor.test.tsx` | Tailwind scope: a vendor utility is compiled, a product-only utility is not, no preflight reset, the copied button renders |
-| `apps/studio/src/ui/UiRenderer.test.tsx` | Card rendering, computed opportunity scores, action dispatch, the finding card's measured number and canvas-checked step, per-node failure isolation, catalog/registry parity |
-| `apps/studio/src/components/canvas/SegmentBoard.test.tsx` | The segment board's members and basis (#559): each segment lists its member outcomes with their stored scores, the mean is over scored members only with "Not scored" for none, an inferred group is called a candidate, a missing member is dropped and counted, a member opens in the landscape by mouse and keyboard, and the empty state names the next step |
-| `apps/studio/src/components/canvas/OpportunityLandscape.test.tsx` | The landscape's honesty pass (#501): the plot draws a point only for a scored outcome, the underserved zone is sampled from `2 × importance − satisfaction > 10` (a boundary pair at one satisfaction lands on opposite sides), an unscored outcome appears under **Not scored (n)** with a **Score me** action that opens the score form without writing a rating |
-| `apps/studio/src/assistant/convert.test.ts` | Every part mapping in both directions, unknown parts dropped, `content` preserved for history |
-| `apps/studio/src/api/studioApi.test.ts` | Chat request serialization: visible-path messages and attachment fields match the sidecar schema |
-| `apps/studio/src/diagnostics/` | Recursive secret/URL/path redaction, 256 KiB cap, opt-in memory-only capture, local-only metadata fetch, and accessible diagnostics preview/export |
-| `apps/studio-api/tests/test_studio_diagnostics.py` | Metadata-only diagnostics response, safe database basename/counts, integrity state, and absence of row contents/config |
-| `apps/studio-api/tests/test_boot_integrity.py` | A damaged store answers every data route with one `store_corrupt` body, health reports degraded, diagnostics and health stay reachable, the idle timer checkpoints and honors `AGENTIC_ODI_CHECKPOINT_SECONDS`, and a clean shutdown checkpoints and closes both stores |
-| `apps/studio-api/tests/test_studio_chat_stream.py` | Streaming chat, opt-in approval decisions for contract writes and unknown tools, and read-only/local-tool classification |
-| `apps/studio/src/components/chat/Conversation.test.tsx` | Prose and surfaces interleaved in the agent's order through the real runtime; intent actions become messages while a finding's breakdown opens the record without sending one; named alternative N of M and its switch; reasoning disclosure opens on request; the phase is announced and the reply is busy while streaming; failure retry |
-| `apps/studio/src/assistant/quote.test.ts`, `src/components/chat/SelectionToolbar.test.tsx` | Quoting a passage verbatim with its attribution, one copy only, and no toolbar until text is selected |
-| `apps/studio/src/components/chat/Composer.test.tsx` | Send, stop, the slash palette, keyboard focus, dropped and pasted attachments, refusal of unreadable files, and accessible attachment format/size limits in the runtime-bound composer |
-| `apps/studio/src/assistant/pending.test.ts`, `src/components/chat/PendingCalls.test.tsx` | The pending-call strip (#390): only running and awaiting-approval calls appear, in transcript order, a settled call leaves the strip for the transcript, a clock is shown only when the store recorded a start, and the strip is never a second live region |
-| `apps/studio/src/components/chat/StallNotice.test.tsx` | The eight-second silence line: appears only while a run is stalled, disappears when it settles, and announces once rather than on every tick |
-| `apps/studio/src/assistant/dictation.test.ts`, `src/components/chat/Dictation.test.tsx` | The speech-recognition support gate, the microphone starting a session, and the absence of the control where the API is missing |
-| `apps/studio/src/assistant/speech.test.ts`, `src/components/chat/Speech.test.tsx` | The speech support gate, speaking a settled reply, stopping on request and on Escape, and the absence of the control where the API is missing |
-| `apps/studio/src/components/chat/ThreadComposer.test.tsx` | Recall of previously sent messages with `ArrowUp`/`ArrowDown`, draft restoration, and the editing and sending keys it must not break |
-| `apps/studio/src/assistant/queue.test.ts`, `src/components/chat/QueueLane.test.tsx` | The follow-up lane (#410): enqueue preserves order, steer interrupts once, a cancel pauses instead of draining, a failed dispatch restores rather than drops; the lane rows read their text from parts and their Run-now and remove controls act on one item only |
-| `apps/studio/src/components/chat/ModelPicker.test.tsx` | Listing and marking the configured model, selection writes through `saveSettings`, arrow/Enter/Escape operation, an unreachable backend explained with a Settings path, one probe per backend |
-| `apps/studio/src/assistant/attachments.test.ts` | Acceptance by extension and type, the 5 MB image ceiling, and human-readable sizes |
-| `apps/studio/src/assistant/starterCopy.test.ts` | The first-run starter lint: situation-first titles, material-first prompts, a promised artifact, no quality adjectives, no claim literal, and the untouched returning-user swaps |
-| `apps/studio/src/components/chat/SuggestionPills.test.tsx` | A starter click sends its exported prompt verbatim, and a starter clicked while a reply streams enqueues instead of being dropped (#410) |
-| `apps/studio-api/tests/test_studio_models.py` | Model listing sorted and deduplicated, offline without connecting, failed probe returned as a message, `/api/models` response shape |
-| `apps/studio/src/state/StudioContext.test.tsx` | New, regenerate, and edit turns against a stubbed stream, the follow-up queue against a gated stream (#410), branch switching, approval answers |
-| `apps/studio-api/tests/test_studio_ui_spec.py` | Catalog validation and `render_ui` tool-schema generation |
-| `apps/studio-api/tests/test_studio_chat_ui.py` | `render_ui` interception, `ui` SSE events, and the correction fed back to the model |
-| `apps/studio-api/tests/test_studio_chat_stream.py` | Reasoning and source events, attachment prompt assembly, terminal-event invariants |
-| `apps/studio-api/tests/test_studio_chat_branches.py` | Turn ids and sibling branches: edit and regenerate produce a tree, not a rewrite |
-| `apps/studio-api/tests/test_studio_conversations.py` | Branch tree endpoint, `head_id` patch, legacy linear fallback, conversation list ordering and turn counts, citation round-trip, idempotent retry, count-mismatch drop |
-| `apps/studio-api/tests/test_studio_claims.py` | Claim parser: markers outside code, hypothesis tags, unknown ids downgraded, headings/questions/instructions exempt, list items, decimals, the three-record cap |
-| `apps/studio/src/assistant/claims.test.ts` | Marker hiding while a reply streams (including a split marker and literal code), block splitting, claim-to-sentence mapping, seeded counts |
-| `apps/studio/src/assistant/parts.test.tsx` | Claim chips open the record, hypothesis tag, uncited underline, missing record, sample chips, the no-citation banner, Escape |
-| `apps/studio-api/tests/test_studio_approvals.py` | Gate lifecycle: resolve, timeout, double resolve, unknown id |
-| `apps/studio/src/features/flags.test.ts` | Flag precedence (query → storage → env → default), value parsing, local overrides |
-| `apps/studio/src/onboarding/machine.test.ts` | Tour transitions, no forward motion without a goal, versioned storage, malformed records |
-| `apps/studio/src/onboarding/FirstRunWizard.test.tsx` | Never auto-opens, explicit open, full flow to a destination, skip/Escape, focus trap, resume, replay, inline model repair, flag off |
-| `apps/studio/src/test/a11y.test.tsx` | axe-core WCAG 2.1 A/AA sweep over every shipping surface, the decision brief included, with zero violations; contrast is scoped to the token audit and documented there |
-| `apps/studio/src/test/keyboard.test.tsx` | Shell landmarks and skip link, the tab path order (skip link → top bar → rail → transcript), and a project-wide AST scan for click handlers on non-controls |
-| `apps/studio/src/styles/theme.test.ts` | Palette contrast in both themes (4.5:1 text, 3:1 focus ring) and no custom property referenced without a definition |
-| `apps/studio/src/styles/tokens.test.ts` | The typographic and scalar foundation: `--font-display` and its fallback, five or more steps each of the type and spacing scales, the corner and leading scales, the light theme carries no `--font` override, the display face is self-hosted (no CDN) with `font-display: swap`, and `var(--font-display)` is applied at exactly four sites |
-| `apps/studio/src/styles/bootShell.test.ts` | The inline shell in `index.html`: it sits inside `#root`, draws the bar/rail/stage, requests no font or image, stays under budget, keeps its literal colours in step with `theme.css`, and its inline script resolves a stored theme (or the media query) before React |
-| `apps/studio/src/lib/theme.test.ts` | `resolveTheme`: the stored choice wins, the media query answers when nothing is stored, and dark is the last resort |
-| `apps/studio/src/lib/boot.test.ts` | `removeBootShell` clears the shell on mount and is a no-op without one |
-| `apps/studio/e2e/first-paint.spec.ts` | Playwright: the shell paints the token colour with JavaScript off and the bundle blocked, a stored theme wins over the system, and the handover to React keeps the colour |
-| `apps/studio/src/lib/guidance.test.ts` | One hint at a time, context before evidence, silence before the first exchange, permanent dismissal, defensive storage |
-| `apps/studio/src/components/BootFailurePage.test.tsx` | The boot failure page names the file and the last backup, offers recheck, and never offers to delete or overwrite the store |
-| `apps/studio/src/App.test.tsx` | First-minute ordering: no tour or interview over the stage, tour on request, context hint after the first reply, job handoff, chosen surface opens, flag off in shell tests, and a complete introduction that saves the brief; a damaged store renders the boot failure page instead of the shell |
-| `apps/studio/src/lib/intro.test.ts` | Introduction turns, parsing under empty, very long, and multi-fact replies, the proposed defaults, draft storage, and one-shot migration |
-| `apps/studio/src/components/setup/IntroConversation.test.tsx` | Five turns, skip, Escape, in-place summary edits, and the accepted brief with role, team, and evidence |
-| `apps/studio/src/components/setup/IntroConversation.visual.test.tsx` | The summary card as one Chromatic snapshot |
+the pure count arithmetic. Every test file, with the one line it says about
+itself, is in [the test map](reference/test-map.md); it is generated from the
+files, so adding a test means writing a docstring, not editing a list here.
 
 ## Website Checks (GitHub Pages)
 
@@ -432,9 +409,17 @@ python3 scripts/pr_ai_merge.py --managed            # list owned labels
 
 The [PR AI merge authorize workflow](.github/workflows/pr-ai-authorize.yml)
 applies `ai-merge-authorized` only when the PR carries `ai-merge-safe`, the
-combined status of the head commit is `success` (CI green), `ready-for-merge`
-is present (no merge conflicts), and hygiene passes (open, non-draft, targets
-`main`). It is removed when any gate fails.
+head commit's check suite is complete and green, `ready-for-merge` is present
+(no merge conflicts), and hygiene passes (open, non-draft, targets `main`). It
+is removed when any gate fails.
+
+"Green" is `compute_ci_state()` in `scripts/pr_ai_authorize.py`: `CI green` and
+`PR guardrails` must be successful, and every other GitHub Actions check run on
+the head commit must be green except the advisory browser suite (`End-to-end`),
+which `AGENTIC_ODI_E2E_BLOCKING=true` turns into a gate. The legacy combined
+commit status is deliberately not consulted — it carries only third-party
+statuses, so it reads `success` while CI is still queued. See
+[ADR 0009](architecture/adr/0009-ai-merge-gate-reads-the-check-suite.md).
 
 ```bash
 python3 scripts/pr_ai_authorize.py --facts facts.json   # print the label or nothing
@@ -444,9 +429,17 @@ python3 scripts/pr_ai_authorize.py --managed            # list owned labels
 ### Auto-merge (Phase 2)
 
 The [PR AI merge act workflow](.github/workflows/pr-ai-merge-act.yml) arms
-`gh pr merge --auto --squash` on any open PR carrying `ai-merge-authorized`,
-re-verifying CI green immediately before arming. Human override: `do-not-merge`
-or `needs human review` cancels auto-merge and a comment explains why.
+`gh pr merge --auto --squash` only on an open PR that carries
+`ai-merge-authorized`, `ai-merge-safe` and `ready-for-merge`, whose head commit
+passes the check-suite gate, and whose labels it has just re-read. The trigger
+is narrowed to the labels that can change the decision, so an unrelated label
+cannot arm a merge.
+
+Arming is a request, not a decision: every run can disarm. If a gate stops
+holding — the authorization or trust label is removed, a new push resets the
+checks, a human adds `do-not-merge` or `needs human review`, or the suite goes
+red — the workflow calls `gh pr merge --disable-auto` and says why in an
+idempotent `## AI merge act` comment that names the head commit it judged.
 
 ### Branch protection (enforced on `main`)
 
@@ -481,13 +474,15 @@ for the decision and the deferred `label gate` check.
 See `.agents/workflows/test.md` for the test tiers. **Before opening a PR**, run the pre-PR tier:
 
 ```bash
-uv run python scripts/verify.py --changed   # fast gate on touched files (PR bar)
-uv run python scripts/verify.py --default   # adds mypy + vitest for touched areas
-uv run python scripts/verify.py --full      # full matrix (CI's job)
+uv run python scripts/verify.py --changed   # required CI checks the diff can drive (PR bar)
+uv run python scripts/verify.py --default   # adds repo-wide mypy, studio build, site build
+uv run python scripts/verify.py --full      # local matrix; e2e/Tauri/audit stay CI-only
 ```
 
 Per-command ceiling is 300s; designed for a 10–30 minute agent budget. CI owns
-`--full`. The PR body must list the tiers run and skipped.
+`--full`. The gate prints which tier covers each required CI job and why the
+rest are CI-only; `tests/scripts/test_verify_ci_parity.py` keeps that table
+equal to `ci-green.needs`. The PR body must list the tiers run and skipped.
 
 Tests use **pytest** with **pytest-asyncio** (strict mode) and run entirely
 in-memory — no running server required. Tests live next to the package they
@@ -541,9 +536,11 @@ response shapes, the sidecar's hydration of the canvas, and the first-run
 wizard's ordering relative to the rest of the app.
 
 ```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
-npm --prefix apps/studio run test:e2e:ui   # the Playwright UI
+npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e         # the product suite
+npm --prefix apps/studio run test:e2e:smoke   # the blocking @smoke subset
+npm --prefix apps/studio run test:e2e:visual  # the opt-in screenshot contract
+npm --prefix apps/studio run test:e2e:ui      # the Playwright UI
 ```
 
 The first run needs the browser once:
@@ -553,9 +550,9 @@ npx --prefix apps/studio playwright install chromium
 ```
 
 Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
+a second sidecar on the MCP passthrough backend. `chromium` (the local
+backend, the product default) and `mcp-backend` (the passthrough) make up
+`test:e2e`; a spec is collected by exactly one of them.
 
 A third project, `screenshots`, is added only when `PR_SCREENSHOTS=1` is set.
 It runs `e2e/pr-screenshots.spec.ts`, which writes one PNG per key screen into
@@ -567,13 +564,30 @@ true` and no membership in `ci-green`'s `needs` — so a screenshot failure
 cannot block a merge.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none. When a test
-needs data behind it, it seeds through the API rather than through the UI, so
-the test stays about the view it is actually checking.
+never to a `data-testid`, of which the application has none, and never to a CSS
+class. When a test needs data behind it, it seeds through the API rather than
+through the UI, so the test stays about the view it is actually checking.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+Every spec imports `test` and `expect` from `e2e/fixtures.ts`. Its automatic
+fixture resets the shared studio — jobs, conversation memory, unread signals —
+before each test, so no spec inherits another's writes and the result does not
+depend on the order Playwright chose. A spec that imports from
+`@playwright/test` directly gets the shared state back.
+
+CI runs two browser jobs. `e2e-smoke` is **required** and runs the `@smoke`
+tagged subset with `--retries=0`. `e2e` runs the whole suite and stays advisory:
+set the repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
+`AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. Its summary lists every
+failure with its locator and call site, plus every test that passed only on
+retry.
+
+`test:e2e:visual` is opt-in because the repository has committed no screenshot
+baselines yet; running it in the product lane made that lane permanently red.
+
+A flaky spec is fixed or parked, never left to retry: `e2e/quarantine.ts` +
+`// quarantined: #<issue> <YYYY-MM-DD>` in the spec, with
+`src/test/e2eQuarantine.test.ts` failing the entry after thirty days. See
+[Testing](architecture/testing.md#a-flaky-spec-is-fixed-or-parked-never-retried-indefinitely).
 
 ## Cold-open budget
 
@@ -704,14 +718,14 @@ uv run pytest \
   `scripts/`).
 - Every async test is decorated with `@pytest.mark.asyncio`.
 - Use `Client(mcp)` directly (no HTTP server needed) for fast, isolated tests.
-- The MCP server's `reset_db` autouse fixture clears in-memory state before
-  each test.
+- The MCP server's `configured_server` autouse fixture names a fresh
+  `InMemoryRepository` before each test.
 
 ### Test Coverage Map
 
 | Area | What it covers |
 |---|---|
-| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
+| `packages/core/tests/` | Domain models, opportunity scoring, `ODIService`, repository implementations, SQLite persistence and its numbered schema-migration ledger, schema, the deterministic study corpus, the onboarding funnel counters, and the per-segment cold-open budget |
 | `apps/mcp-server/tests/` | Full ODI workflow, entity parity, context tools, Customer Outcomes, evidence, tool errors, and HTTP transport startup |
 | `apps/studio-api/tests/` | Health, config, canvas, SSE chat, SPA fallback, MCP hydration, probes, step/outcome passthrough, and the funnel endpoints |
 | `apps/cli/tests/` | Backend selection, local/remote CRUD, chat, wizard, onboarding, updates, rendering, the funnel report, connectors, and startup performance |
@@ -726,6 +740,61 @@ uv run pytest \
 > [!TIP]
 > Type `/test` in the AI assistant to have the agent run all tests and report the
 > results automatically.
+
+## Store schema version
+
+The SQLite event store stamps its own file-format version in a `schema_meta`
+table on open. The constants live in
+`packages/core/src/agentic_odi_core/intent_store.py`:
+
+- `CURRENT_SCHEMA_VERSION` — the format this build writes. It starts at `1`.
+- `MIGRATIONS` — a `dict[int, Callable]` keyed by the version it produces;
+  `MIGRATIONS[n]` upgrades a store from `n - 1` to `n`.
+
+`IntentStore.ensure_version()` runs on every open:
+
+- A current-version store is left untouched (no migration, no version write).
+- An unstamped (legacy) store is stamped `v1` once, then migrated forward.
+- Migrations run **in order inside one transaction**. A step that raises rolls
+  back its data *and* schema changes together with the version stamp, so a
+  half-migrated event log can never be left behind.
+- A store written by a newer build is refused with both versions named and the
+  `odi update` upgrade command, and the file is left byte-for-byte unchanged.
+
+Bump `CURRENT_SCHEMA_VERSION` **only** when you register a migration. An
+additive field that needs no data change must not bump it.
+
+## Contract drift snapshot
+
+`tests/contract/test_contract_snapshot.py` pins three surfaces together so an
+accidental change fails CI instead of a customer: `contract.TOOL_SPECS`, the
+live FastMCP registry's input schemas, and `schema.odi_schema()`.
+
+When you make a **deliberate** change to any of those, regenerate the snapshot
+locally, then review the diff like code before committing:
+
+```bash
+uv run pytest tests/contract/test_contract_snapshot.py --inline-snapshot=fix
+```
+
+CI never accepts a snapshot automatically; drift fails the build. A newly
+accepted snapshot is not proof of backward compatibility — an intentional
+breaking change needs its own compatibility decision.
+
+## The ninety-second tour
+
+`docs/tour/README.md` and `docs/tour/tour.cast` are generated, never hand-edited.
+Regenerate them in one command after a change that affects the walkthrough:
+
+```bash
+uv run python scripts/tour.py
+```
+
+`scripts/tour.py` executes every command in `docs/tour/script.md` against a
+disposable store, so a command that no longer runs fails the build rather than
+rotting in prose. `tests/test_tour.py` fails if the committed artifacts differ
+from a fresh run, if the walkthrough exceeds the ninety-second budget, or if a
+documented command cannot be executed.
 
 ## Agent Session Tracking
 

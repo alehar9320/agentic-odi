@@ -61,9 +61,12 @@ The project card, rendered from the committed source by
 | **A conversation, not a form.** The Living Studio opens on one question — **What do you want to win?** — with the composer focused. When you ask for context, the agent speaks first, and the answers come back as a brief you can edit line by line. Every claim in a reply names the record behind it, or says it is a hypothesis. | [The Living Studio →](docs/living-studio.md) |
 | **A document when the conversation needs one.** `/brief` writes the decision brief from the canvas — the ranked bets, the records behind each, what argues against them, and the next evidence to collect — as Markdown a review can read with or without the Studio. Provenance travels with it: demo rows are excluded from every count and labelled. | [The Living Studio →](docs/living-studio.md) |
 | **Evidence becomes outcomes.** An ingested record is mined into a scored, approvable outcome proposal — statement, direction, importance, satisfaction, and a stated confidence, with its rationale and the quote it came from. The mining is deterministic and offline. | [The method →](docs/method.md) |
+| **Candidates linked to underserved outcomes.** Evidence is mined into candidate proposals (statement, importance, satisfaction, confidence, rationale) that can be reviewed, edited, approved as outcomes, or rejected — all with full traceability. | [The method →](docs/method.md) |
 | **A catch-up that means something.** Writes emit signals — an outcome re-scored, evidence promoted, a job map completed — stored in the same event log and read by the CLI, any MCP client, and the Studio's bell. Nothing is invented, and the feed is deduped and budgeted. | [CLI reference →](docs/cli.md) |
 | **Connectors, without storing a credential.** Register MCP or REST connectors (Notion, PostHog, Exa, Linear, GitHub) from a trusted vendor marketplace, conversationally, or from the CLI. A listing that needs a token names the environment variable to set. | [External Connectors →](docs/connectors.md) |
+| **Accepted bets written to delivery tools.** Approved outcomes and strategy bets push to Linear, GitHub, Jira, and other delivery trackers via MCP connectors — closing the loop from evidence to execution. | [External Connectors →](docs/connectors.md) |
 | **Browser-first, local-second.** The Studio opens in any browser and is fully usable with no account, no server, and no sidecar: jobs, outcomes, memory, and the assistant all run locally on your device. The desktop app (any OS) and the sidecar elevate your capabilities — local LLM proxy, connectors, MCP passthrough, updates — when you choose to add them. Start on web or mobile, then graduate to the CLI or local app as you get deeper. | [Local LLM Backend →](docs/local-llm.md) |
+| **Candidates and delivery write-back.** Candidate solutions link to the underserved outcomes they serve, with opportunity scores that rank the bets worth taking; accepted candidates are written to delivery tools such as Linear so the roadmap moves from the evidence that justifies it. | [The method →](docs/method.md) |
 
 **How you start.** Open the Studio on the web (desktop or mobile) or connect any
 MCP client to the local server. Everything works right there. When you want more
@@ -78,7 +81,9 @@ service.
   in `packages/core` describe typed, AI-native relationships between ODI
   entities (such as `evidence` serving an `outcome`, `blocked_by`, or
   `external_jira`/`external_github` references) with optional external
-  identifiers and cached previews, currently scoped to the core domain model.
+  identifiers and cached previews. Both repositories now persist them: a link
+  survives a restart, filters by its endpoints, and rejects a duplicate
+  relationship. The MCP and CLI surfaces are still to come.
 - **One artifact you can hand over.** A read-only link opens a single artifact
   and its evidence on its own page — no rail, no composer, no way into the rest
   of the workspace — and states when the link expires. The link is a capability,
@@ -121,6 +126,62 @@ curl -fsSL https://github.com/alehar9320/agentic-odi/releases/latest/download/in
 ```powershell
 iex (Invoke-WebRequest -Uri https://github.com/alehar9320/agentic-odi/releases/latest/download/install.ps1 -UseBasicParsing)
 ```
+Every score also carries **who stands behind it**. `score_method` records whether
+the number is a one-person `estimate`, a `survey`, or an `import`, and
+`importance_n` / `satisfaction_n` record how many people answered. An unknown
+count stays unknown — the CLI renders it as `est.`, never `n=0` — and an
+`estimate` that claims a sample above one is refused before the write. See
+[CLI reference](docs/cli.md#desired-outcomes) for the flags.
+
+A score is a number with a **range**, not a point. Importing a survey with
+`odi survey import <csv>` lands each outcome's mean, its sample and a bootstrap
+band from the real paired responses; editing the score without a fresh band
+clears the stale one, so a new number never carries an old range. A stored band
+is readable with its provenance — sample, seed, confidence level, method and
+computed-at, plus whether a later snapshot moved the score — through
+`odi desired-outcomes get`, the `get_outcome_interval` tool and
+`GET /api/outcomes/{id}/interval`. A score with no band reads as `no band`, not
+as a zero-width range, and a stale band says so.
+
+A band is not just reproducible in principle: the accepted survey import keeps
+the exact paired responses behind it, de-identified (an opaque per-pair token and
+the two numbers), in the append-only log behind a named provisional retention
+convention. So a stored band names the input set it came from and can be
+reproduced bit for bit after a restart, and the inputs are dropped in the same
+write that clears a stale band — a later reader can never reproduce a band for a
+score that no longer exists. Read them with `get_outcome_inputs`,
+`GET /api/outcomes/{id}/inputs`, or the CLI local backend; `null` means nothing
+is retained, a distinct state from a retained set and never an empty list that
+would read as zero responses.
+
+A score says a need is unmet; it does not say whether a solution exists and is
+merely disliked. The **alternatives inventory** records what a customer uses
+today for each Job — a product, a service, a workaround, a manual process, or
+`nothing` — and rates each against an outcome with the customer's own `adequacy`
+(1–10). The explicit three-state query distinguishes "we asked and there is
+nothing" from "we have not asked", so an un-inventoried outcome is never rendered
+as "no solution". Record it with `odi alternatives add|list|link|show`, the
+`add_alternative` / `link_alternative` / `get_outcome_alternatives` tools, or the
+Studio API. Read a whole Job's inventory in one call with `odi alternatives
+links`, the `list_alternative_links` tool, or `GET /api/alternative-links`, and
+one outcome's solution state with `get_has_existing_solution` or `GET
+/api/outcomes/{id}/existing-solution`. The Studio shows the recorded
+alternatives on the outcome detail and offers an **Only workaround** facet on the
+landscape, so an outcome whose only recorded solution is a workaround can be
+pulled out of the ranking without turning an un-inventoried outcome into a
+workaround.
+
+`odi top` answers "what should we build next?" from the measured section only —
+highest low end of the band first — naming the thin and unscored outcomes it
+left out, and `odi coverage` reports that split. An estimate can no longer
+outrank a measured score.
+
+A score says *which outcome* to chase; the job map says *who* is underserved.
+Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
+recommends one of three paths — differentiated for an underserved segment,
+disruptive for an overserved one, new-market for outcomes that map to no job in
+the store — recording the two it rejected. An outcome that joins no cluster is
+reported as unclustered, never inflated into a market.
 
 **Direct download buttons.** One-click links to the latest platform assets:
 
@@ -205,12 +266,28 @@ Score **> 10** → underserved, innovate. **= 10** → served, maintain.
 **< 10** → overserved, disrupt. ODI reports an **86% innovation success rate**
 (as reported in the [Strategyn](https://strategyn.com/outcome-driven-innovation/) literature).
 
+When an outcome comes from a single evidence record, that record's confidence
+weights the two inputs **before** the formula runs — `verified` counts in full,
+`claimed` counts at half — so a score built on a claimed quote cannot outrank one
+built on verified interviews. The formula above is unchanged; the stored inputs
+are the weighted ones, so the score always matches them.
+
 A score says *which outcome* to chase; the job map says *who* is underserved.
 Stage 5 clusters a job's scored outcomes by the step they attach to, and Stage 6
 recommends one of three paths — differentiated for an underserved segment,
 disruptive for an overserved one, new-market for outcomes that map to no job in
 the store — recording the two it rejected. An outcome that joins no cluster is
 reported as unclustered, never inflated into a market.
+
+**See the loop in ninety seconds.** The
+[ninety-second tour](docs/tour/README.md) walks quote → candidate → outcome →
+brief on a labelled sample workspace, with a generated transcript and a
+committed terminal cast:
+
+```bash
+odi demo load                        # a labelled sample you can explore
+odi summary demo-job-1 --top 3       # the landscape
+```
 
 ## Connect your agent
 
@@ -243,12 +320,20 @@ soon". See [External Connectors](docs/connectors.md).
 | [CLI Reference](docs/cli.md) | Backends, chat, entities, and scoring. |
 | [Connectors](docs/connectors.md) | The registry, the presets, and the protocol. |
 | [Architecture](docs/architecture/README.md) | The workspace, the data flow, and the testing strategy. |
+| [Test map](docs/reference/test-map.md) | Every test file and the one line it says about itself. |
+| [Observability](docs/architecture/observability.md) | What a turn cost, which tool was slow, and the one logging setup. |
+| [Interviews](docs/interviews.md) | Quote to candidate to outcome: propose, review, and accept. |
+| [Scoring](docs/scoring.md) | The opportunity score, its basis, bands, and the landscape. |
+| [Decisions](docs/decision.md) | Brief to decision to bet to measure, and the honest empty states. |
+| [Integrate an Agent](docs/integration.md) | Connect an external agent over MCP: connect, read, write under consent, and errors. |
+| [The ODI Spine](docs/architecture/spine.md) | Quote to candidate to outcome to score to brief to decision to bet to measure. |
 | [Deployment](docs/deployment.md) | The project site, the hosted server, and the Worker. |
 | [Development](docs/development.md) | Lint, types, frontend checks, and the coverage map. |
 | [The assistant-ui ledger](docs/assistant-ui-ledger.md) | Every assistant-ui capability, and the one honest state it is in. |
 | [Agent Assignment](docs/agents.md) | Which agents take issues, how to claim one, and when a claim expires. |
-| [Roadmap](docs/roadmap.md) | What has shipped, and what is queued. |
+| [Roadmap](docs/roadmap.md) | Where to see what shipped, what is in review, and what is queued. |
 | [Superpowers](docs/superpowers.md) | Pi, OpenCode, and Freebuff integration. |
+| [Configuration](docs/reference/configuration.md) | Every environment variable, its default, and the form it accepts. |
 <!-- END GENERATED: docs -->
 
 Every guide is also published on the
@@ -280,8 +365,8 @@ drift from the workspace. The distributions are:
 <!-- BEGIN GENERATED: packages -->
 | Path | Distribution | Description |
 |---|---|---|
-| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector and REST item previews. |
-| **`packages/core/`** | `agentic-odi-core` | Core domain models, services, and repositories for Agentic ODI. |
+| **`packages/connectors/`** | `agentic-odi-connectors` | External system connectors for Agentic ODI, including an MCP client ingest connector, REST item previews, and delivery write-back to Linear, GitHub, and Jira. |
+| **`packages/core/`** | `agentic-odi-core` | Core domain models, services, and repositories for Agentic ODI; includes candidate proposal extraction, approval, and rejection. |
 | **`apps/cli/`** | `agentic-odi-cli` | Command-line interface for Agentic ODI. |
 | **`apps/mcp-server/`** | `agentic-odi-mcp-server` | FastMCP server for Agentic ODI. |
 | **`apps/studio-api/`** | `agentic-odi-studio-api` | FastAPI sidecar for the Agentic ODI Living Studio. |
@@ -292,7 +377,8 @@ written down rather than implied — with `errors.py`, the exception hierarchy, 
 to every group. **Domain** (`models.py`, `evaluation.py`, `mapping.py`,
 `corpus.py`) is the vocabulary and imports no other group. **Persistence**
 (`repository.py`, `sqlite_repository.py`, `intent_store.py`, `events.py`,
-`factory.py`) stores what the other groups decide and may not import methodology —
+`factory.py`, `integrity.py`, `migrations.py`) stores what the other groups
+decide and may not import methodology —
 `tests/test_architecture.py` enforces that one rule, and also refuses a new core
 module that belongs to no group. **Methodology** (`services.py`, `segmentation.py`,
 `strategy.py`, `router.py`, `messages.py`, `steve_jobs.py`) owns the service door,
@@ -322,6 +408,11 @@ See [Development](docs/development.md) for the frontend checks, the coverage
 map, and how every pull request is automatically risk-classified.
 The browser-level Studio suite runs in its own non-blocking CI job; set the
 repository variable `AGENTIC_ODI_E2E` to `false` to skip it.
+
+A `dependencies` CI job fails a pull request that pins a high-severity advisory
+in the Python, npm, or Cargo dependency set. Accepted advisories live in
+`security/audit-ignore.toml` with an expiry date; see
+[ADR 0008](docs/architecture/adr/0008-dependency-advisories-are-a-gate.md).
 
 ## Brand
 

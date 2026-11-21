@@ -1,6 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-import { COMPOSER, lens, openStudio, resetRepository, seedOutcomes } from "./helpers";
+import { expect, test } from "./fixtures";
+
+import { COMPOSER, CONVERSATION, lens, openStudio, seedOutcomes } from "./helpers";
 
 /**
  * The decision brief is the document the studio writes for a review, and it is
@@ -20,10 +22,6 @@ const OUTCOME = {
 const DOCUMENT = "Decision brief";
 
 test.describe("the decision brief", () => {
-  test.beforeEach(async ({ request }) => {
-    await resetRepository(request);
-  });
-
   test("opens from the landscape header", async ({ page, request }) => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
@@ -31,8 +29,11 @@ test.describe("the decision brief", () => {
     await railLandscape(page).click();
     await page.getByRole("button", { name: "Export brief" }).click();
 
-    await expect(lens(page)).toHaveAttribute("aria-label", DOCUMENT);
-    await expect(lens(page).getByRole("article", { name: DOCUMENT })).toContainText(
+    // The docked lens names itself with `aria-labelledby` and the mobile sheet
+    // with `aria-label`; the accessible name is the one handle that holds in
+    // both shells.
+    await expect(lens(page, DOCUMENT)).toBeVisible();
+    await expect(lens(page, DOCUMENT).getByRole("article", { name: DOCUMENT })).toContainText(
       "Minimize the time to deploy",
     );
   });
@@ -44,7 +45,7 @@ test.describe("the decision brief", () => {
     await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
     await page.keyboard.press("Enter");
 
-    await expect(lens(page)).toHaveAttribute("aria-label", DOCUMENT);
+    await expect(lens(page, DOCUMENT)).toBeVisible();
   });
 
   test("is not offered before there is anything to brief", async ({ page }) => {
@@ -67,15 +68,21 @@ test.describe("the decision brief", () => {
 
     await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
     await page.keyboard.press("Enter");
-    await lens(page).getByRole("button", { name: "Print / PDF" }).click();
+    await lens(page, DOCUMENT).getByRole("button", { name: "Print / PDF" }).click();
     await expect(page.locator("body")).toHaveClass(/brief-printing/);
 
     await page.emulateMedia({ media: "print" });
-    await expect(lens(page).getByRole("article", { name: DOCUMENT })).toBeVisible();
-    await expect(page.locator(".brief__bar")).toBeHidden();
-    await expect(lens(page).getByRole("textbox", { name: /What argues against/ })).toBeHidden();
+    await expect(lens(page, DOCUMENT).getByRole("article", { name: DOCUMENT })).toBeVisible();
+    // The bar's three actions are the app chrome on this sheet, so their
+    // absence is what "the document, not the app" means.
+    for (const action of ["Download .md", "Print / PDF", "Copy"]) {
+      await expect(
+        lens(page, DOCUMENT).getByRole("button", { name: action }),
+      ).toBeHidden();
+    }
+    await expect(lens(page, DOCUMENT).getByRole("textbox", { name: /What argues against/ })).toBeHidden();
     await expect(page.getByRole("textbox", { name: COMPOSER })).toBeHidden();
-    await expect(page.locator(".chat")).toBeHidden();
+    await expect(page.getByRole("log", { name: CONVERSATION })).toBeHidden();
   });
 
   test("carries an objection typed on the sheet into the document", async ({
@@ -88,14 +95,14 @@ test.describe("the decision brief", () => {
     await page.getByRole("textbox", { name: COMPOSER }).fill("/brief");
     await page.keyboard.press("Enter");
 
-    await lens(page)
+    await lens(page, DOCUMENT)
       .getByRole("textbox", { name: "What argues against this?" })
       .fill("Release cadence is already a solved problem for this buyer.");
 
-    await expect(lens(page).getByRole("article", { name: DOCUMENT })).toContainText(
+    await expect(lens(page, DOCUMENT).getByRole("article", { name: DOCUMENT })).toContainText(
       "Release cadence is already a solved problem",
     );
-    await expect(lens(page).getByRole("article", { name: DOCUMENT })).toContainText(
+    await expect(lens(page, DOCUMENT).getByRole("article", { name: DOCUMENT })).toContainText(
       "author-supplied",
     );
   });

@@ -187,3 +187,25 @@ def test_maybe_run_first_launch_shows_the_card(monkeypatch) -> None:
     output = "".join(printed)
     assert "First-run onboarding card" in output
     assert "consent" in output
+
+
+def test_user_agent_carries_the_running_version() -> None:
+    from agentic_odi_cli import version
+
+    assert onboard.UA == f"agentic-odi/{version.__version__}"
+
+
+def test_the_fetch_sends_the_running_version_as_its_user_agent(monkeypatch) -> None:
+    from agentic_odi_cli import version
+
+    seen: dict[str, str] = {}
+
+    def _record(url, **kwargs):
+        seen.update(kwargs["headers"])
+        return _Response("<html><title>Acme</title></html>")
+
+    monkeypatch.setattr(onboard.httpx, "get", _record)
+
+    onboard.fetch_signals("https://acme.test")
+
+    assert seen["User-Agent"] == f"agentic-odi/{version.__version__}"

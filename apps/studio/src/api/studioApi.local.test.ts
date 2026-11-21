@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StudioApiError, addEvidence, addOutcome, addStep, createJob, deleteEvidence, fetchCanvas, fetchMemory, isTransportFailure, listConversations, streamChat } from "./studioApi";
+import { StudioApiError, addEvidence, addOutcome, addStep, createJob, deleteConversation, deleteEvidence, fetchCanvas, fetchMemory, isTransportFailure, listConversations, renameConversation, streamChat } from "./studioApi";
 import type { OutboxRecord } from "../bff/store/types";
 
 const outbox: OutboxRecord[] = [];
 
 const bff = {
   data: { fetchCanvas: vi.fn() },
-  memory: { listObservations: vi.fn(), listConversations: vi.fn() },
+  memory: {
+    listObservations: vi.fn(),
+    listConversations: vi.fn(),
+    renameConversation: vi.fn(),
+    deleteConversation: vi.fn(),
+  },
   chat: { stream: vi.fn() },
   createJob: vi.fn(),
   addStep: vi.fn(),
@@ -70,6 +75,8 @@ beforeEach(() => {
   vi.mocked(bff.data.fetchCanvas).mockReset();
   vi.mocked(bff.memory.listObservations).mockReset();
   vi.mocked(bff.memory.listConversations).mockReset();
+  vi.mocked(bff.memory.renameConversation).mockReset();
+  vi.mocked(bff.memory.deleteConversation).mockReset();
   vi.mocked(bff.chat.stream).mockReset();
   vi.mocked(bff.createJob).mockReset();
   vi.mocked(bff.addStep).mockReset();
@@ -255,6 +262,58 @@ describe("listConversations fallback", () => {
 
     expect(listed.map((item) => item.id)).toEqual(["c-2"]);
     expect(bff.memory.listConversations).not.toHaveBeenCalled();
+  });
+});
+
+describe("renameConversation fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.memory.renameConversation).mockResolvedValueOnce({
+      id: "c-1",
+      title: "Renamed",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+      head_id: null,
+    });
+
+    const renamed = await renameConversation("c-1", "Renamed");
+
+    expect(renamed.title).toBe("Renamed");
+    expect(bff.memory.renameConversation).toHaveBeenCalledWith("c-1", "Renamed");
+  });
+
+  it("PATCHes the title while the sidecar answers", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({
+        conversation: {
+          id: "c-1",
+          title: "Renamed",
+          created_at: "x",
+          updated_at: "x",
+          head_id: null,
+        },
+      }),
+    );
+
+    const renamed = await renameConversation("c-1", "Renamed");
+
+    expect(renamed.title).toBe("Renamed");
+    expect(bff.memory.renameConversation).not.toHaveBeenCalled();
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain("/api/conversations/c-1");
+    expect(init?.method).toBe("PATCH");
+    expect(JSON.parse(String(init?.body))).toEqual({ title: "Renamed" });
+  });
+});
+
+describe("deleteConversation fallback", () => {
+  it("falls back to the local BFF when the sidecar returns 502", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: "Sidecar unreachable" }, 502));
+    vi.mocked(bff.memory.deleteConversation).mockResolvedValueOnce({ ok: true });
+
+    await expect(deleteConversation("c-1")).resolves.toEqual({ ok: true });
+
+    expect(bff.memory.deleteConversation).toHaveBeenCalledWith("c-1");
   });
 });
 
