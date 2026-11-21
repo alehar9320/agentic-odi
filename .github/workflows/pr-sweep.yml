@@ -47,34 +47,36 @@ jobs:
 
       - name: Validate report is non-empty
         run: |
-          python3 -c "
-import json, sys
-with open('$RUNNER_TEMP/sweep-report.json') as f:
-    data = json.load(f)
-total = data.get('total_pull_requests', 0)
-counts = data.get('counts', {})
-if total == 0:
-    print('::error::Sweep report has zero total pull requests — run may be broken')
-    sys.exit(1)
-if sum(counts.values()) == 0:
-    print('::error::Sweep report has zero bucket counts — run may be broken')
-    sys.exit(1)
-print(f'Report valid: {total} PRs across {len(counts)} buckets')
-"
+          python3 - "$RUNNER_TEMP/sweep-report.json" <<'PY'
+          import json, sys
+
+          with open(sys.argv[1]) as f:
+              data = json.load(f)
+          total = data.get('total_pull_requests', 0)
+          counts = data.get('counts', {})
+          if total == 0:
+              print('::error::Sweep report has zero total pull requests — run may be broken')
+              sys.exit(1)
+          if sum(counts.values()) == 0:
+              print('::error::Sweep report has zero bucket counts — run may be broken')
+              sys.exit(1)
+          print(f'Report valid: {total} PRs across {len(counts)} buckets')
+          PY
 
       - name: Post or update tracking issue comment
         if: env.TRACKING_ISSUE != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPORT=$(cat "$RUNNER_TEMP/sweep-report.json")
-          # Extract the table from the JSON for a readable comment
-          TABLE=$(uv run python scripts/pr_sweep.py --live --since 30d 2>/dev/null || echo "_Failed to render table_")
-          BODY="## Weekly PR Sweep Report
-
-\`\`\`
-$TABLE
-\`\`\`
-
-*Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
-          gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body "$BODY"
+          # Post the report this job already fetched and validated. Sweeping a
+          # second time here made the comment a different read of the queue:
+          # it could disagree with the validated numbers, or be rate-limited
+          # and post "failed" for a run that had already succeeded.
+          {
+            echo '## Weekly PR Sweep Report'
+            echo
+            uv run python scripts/pr_sweep.py --render "$RUNNER_TEMP/sweep-report.json"
+            echo
+            echo "*Generated on $(date -u +'%Y-%m-%d %H:%M UTC')*"
+          } > "$RUNNER_TEMP/sweep-comment.md"
+          gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/sweep-comment.md"

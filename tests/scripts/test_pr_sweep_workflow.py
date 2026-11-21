@@ -7,10 +7,33 @@ report validation step.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SWEEP = ROOT / ".github" / "workflows" / "pr-sweep.yml"
+
+
+def test_workflow_parses_as_yaml() -> None:
+    """An unparseable file never runs, and the text still contains every key the
+    substring assertions below look for, so only a parse can catch it."""
+    document = yaml.safe_load(SWEEP.read_text(encoding="utf-8"))
+    assert document["name"] == "PR sweep weekly report"
+    assert list(document["jobs"]) == ["pr-sweep"]
+
+
+def test_every_run_script_is_valid_shell() -> None:
+    """A block scalar ends at the first under-indented line, so a multi-line string
+    written at column 0 truncates the script. Ask bash whether what GitHub would
+    execute actually parses."""
+    document = yaml.safe_load(SWEEP.read_text(encoding="utf-8"))
+    scripts = [step["run"] for step in document["jobs"]["pr-sweep"]["steps"] if "run" in step]
+    assert scripts, "the job must run something"
+    for script in scripts:
+        completed = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
+        assert completed.returncode == 0, completed.stderr
 
 
 def test_workflow_has_weekly_schedule() -> None:
@@ -90,3 +113,23 @@ def test_workflow_has_concurrency_control() -> None:
     text = SWEEP.read_text(encoding="utf-8")
     assert "concurrency:" in text
     assert "cancel-in-progress: true" in text
+
+
+def test_the_comment_posts_the_report_the_job_validated() -> None:
+    """One live sweep per run: the comment renders the saved report.
+
+    A second ``--live`` call for the comment made the posted table an
+    independent read of the queue, so it could disagree with the validated
+    numbers, or fail after validation passed.
+    """
+    document = yaml.safe_load(SWEEP.read_text(encoding="utf-8"))
+    steps = {
+        step["name"]: step["run"] for step in document["jobs"]["pr-sweep"]["steps"] if "run" in step
+    }
+
+    assert steps["Run PR sweep (live)"].count("--live") == 1
+    comment = steps["Post or update tracking issue comment"]
+    assert "--render" in comment
+    assert "sweep-report.json" in comment
+    assert "--live" not in comment
+    assert "--body-file" in comment
