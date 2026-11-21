@@ -322,11 +322,26 @@ describe("OpportunityLandscape canvas states", () => {
 
     render(<OpportunityLandscape />);
 
-    expect(screen.getByText("No saved copy on this device")).toBeInTheDocument();
+    expect(screen.getByText("Nothing captured yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Capture an outcome" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export brief" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /search outcomes/i })).toBeNull();
     expect(screen.queryByText("Active Job Map Contexts")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /capture an outcome/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Capture an outcome" }));
     expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
+  });
+
+  it("counts the empty instruction once", () => {
+    harness.state.canvasState = {
+      kind: "empty",
+      data: { jobs: [], steps: [], outcomes: [], source: "local" },
+    } as unknown as CanvasState;
+
+    render(<OpportunityLandscape />);
+
+    expect(screen.getAllByText(/capture an outcome/i)).toHaveLength(2);
+    expect(screen.queryByText("Capture an outcome to see it here.")).toBeNull();
   });
 
   it("shows why the seed board is standing in when the canvas says so", () => {
@@ -928,14 +943,17 @@ describe("OpportunityLandscape underserved boundary", () => {
     expect(harness.state.openPanel).toHaveBeenCalledWith("brief");
   });
 
-  it("refuses to brief an empty canvas, and says why", () => {
+  it("offers no brief or share on an empty canvas", () => {
     harness.state.canvasState = { kind: "empty", data: null } as unknown as CanvasState;
 
     render(<OpportunityLandscape />);
 
-    const action = screen.getByRole("button", { name: "Export brief" });
-    expect(action).toBeDisabled();
-    expect(action).toHaveAttribute("title", "Nothing to brief yet");
+    expect(screen.queryByRole("button", { name: "Export brief" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Capture an outcome" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Capture an outcome" }));
+    expect(harness.state.openPanel).toHaveBeenCalledWith("capture");
   });
 
   it("renders the Band and Sample columns in the table view", () => {
