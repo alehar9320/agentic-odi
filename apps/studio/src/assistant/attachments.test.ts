@@ -11,11 +11,13 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_IMAGE_BYTES,
   attachmentRejection,
+  attachmentState,
   createAttachmentAdapter,
   formatFileSize,
   isTextLike,
   prepareAttachment,
   tooLargeMessage,
+  tooManyMessage,
 } from "./attachments";
 
 function fileOf(name: string, type: string, size = 10): File {
@@ -145,8 +147,11 @@ describe("prepareAttachment with a PDF", () => {
   it("hands the composer a failed chip carrying the PDF's own reason", async () => {
     const states = await addedStates(createAttachmentAdapter(), pdfFixture("encrypted.pdf"));
 
-    expect(states).toHaveLength(1);
-    const status = states[0]!.status;
+    // One row, two states: the chip is there while the bytes are read, then it
+    // carries the sentence explaining why they never became content.
+    expect(states.map((state) => state.status.type)).toEqual(["running", "incomplete"]);
+    expect(new Set(states.map((state) => state.id)).size).toBe(1);
+    const status = states.at(-1)!.status;
     expect(status.type).toBe("incomplete");
     expect(status).toMatchObject({ reason: "error" });
     expect((status as { message?: string }).message).toContain("password");
@@ -194,8 +199,8 @@ describe("an unreadable file", () => {
   it("hands the composer a failed attachment rather than an invisible one", async () => {
     const states = await addedStates(createAttachmentAdapter(), unreadableFile());
 
-    expect(states).toHaveLength(1);
-    expect(states[0]).toMatchObject({
+    expect(states.map((state) => state.status.type)).toEqual(["running", "incomplete"]);
+    expect(states.at(-1)).toMatchObject({
       name: "notes.md",
       status: { type: "incomplete", reason: "error", message: ATTACHMENT_READ_FAILURE },
     });
@@ -245,8 +250,7 @@ describe("an over-limit text file", () => {
       textFileOf("interview.md", "a".repeat(MAX_ATTACHMENT_CHARS + 1)),
     );
 
-    expect(states).toHaveLength(1);
-    expect(states[0]).toMatchObject({
+    expect(states.at(-1)).toMatchObject({
       name: "interview.md",
       status: {
         type: "incomplete",
@@ -297,5 +301,41 @@ describe("formatFileSize", () => {
 
   it("says nothing when there is no size to report", () => {
     expect(formatFileSize(0)).toBe("");
+  });
+});
+
+describe("the adapter's first state", () => {
+  it("shows the row before the bytes are read, then the same row ready", async () => {
+    const states = await addedStates(
+      createAttachmentAdapter(),
+      fileOf("notes.md", "text/markdown"),
+    );
+
+    expect(states.map((state) => state.status.type)).toEqual(["running", "requires-action"]);
+    expect(states.map((state) => state.id)).toEqual([states[0]!.id, states[0]!.id]);
+  });
+});
+
+describe("attachmentState", () => {
+  it("reads the four states from the runtime's own status", () => {
+    expect(attachmentState({ type: "running", reason: "uploading", progress: 0.5 })).toBe(
+      "reading",
+    );
+    expect(attachmentState({ type: "requires-action", reason: "composer-send" })).toBe("ready");
+    expect(attachmentState({ type: "complete" })).toBe("ready");
+    expect(
+      attachmentState({ type: "incomplete", reason: "error", message: ATTACHMENT_READ_FAILURE }),
+    ).toBe("failed");
+  });
+
+  it("reads a pause with nothing to explain as a refusal", () => {
+    expect(attachmentState({ type: "incomplete", reason: "upload-paused" })).toBe("refused");
+  });
+});
+
+describe("tooManyMessage", () => {
+  it("names the file and the count limit", () => {
+    expect(tooManyMessage("notes-6.txt")).toContain("notes-6.txt");
+    expect(tooManyMessage("notes-6.txt")).toContain("5-file");
   });
 });
