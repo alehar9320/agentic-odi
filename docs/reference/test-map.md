@@ -187,7 +187,8 @@ isolation, and coverage rules stay in
 | `apps/studio/src/components/BootFailurePage.test.tsx` | — |
 | `apps/studio/src/components/ChangelogModal.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
 | `apps/studio/src/components/FailurePanel.visual.test.tsx` | The build table would otherwise name this `FailurePanel.visual` after the |
-| `apps/studio/src/components/OdiMascot.test.tsx` | — |
+| `apps/studio/src/components/OdiMascot.test.tsx` | Smoothing is what we want on a curved mark, so the browser is free to |
+| `apps/studio/src/components/OdiMascot.visual.test.tsx` | The build table would otherwise name this `OdiMascot.visual` after the test |
 | `apps/studio/src/components/SettingsPanel.test.tsx` | The key control asks the sidecar for a key's state on mount; the panel tests |
 | `apps/studio/src/components/ShareAction.test.tsx` | — |
 | `apps/studio/src/components/ShareSheet.test.tsx` | The primitive dismisses on a keydown it receives from the document, |
