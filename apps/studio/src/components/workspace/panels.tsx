@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import type { WorkspacePanelId } from "../../types";
 import { BriefLens } from "../brief/BriefLens";
+import { Dashboard } from "../canvas/Dashboard";
 import { DirectCapture } from "../canvas/DirectCapture";
 import { EvidenceStream } from "../canvas/EvidenceStream";
 import { JobMap } from "../canvas/JobMap";
@@ -32,6 +33,15 @@ export interface PanelTalk {
   intent: string;
 }
 
+/**
+ * How a panel behaves as the right region's one detail (#740).
+ *
+ * `detail` is a lens on one thing the mainstage pointed at; `browse` is a list
+ * the person is scanning. The distinction is framing, not navigation: both stay
+ * panel content, and neither becomes a switcher.
+ */
+export type PanelMode = "detail" | "browse";
+
 export interface PanelDefinition {
   id: WorkspacePanelId;
   /** Short label used by the rail and the lens header. */
@@ -42,6 +52,14 @@ export interface PanelDefinition {
   render: () => ReactNode;
   /** The one sentence that takes the user back into the thread. */
   talk?: PanelTalk;
+  /**
+   * Where this detail sits in the job it belongs to, e.g. *Step 2 of 4 •
+   * Locate*. Only set where a real step backs it; a panel with none omits the
+   * line rather than inventing one.
+   */
+  contextLine?: string;
+  /** Whether the lens reads as one detail or a browsable list. Defaults to `browse`. */
+  mode?: PanelMode;
 }
 
 /**
@@ -49,6 +67,18 @@ export interface PanelDefinition {
  * them owns an input the agent could take more naturally as a message.
  */
 export const WORKSPACE_PANELS: PanelDefinition[] = [
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    title: "Dashboard",
+    blurb: "Where your attention should go: the headline numbers and how they moved.",
+    icon: <TableIcon />,
+    render: () => <Dashboard />,
+    talk: {
+      label: "Ask what to look at",
+      intent: "Looking at my dashboard, where should my attention go next, and why?",
+    },
+  },
   {
     id: "records",
     label: "Records",
@@ -64,8 +94,8 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
   },
   {
     id: "catchup",
-    label: "Catch up",
-    title: "Catch up",
+    label: "What changed",
+    title: "What changed",
     blurb: "What moved while you were away, and what each signal asks of you.",
     icon: <BellIcon />,
     render: () => <CatchUpFeed />,
@@ -76,8 +106,8 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
   },
   {
     id: "landscape",
-    label: "Landscape",
-    title: "Opportunity landscape",
+    label: "Where to focus",
+    title: "Where to focus",
     blurb: "Every outcome scored. Anything above 10 is underserved.",
     icon: <CompassIcon />,
     render: () => <OpportunityLandscape />,
@@ -93,11 +123,12 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
     blurb: "The document a review reads: the vision, the ranked bets, their evidence, the dissent.",
     icon: <FileIcon />,
     render: () => <BriefLens />,
+    mode: "detail",
   },
   {
     id: "jobmap",
-    label: "Job map",
-    title: "Universal job map",
+    label: "Steps in the job",
+    title: "Steps in the job",
     blurb: "The eight phases of the job, in the order customers live them.",
     icon: <RouteIcon />,
     render: () => <JobMap />,
@@ -109,8 +140,8 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
   },
   {
     id: "segments",
-    label: "Segments",
-    title: "Segments and the bet",
+    label: "Who this is for",
+    title: "Who this is for",
     blurb: "Who the scored outcomes point at, and the strategy that follows from it.",
     icon: <ClusterIcon />,
     render: () => <SegmentBoard />,
@@ -122,8 +153,8 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
   },
   {
     id: "evidence",
-    label: "Evidence",
-    title: "Customer evidence",
+    label: "What customers said",
+    title: "What customers said",
     blurb: "What customers actually said, and what it does and does not prove.",
     icon: <SignalIcon />,
     render: () => <EvidenceStream />,
@@ -156,8 +187,8 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
   },
   {
     id: "capture",
-    label: "Capture",
-    title: "Capture by hand",
+    label: "Add what you heard",
+    title: "Add what you heard",
     blurb: "The offline path. With a model, just tell the studio what you heard.",
     icon: <CaptureIcon />,
     render: () => <DirectCapture />,

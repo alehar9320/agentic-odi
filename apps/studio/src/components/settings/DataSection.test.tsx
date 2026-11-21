@@ -1,18 +1,29 @@
+/**
+ * Storage facts, workspace export and import, and the error states around them.
+ *
+ * The export must go through the shared `downloadFile` helper, which owns the
+ * blob URL and its deferred revocation (see `lib/download.test.ts`).
+ */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataSection } from "./sections/DataSection";
 
 const getStorageFacts = vi.hoisted(() => vi.fn());
+const getDataStatus = vi.hoisted(() => vi.fn());
 const exportWorkspace = vi.hoisted(() => vi.fn());
 const importWorkspace = vi.hoisted(() => vi.fn());
 const pushToast = vi.hoisted(() => vi.fn());
+const downloadFile = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/studioApi", () => ({
   getStorageFacts,
+  getDataStatus,
   exportWorkspace,
   importWorkspace,
 }));
+
+vi.mock("../../lib/download", () => ({ downloadFile }));
 
 vi.mock("../../state/StudioContext", () => ({
   useStudio: () => ({ pushToast }),
@@ -35,6 +46,7 @@ function renderSection(overrides: Partial<Parameters<typeof DataSection>[0]> = {
 describe("DataSection (storage)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getDataStatus.mockResolvedValue({ stores: [] });
   });
 
   afterEach(() => {
@@ -131,6 +143,15 @@ describe("DataSection (storage)", () => {
       expect(exportWorkspace).toHaveBeenCalled();
       expect(pushToast).toHaveBeenCalledWith("success", expect.stringContaining("Exported"));
     });
+
+    // The export must go through the shared helper, which owns the download and
+    // its deferred revocation (lib/download.test.ts). Inlining the blob/anchor
+    // dance here instead is the regression this guards against.
+    expect(downloadFile).toHaveBeenCalledWith(
+      '{"jobs":[]}',
+      "agentic-odi-workspace-2026-01-01.json",
+      "application/json;charset=utf-8",
+    );
   });
 
   it("imports workspace and reloads on success", async () => {
@@ -215,5 +236,82 @@ describe("DataSection (storage)", () => {
     fireEvent.change(fileInput);
 
     expect(importWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("renders the ODI and Studio sidecar database rows when reachable", async () => {
+    getStorageFacts.mockResolvedValue({
+      kind: "browser",
+      bytes: 512000,
+      lastWrittenAt: "2026-01-15T10:30:00.000Z",
+    });
+    getDataStatus.mockResolvedValue({
+      stores: [
+        {
+          id: "odi",
+          path: "/home/user/.agentic-odi/odi.db",
+          bytes: 4096,
+          lastModified: "2026-01-15T10:30:00.000Z",
+        },
+        {
+          id: "studio",
+          path: "/home/user/.agentic-odi/studio.db",
+          bytes: 8192,
+          lastModified: "2026-01-16T09:00:00.000Z",
+        },
+      ],
+    });
+
+    renderSection();
+
+    await waitFor(() => {
+      expect(screen.getByText(/odi store/i)).toBeInTheDocument();
+      expect(screen.getByText(/studio store/i)).toBeInTheDocument();
+      expect(screen.getByText(/home\/user\/.agentic-odi\/odi.db/i)).toBeInTheDocument();
+      expect(screen.getByText(/4.0 KB/i)).toBeInTheDocument();
+      expect(screen.getByText(/8.0 KB/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows the sidecar stores as not connected when the sidecar is unreachable", async () => {
+    getStorageFacts.mockResolvedValue({
+      kind: "browser",
+      bytes: 512000,
+      lastWrittenAt: "2026-01-15T10:30:00.000Z",
+    });
+
+    renderSection({ sidecarReachable: false });
+
+    await waitFor(() => {
+      expect(screen.getByText(/odi store · not connected/i)).toBeInTheDocument();
+      expect(screen.getByText(/studio store · not connected/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows a store as not connected when its file is missing", async () => {
+    getStorageFacts.mockResolvedValue({
+      kind: "browser",
+      bytes: 512000,
+      lastWrittenAt: "2026-01-15T10:30:00.000Z",
+    });
+    getDataStatus.mockResolvedValue({
+      stores: [
+        { id: "odi", path: "/home/user/.agentic-odi/odi.db", bytes: null, lastModified: null },
+        {
+          id: "studio",
+          path: "/home/user/.agentic-odi/studio.db",
+          bytes: 8192,
+          lastModified: "2026-01-16T09:00:00.000Z",
+        },
+      ],
+    });
+
+    renderSection();
+
+    await waitFor(() => {
+      expect(screen.getByText(/odi store/i)).toBeInTheDocument();
+      expect(screen.getByText(/not connected/i)).toBeInTheDocument();
+      expect(screen.getByText(/studio store/i)).toBeInTheDocument();
+      expect(screen.getByText(/8.0 KB/i)).toBeInTheDocument();
+    });
   });
 });

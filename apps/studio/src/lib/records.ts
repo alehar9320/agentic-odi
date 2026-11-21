@@ -1,4 +1,5 @@
 import type { CanvasData, Evidence, Job, Outcome, Step } from "../types";
+import { UNSCORED_LABEL } from "./odi";
 
 /**
  * The kinds the canvas actually carries. Thesis, Segment and Strategy are not
@@ -56,7 +57,7 @@ export function text(value: string | number | null | undefined): string {
 
 /** A score is the number the sidecar returned, or the word for having none. */
 export function score(value: number | null | undefined): string {
-  return value === null || value === undefined ? "unscored" : String(value);
+  return value === null || value === undefined ? UNSCORED_LABEL : String(value);
 }
 
 /**
@@ -133,6 +134,50 @@ export function buildRecords(canvas: CanvasData | null | undefined): RecordRow[]
   });
 
   return rows;
+}
+
+/**
+ * RFC 4180: a value holding a quote, a comma or a line break is wrapped in quotes, and a
+ * quote inside it is doubled.
+ */
+function csvField(value: string | undefined): string {
+  const cell = value ?? "";
+  return /[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+}
+
+/**
+ * The lens, as a file the person can take to a spreadsheet.
+ *
+ * One header line, then every section the screen would show, each introduced by the same
+ * label, in the same order — the shape of the table is the shape of the file. Cells are the
+ * stored strings, so an outcome with no score exports the same label the lens prints
+ * (`Not scored`), never a number.
+ *
+ * Rows are exported whole rather than at the screen's `MAX_ROWS`, because the cap exists to
+ * keep one render cheap and a spreadsheet is exactly where the remainder belongs.
+ */
+export function toCsv(rows: RecordRow[]): string {
+  if (rows.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = [RECORD_SECTIONS[0].columns.map(csvField).join(",")];
+  for (const section of RECORD_SECTIONS) {
+    const sectionRows = rows.filter((row) => row.kind === section.kind);
+    if (sectionRows.length === 0) {
+      continue;
+    }
+    lines.push(csvField(section.label));
+    for (const row of sectionRows) {
+      lines.push(
+        Array.from({ length: section.columns.length }, (_, index) => csvField(row.cells[index])).join(
+          ",",
+        ),
+      );
+    }
+  }
+
+  return lines.join("\r\n");
 }
 
 /** The field that names each kind, read from `types.ts` rather than invented here. */

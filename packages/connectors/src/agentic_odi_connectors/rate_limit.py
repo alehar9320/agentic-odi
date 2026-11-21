@@ -13,14 +13,23 @@ INGEST_RATE_ENV = "AGENTIC_ODI_INGEST_RATE"
 
 
 def _positive_int(name: str, default: int) -> int:
+    """Read a positive integer, or ``default`` when the variable is unset.
+
+    An absent or empty variable means "use the default". A variable that is
+    present but not a positive integer raises: silently substituting the
+    default would let ``AGENTIC_ODI_INGEST_RATE=0`` — the obvious way to ask
+    for no ingest — enable the default rate instead.
+    """
     raw = os.environ.get(name, "").strip()
     if not raw:
         return default
     try:
         value = int(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer, got {raw!r}") from exc
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer, got {value}")
+    return value
 
 
 class RateLimiter:
@@ -51,7 +60,12 @@ class RateLimiter:
 
     @classmethod
     def from_env(cls) -> RateLimiter:
-        """Build a limiter from ``AGENTIC_ODI_INGEST_RATE`` (records/second)."""
+        """Build a limiter from ``AGENTIC_ODI_INGEST_RATE`` (records/second).
+
+        An unset or empty variable yields :data:`DEFAULT_INGEST_RATE`. A
+        present-but-invalid value raises :class:`ValueError` rather than
+        silently falling back.
+        """
         return cls(rate=_positive_int(INGEST_RATE_ENV, DEFAULT_INGEST_RATE))
 
     def acquire(self, tokens: int = 1) -> None:

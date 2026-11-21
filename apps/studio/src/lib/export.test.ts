@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatMessage } from "../types";
+import type { DecisionBrief } from "./brief";
 import { catalogManifest } from "../ui/catalog";
 import { parseUiSpec, type UiNode } from "../ui/protocol";
-import { conversationToMarkdown, exportFilename } from "./export";
+import {
+  briefFilename,
+  briefToMarkdown,
+  conversationToMarkdown,
+  exportFilename,
+} from "./export";
 
 const exportedAt = new Date("2026-10-24T12:00:00Z");
 
@@ -452,9 +458,141 @@ describe("conversationToMarkdown", () => {
     expect(markdown.match(/Ticket 812 backs it up/g)).toHaveLength(1);
   });
 
+  it("prints a claim that is a prefix of another printed sentence", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: "m-1",
+        parentId: null,
+        role: "assistant",
+        content: "",
+        parts: [
+          {
+            kind: "claims",
+            content: "Rotation costs two engineer-days and a review. [[ev:e1]]",
+            claims: [
+              {
+                index: 0,
+                text: "Rotation costs two engineer-days and a review.",
+                status: "cited",
+                evidence: [
+                  { id: "e1", name: "Call with Acme", source_name: "Gong" },
+                ],
+              },
+              {
+                index: 1,
+                text: "Rotation costs",
+                status: "uncited",
+                evidence: [],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = conversationToMarkdown(messages, exportedAt);
+
+    // Both the full sentence and the prefix claim should appear
+    expect(markdown).toContain(
+      "Rotation costs two engineer-days and a review. (per Gong · Call with Acme, record e1)",
+    );
+    expect(markdown).toContain("Rotation costs (Uncited)");
+  });
+
   it("dates the export in the filename", () => {
     expect(exportFilename(exportedAt)).toBe(
       "agentic-odi-conversation-2026-10-24.md",
+    );
+  });
+
+  describe("briefToMarkdown", () => {
+    const minimalBrief: DecisionBrief = {
+      schema_version: 1,
+      generated_at: "2026-10-24T12:00:00Z",
+      product_name: "Test Product",
+      vision: "Test vision",
+      decision: null,
+      opportunities: [],
+      evidence: [],
+      unlinked_evidence_count: 0,
+      dissent: [],
+      next_evidence: null,
+      provenance: {
+        kind: "live",
+        source: "local",
+        cached: false,
+        sample: false,
+        excluded_sample_rows: { outcomes: 0, evidence: 0 },
+        counted_rows: { outcomes: 1, evidence: 2 },
+        record_counts: null,
+        canvas_generated_at: null,
+      },
+    };
+
+    it("dates the brief in the reader's locale", () => {
+      const markdown = briefToMarkdown(minimalBrief);
+
+      // Should contain day number (24) and year (2026)
+      expect(markdown).toMatch(/_Decision brief — .*24.*2026/);
+      // Should not assert a specific month word order (locale-dependent)
+      // The test passes in any locale if it contains the day and year
+    });
+
+    it("keeps ISO dates in filenames", () => {
+      expect(briefFilename(new Date("2026-10-24T12:00:00Z"))).toBe(
+        "agentic-odi-decision-brief-2026-10-24.md",
+      );
+    });
+  });
+});
+
+function decisionBrief(generatedAt: string): DecisionBrief {
+  return {
+    schema_version: 1,
+    generated_at: generatedAt,
+    product_name: "Acme Platform",
+    vision: null,
+    decision: null,
+    opportunities: [],
+    evidence: [],
+    unlinked_evidence_count: 0,
+    dissent: [],
+    next_evidence: null,
+    provenance: {
+      kind: "live",
+      source: "mcp",
+      cached: false,
+      sample: false,
+      excluded_sample_rows: { outcomes: 0, evidence: 0 },
+      counted_rows: { outcomes: 0, evidence: 0 },
+      record_counts: null,
+      canvas_generated_at: null,
+    },
+  };
+}
+
+describe("brief document", () => {
+  it("dates the brief in the reader's locale", () => {
+    const markdown = briefToMarkdown(decisionBrief("2026-11-17T12:00:00Z"));
+    const line = markdown
+      .split("\n")
+      .find((candidate) => candidate.startsWith("_Decision brief — "));
+
+    expect(line).toBeDefined();
+    // Computed with the same reader locale the brief uses, so the assertion holds
+    // in any locale while still failing if the format locks to a fixed one.
+    const expected = new Intl.DateTimeFormat(undefined, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date("2026-11-17T12:00:00Z"));
+    expect(line).toBe(`_Decision brief — ${expected}_`);
+    expect(line).toContain("2026");
+  });
+
+  it("keeps ISO dates in filenames", () => {
+    expect(briefFilename(exportedAt)).toBe(
+      "agentic-odi-decision-brief-2026-10-24.md",
     );
   });
 });

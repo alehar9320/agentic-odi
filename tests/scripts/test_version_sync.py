@@ -205,3 +205,34 @@ def test_the_parity_script_fails_on_a_drifted_workspace(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text('[project]\nversion = "0.1.0"\n', encoding="utf-8")
 
     assert check_version_parity.check_parity(tmp_path) == [("pyproject.toml", "0.1.0", "9.9.9")]
+
+
+def test_no_cli_source_line_hardcodes_a_user_agent_version() -> None:
+    # `onboard.UA` is built from `version.__version__`; a literal here would let
+    # outbound requests name a build that never made the call.
+    import check_version_parity
+
+    assert check_version_parity.hardcoded_user_agents(ROOT) == []
+
+
+def test_a_hardcoded_user_agent_literal_is_reported(tmp_path: Path) -> None:
+    import check_version_parity
+
+    source = tmp_path / check_version_parity.CLI_SOURCE / "agentic_odi_cli"
+    source.mkdir(parents=True, exist_ok=True)
+    (source / "onboard.py").write_text('UA = "agentic-odi/0.1.0"\n', encoding="utf-8")
+
+    found = check_version_parity.hardcoded_user_agents(tmp_path)
+
+    assert found == [("apps/cli/src/agentic_odi_cli/onboard.py", 'UA = "agentic-odi/0.1.0"')]
+
+
+def test_the_parity_script_fails_on_a_hardcoded_user_agent(tmp_path: Path) -> None:
+    import check_version_parity
+
+    _clean_workspace(tmp_path, "9.9.9")
+    source = tmp_path / check_version_parity.CLI_SOURCE / "agentic_odi_cli"
+    source.mkdir(parents=True, exist_ok=True)
+    (source / "onboard.py").write_text('UA = "agentic-odi/0.1.0"\n', encoding="utf-8")
+
+    assert check_version_parity.main(["check_version_parity.py", str(tmp_path)]) == 1

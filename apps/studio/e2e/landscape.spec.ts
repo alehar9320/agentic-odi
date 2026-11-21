@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
-import { openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { openStudio, rail, seedOutcomes } from "./helpers";
 
 /**
  * The Opportunity Landscape is where scored outcomes are read. These tests
@@ -22,16 +22,12 @@ const SERVED = {
 };
 
 test.describe("the opportunity landscape", () => {
-  test.beforeEach(async ({ request }) => {
-    await resetRepository(request);
-  });
-
   test("reports the number of jobs and outcomes", async ({ page, request }) => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
     await expect(landscape).toBeVisible();
 
     await expect(landscape.getByText("Active Job Map Contexts")).toBeVisible();
@@ -43,8 +39,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
 
     // The cards view shows every outcome, unlike the matrix, which shows one
     // at a time.
@@ -60,8 +56,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
 
     // The table view lists each outcome by statement.
     await landscape.getByRole("button", { name: "📋 Table View" }).click();
@@ -78,8 +74,8 @@ test.describe("the opportunity landscape", () => {
     await seedOutcomes(request, [UNDERSERVED, SERVED]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    const landscape = page.getByRole("complementary", { name: "Opportunity landscape" });
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    const landscape = page.getByRole("complementary", { name: "Where to focus" });
 
     await expect(landscape.getByRole("button", { name: "📊 Matrix" })).toBeVisible();
 

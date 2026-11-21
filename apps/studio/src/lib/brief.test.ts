@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CanvasData, ConnectorPreset, StudioBrief, Thesis } from "../types";
 import { briefFilename, briefToMarkdown } from "./export";
 import { buildDecisionBrief, EXCERPT_LIMIT } from "./brief";
+import { opportunityScore } from "./odi";
 
 /**
  * The decision brief is the document a review reads, so these tests hold it to
@@ -32,7 +33,7 @@ function outcome(
 ) {
   const score =
     importance != null && satisfaction != null
-      ? importance + Math.max(importance - satisfaction, 0)
+      ? opportunityScore(importance, satisfaction)
       : null;
   return { id, statement, importance, satisfaction, opportunity_score: score, ...overrides };
 }
@@ -420,7 +421,19 @@ describe("briefToMarkdown", () => {
   });
 
   it("dates the document from its own timestamp", () => {
-    expect(markdown).toContain("3 November 2026");
+    // The prose date follows the reader's locale, so assert only the day number
+    // and the year — never a month word order, which en-GB and en-US disagree on.
+    const dateLine =
+      markdown.match(/_Decision brief — (.*)_/m)?.[1] ?? "";
+    expect(dateLine).toMatch(/\b3\b/);
+    expect(dateLine).toContain("2026");
+    expect(dateLine).toMatch(/[A-Za-z]{3,9}/);
+  });
+
+  it("keeps ISO dates in filenames", () => {
+    expect(briefFilename(new Date("2026-11-03T09:00:00Z"))).toBe(
+      "agentic-odi-decision-brief-2026-11-03.md",
+    );
   });
 
   it("names the decision, its score, and the reasoning saved against it", () => {

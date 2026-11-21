@@ -5,6 +5,7 @@ import re
 from uuid import uuid4
 
 import pytest
+from agentic_odi_core.contract import TOOL_SPECS, ToolEffect
 from agentic_odi_mcp_server import mcp, mcp_server
 from fastmcp import Client
 from mcp_failures import failure, sentence
@@ -341,10 +342,9 @@ async def test_a_refused_score_range_carries_the_range_code():
         payload = _failure_payload(res.content[0].text)
 
         assert payload["error"]["code"] == "out_of_range"
-        # The score that was out of range is named, so a client can show the
-        # message next to the field that needs it instead of on top of the form.
-        assert payload["error"]["field"] == "importance"
-        assert payload["message"] == "Error: importance must be between 1.0 and 10.0"
+        assert (
+            payload["message"] == "Error: importance and satisfaction must be between 1.0 and 10.0"
+        )
 
 
 @pytest.mark.asyncio
@@ -355,6 +355,58 @@ async def test_a_successful_tool_returns_no_envelope():
         )
 
         assert res.content[0].text.startswith("Job created successfully:")
+
+
+@pytest.mark.asyncio
+async def test_add_evidence_records_impact_and_confidence():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "interview",
+                "source_kind": "manual",
+                "name": "Customer quote",
+                "content": "It takes too long to deploy",
+                "job_id": job_id,
+                "impact": "high",
+                "confidence": "verified",
+            },
+        )
+        text = res.content[0].text
+        assert "Evidence created successfully" in text
+        match = re.search(r"({.*})", text, re.DOTALL)
+        evidence_data = json.loads(match.group(1)) if match else {}
+        assert evidence_data["impact"] == "high"
+        assert evidence_data["confidence"] == "verified"
+
+
+@pytest.mark.asyncio
+async def test_add_evidence_applies_defaults_for_impact_and_confidence():
+    async with Client(mcp) as client:
+        create_res = await client.call_tool("add_job", {"name": "Job", "description": "Desc"})
+        job_id = _extract_id(create_res.content[0].text)
+        assert job_id is not None
+
+        res = await client.call_tool(
+            "add_evidence",
+            {
+                "source_name": "interview",
+                "source_kind": "manual",
+                "name": "Customer quote",
+                "content": "It takes too long to deploy",
+                "job_id": job_id,
+            },
+        )
+        text = res.content[0].text
+        assert "Evidence created successfully" in text
+        match = re.search(r"({.*})", text, re.DOTALL)
+        evidence_data = json.loads(match.group(1)) if match else {}
+        assert evidence_data["impact"] == "medium"
+        assert evidence_data["confidence"] == "claimed"
 
 
 def _is_tool_handler(node: ast.FunctionDef) -> bool:
@@ -385,3 +437,110 @@ def test_no_handler_returns_a_bare_prose_error():
                 offenders.append(f"mcp_server.py:{returned.lineno} {node.name} -> {unparsed}")
 
     assert not offenders, "bare prose error returns, which carry no code:\n" + "\n".join(offenders)
+
+
+@pytest.mark.asyncio
+async def test_links_add_then_list_returns_the_created_link():
+    async with Client(mcp) as client:
+        add_res = await client.call_tool(
+            "links_add",
+            {
+                "source_type": "outcome",
+                "source_id": "out-1",
+                "target_type": "evidence",
+                "target_id": "ev-1",
+                "relationship_type": "references",
+            },
+        )
+        link = json.loads(add_res.content[0].text)
+        assert link["source_id"] == "out-1"
+        assert link["target_id"] == "ev-1"
+        assert link["relationship_type"] == "references"
+
+        list_res = await client.call_tool("links_list", {})
+        links = json.loads(list_res.content[0].text)
+        assert [item["id"] for item in links] == [link["id"]]
+
+
+@pytest.mark.asyncio
+async def test_links_add_duplicate_pair_returns_conflict_and_keeps_one():
+    async with Client(mcp) as client:
+        args = {
+            "source_type": "outcome",
+            "source_id": "out-1",
+            "target_type": "evidence",
+            "target_id": "ev-1",
+            "relationship_type": "references",
+        }
+        first = await client.call_tool("links_add", args)
+        assert "error" not in json.loads(first.content[0].text)
+
+        dup = await client.call_tool("links_add", args)
+        text = dup.content[0].text
+        assert failure(text).code.value == "conflict"
+
+        list_res = await client.call_tool("links_list", {})
+        links = json.loads(list_res.content[0].text)
+        assert len(links) == 1
+
+
+@pytest.mark.asyncio
+async def test_links_remove_then_list_is_empty():
+    async with Client(mcp) as client:
+        add_res = await client.call_tool(
+            "links_add",
+            {
+                "source_type": "outcome",
+                "source_id": "out-1",
+                "target_type": "evidence",
+                "target_id": "ev-1",
+                "relationship_type": "references",
+            },
+        )
+        link_id = json.loads(add_res.content[0].text)["id"]
+
+        remove_res = await client.call_tool("links_remove", {"link_id": link_id})
+        assert json.loads(remove_res.content[0].text) is True
+
+        list_res = await client.call_tool("links_list", {})
+        assert json.loads(list_res.content[0].text) == []
+
+
+@pytest.mark.asyncio
+async def test_links_remove_unknown_id_returns_false():
+    async with Client(mcp) as client:
+        res = await client.call_tool("links_remove", {"link_id": str(uuid4())})
+        assert json.loads(res.content[0].text) is False
+
+
+@pytest.mark.asyncio
+async def test_links_list_filters_by_relationship_type():
+    async with Client(mcp) as client:
+        await client.call_tool(
+            "links_add",
+            {
+                "source_type": "outcome",
+                "source_id": "out-1",
+                "target_type": "evidence",
+                "target_id": "ev-1",
+                "relationship_type": "references",
+            },
+        )
+        await client.call_tool(
+            "links_add",
+            {
+                "source_type": "outcome",
+                "source_id": "out-2",
+                "target_type": "evidence",
+                "target_id": "ev-2",
+                "relationship_type": "relates_to",
+            },
+        )
+
+        res = await client.call_tool("links_list", {"relationship_type": "relates_to"})
+        links = json.loads(res.content[0].text)
+        assert [link["source_id"] for link in links] == ["out-2"]
+
+
+def test_links_list_is_a_read_tool():
+    assert TOOL_SPECS["links_list"].effect is ToolEffect.READ

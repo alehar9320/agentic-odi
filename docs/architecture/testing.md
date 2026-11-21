@@ -2,9 +2,9 @@
 
 ## Tiers (pre-PR)
 See [`.agents/workflows/test.md`](../../.agents/workflows/test.md):
-- `--changed` — PR bar (fast gate on touched files)
-- `--default` — adds `mypy` and `vitest` for touched areas
-- `--full` — CI's responsibility (full matrix)
+- `--changed` — PR bar. Runs every required CI check that is a function of the diff.
+- `--default` — merge-review bar. Adds repo-wide `mypy`, Studio units/build/bundle budget, and the site build.
+- `--full` — CI's responsibility (the local matrix; e2e, Tauri, and the audit stay CI-only).
 
 ```bash
 uv run python scripts/verify.py --changed
@@ -13,8 +13,22 @@ uv run python scripts/verify.py --full
 ```
 
 The full tier is CI's responsibility and is not asked of anyone before they
-open a pull request. The commands below are the manual equivalent of the
-default tier.
+open a pull request. The commands below are the reference for what each tier
+wraps.
+
+### What the gate covers
+
+`scripts/verify.py` declares, in `CI_JOB_COVERAGE`, which tier covers each job
+in `ci-green.needs`, and lists the rest in `CI_ONLY_REASONS` with the reason
+they cannot run locally (the dependency audit needs the network; smoke boots
+both services; contrast and e2e need Chromium; `tauri-*` need the Rust
+toolchain and the webview libraries). It prints that table on every run.
+`tests/scripts/test_verify_ci_parity.py` fails when the declaration and
+`.github/workflows/ci.yml` disagree, so adding a required job is a two-file
+change with a recorded decision, not a silent gap.
+
+A diff that selects no check is a failure. The gate used to print `PASSED`
+having run nothing for a studio-only or website-only diff.
 
 ## Commands (reference)
 
@@ -35,183 +49,91 @@ The root `pyproject.toml` owns pytest, coverage, ruff, mypy, and bandit configur
 
 Tests live next to their package (`packages/*/tests`, `apps/*/tests`). `testpaths` in the root `pyproject.toml` covers `apps`, `brand`, `packages`, `tests`, and `website`, so one `uv run pytest` collects all of them.
 
-### `packages/core/tests/`
+### The per-file map
 
-- `test_models.py` — domain models and their validation rules.
-- `test_job_validation.py` — Job name and description constraints and `create_job()`.
-- `test_opportunity_score.py` — the ODI opportunity formula, its clamp, and its monotonicity.
-- `test_evaluation.py` — the outcome-statement format guard, and the harness that judges a service's scored outcomes by the shared fixture.
-- `test_evaluation_harness.py` — a service is judged by `packages/core/tests/fixtures/opportunity-score.json`: a wrong score fails with the id and both values; an unscored outcome stays allowed.
-- `test_service.py` — `ODIService` CRUD, Opportunity Score, and thesis rendering.
-- `test_repository.py` — `InMemoryRepository` behavior.
-- `test_sqlite_repository.py` — SQLite persistence and round-trips.
-- `test_repository_factory.py` — `build_repository()` variant selection.
-- `test_repository_health.py` — both repositories report store reachability.
-- `test_schema.py` — schema creation and migration.
-- `test_events.py` — event-store schema and legacy-database backfill.
-- `test_intent_store.py` — append-only Intent Store ordering.
-- `test_sqlite_integrity.py` — the boot integrity gate, the bounded check, and the clean-shutdown checkpoint.
-- `test_pagination.py` — list pagination across both repositories and the service.
-- `test_errors.py` — the ODI error hierarchy and its messages.
-- `test_evidence_not_found.py` — actionable evidence-not-found errors.
-- `test_consent_pause.py` — acting tools wait for PM consent.
-- `test_remote.py` — shared MCP tool-result and error parser.
-- `test_connection.py` — MCP timeout and keepalive settings read from the environment.
-- `test_messages.py` — framework guidelines and shared assistant messages.
+Every test file and the one line it says about itself lives in
+[the test map](../reference/test-map.md). It is generated from the files
+themselves by `scripts/docs_index.py`, so a new test file appears there after
+`--write` and a file with no description still appears, named, with `—`. The
+rules below are what stays prose here.
 
-### `apps/mcp-server/tests/`
+### Broad `except` handlers
 
-- `test_tools.py` — the tool surface returns content for each ODI operation.
-- `test_odi.py` — end-to-end job/step/outcome workflow through MCP tools.
-- `test_parity.py` — the same entity reachable through every tool that touches it.
-- `test_context_tools.py` — guidelines, capabilities, and framework context tools.
-- `test_customer_outcomes.py` — Customer Outcome and value entities.
-- `test_tool_branches.py` — branch coverage for prompts, errors, and full updates.
-- `test_server_tools.py` — server-level tool registration and transport wiring.
-- `test_tool_spec_validation.py` — startup refuses a contract/registry mismatch.
-- `test_health.py` — the `get_health` tool reports accessible and degraded stores.
-- `conftest.py` — sets `AGENTIC_ODI_DB=:memory:` before the server imports.
+`tests/scripts/test_blind_excepts.py` walks `apps/` and `packages/` with `ast`
+and fails on any handler that catches `Exception` (or `BaseException`, or
+nothing) without a log call. A suppression that genuinely needs no log is named
+in the test's `ALLOWED` baseline with a reason; that list is capped, and an
+entry whose handler is gone fails, so it can only shrink.
 
-### `apps/studio-api/tests/`
-
-- `test_api.py` — health, config, and canvas bootstrap.
-- `test_studio_api.py` — step and outcome passthrough.
-- `test_studio_manual_crud.py` — local-backend CRUD from the SPA.
-- `test_studio_mcp_data.py` — MCP-backed canvas hydration.
-- `test_studio_chat_ui.py` — the `render_ui` local tool in the streaming loop.
-- `test_studio_chat_branches.py` — branches of the streaming tool loop.
-- `test_studio_brief.py` — onboarding brief reaches the model and the offline fallback.
-- `test_studio_connectors.py` — connector registry add, remove, and health.
-- `test_studio_connectors_router.py` — connector HTTP routes and catalog.
-- `test_studio_memory.py` — conversation memory and recall.
-- `test_studio_errors.py` — failures surface as considered errors, not log noise.
-- `test_studio_observability.py` — the per-turn structured log line and its redaction.
-- `test_studio_probes.py` — endpoint probing and LLM health classification.
-- `test_studio_ui_spec.py` — catalog-driven UI validation.
-- `test_studio_router.py` — passthrough responses from the Studio router.
-- `test_app_spa.py` — static SPA fallback and the local server entrypoint.
-- `test_boot_integrity.py` — the boot failure page, the idle checkpoint, and the clean shutdown that closes both stores.
-- `conftest.py` — shared `InMemoryRepository` fixtures.
-
-### `apps/cli/tests/`
-
-- `test_cli.py`, `test_cli_edges.py` — root commands and their edge cases.
-- `test_jobs_cli.py`, `test_steps_cli.py`, `test_desired_outcomes_cli.py`, `test_customer_outcomes_cli.py`, `test_evidence_cli.py` — one file per command group.
-- `test_insight_commands.py` — `evaluate`, guidelines, and capabilities on the local backend.
-- `test_backend.py`, `test_backend_edges.py`, `test_backend_selection.py` — local vs MCP backend selection and errors.
-- `test_context.py` — the global backend context.
-- `test_chat_cli.py`, `test_chat_runtime.py`, `test_chat_wizard.py` — chat command, interactive loop and handlers (including reasoning kept out of the answer, and the terminal-only `thinking…` hint), and first-run wizard.
-- `test_connectors_cli.py`, `test_connectors_edges.py` — `connectors` subcommands and their edges.
-- `test_onboard.py` — first-run onboarding signal extraction and gating.
-- `test_update.py`, `test_update_command.py`, `test_update_edges.py`, `test_update_check.py` — update checks and installation.
-- `test_profile.py`, `test_paths.py` — config/data directories and `--profile`.
-- `test_persistence.py` — every entity survives a fresh repository.
-- `test_data_export.py` — `data-export` writes a restorable JSON snapshot.
-- `test_render.py` — table and JSON rendering.
-- `test_mascot.py` — the CLI banner.
-- `test_build_info.py` — the version string matches build metadata.
-- `test_startup_perf.py` — import-time budget.
-
-### `packages/connectors/tests/`
-
-- `test_catalog.py` — preset catalog contents.
-- `test_registry.py` — `connectors.json` persistence.
-- `test_factory.py` — building a connector from a config.
-- `test_config_path.py` — `AGENTIC_ODI_CONNECTORS_CONFIG` and the default path.
-- `test_mcp_connector.py`, `test_rest_connector.py` — MCP and REST ingest.
-- `test_mapping.py` — connector records mapped to evidence drafts.
-- `test_http_client.py` — the shared HTTP client reads its pool, timeout, and retry settings from the environment.
-- `test_rate_limit.py` — token-bucket ingest limits and environment configuration.
-- `test_sink.py` — the in-process ingest sink and its rate gate.
-
-### Root `tests/`
-
-Checks that span the workspace rather than one distribution:
-
-- `tests/contract/test_mcp_contract.py` — live FastMCP names, argument names, and required fields match `agentic_odi_core.contract.TOOL_SPECS`.
-- `tests/contract/test_cli_contract.py` — the CLI local-handler keys are a subset of `TOOL_NAMES`.
-- `tests/test_architecture.py` — the package diagram in the [architecture index](README.md#dependency-direction), the `[project] dependencies` each member declares, and the imports the source actually contains must all agree. It also checks the four groups inside `packages/core`: persistence imports no methodology, and every core module belongs to exactly one group ([the layer table](README.md#inside-packagescore)).
-- `tests/test_worker_security_headers.py` — the Living Studio Worker sends its security headers.
-- `tests/test_worker_error_origin.py` — every Worker-generated failure body carries `origin: "proxy"`, and no failure path bypasses the one factory.
-- `tests/scripts/test_dev.py`, `test_dev_main.py` — `scripts/dev.py` startup, ports, signals, and shutdown.
-- `tests/scripts/test_doc_check.py` — documentation drift: commands, paths, routes, env vars, and README layout.
-- `tests/scripts/test_assistant_ui_ledger.py` — the assistant-ui ledger (issue #429): adopted rows cite a merged delivery and name an existing file, counts and the Living Studio projection match the rows.
-- `tests/scripts/test_pr_body_gate.py` — CI refuses a branch without a described pull request.
-- `tests/scripts/test_release_instructions.py` — release-note section generation.
-- `tests/scripts/test_version_sync.py` — the declared version matches the release.
-
-### `brand/tests/` and `website/tests/`
-
-- `brand/tests/test_brand_assets.py`, `test_generated_sources.py` — mascot art and generated brand sources.
-- `website/tests/` — static site integrity (`test_site.py`), docs rendering (`test_docs_render.py`), content sync with the repo (`test_content_sync.py`, `test_generated.py`), OG art reproducibility (`test_make_og.py`), the design system (`test_design_system.py`), the Pages deploy (`test_pages_deploy.py`), and the CI wiring that runs this suite (`test_ci_required.py`).
+### `website/tests/` contracts
 
 `test_ci_required.py` is the contract that keeps the site from shipping on faith. It asserts the `website` job in `ci.yml` runs `uv run --directory website pytest tests/`, carries no `continue-on-error`, and is both a `needs:` entry and an enforced result in the `CI green` aggregate — the status check the `main-requires-ci-green` ruleset requires. It also asserts the Pages `deploy` job waits on the tested `build`. The wiring has regressed before: the site's checks once lived in a `feature/gh-pages`-only workflow that never ran for a pull request into `main` (402f0a5).
 
 ## Isolation Rules
 
 - Use `InMemoryRepository` in tests. `create_app(InMemoryRepository())` keeps the Studio API off the real `~/.agentic-odi/odi.db`.
-- The MCP server uses `build_repository()`; tests set `AGENTIC_ODI_DB=:memory:` before import and call tools through `Client(mcp)` without HTTP.
+- The MCP server builds no store at import. `main()` calls `configure()`; a test calls `configure(InMemoryRepository())` in an autouse fixture and reaches tools through `Client(mcp)` without HTTP.
 - Async tests use `@pytest.mark.asyncio` (strict mode).
 
 ## Coverage
 
 The authoritative Python gate is the `test` job, not Codecov. Pytest runs with
-coverage on, and the floor comes from `[tool.coverage.report] fail_under` in
-`pyproject.toml` — token-free, so it gates a fork PR the same way it gates
-`main`. The current measurement is **89.75%**
-(7,720 statements, 791 missed). On pull requests, `scripts/coverage_floor.py`
-refuses a `pyproject.toml` whose `fail_under` is lower than the base branch's,
-so the floor can only ratchet upward. The 3.12 job writes per-distribution
-percentages to the job summary and uploads `coverage.xml` to Codecov, which
-reports a 90% project target with a 1% dip (the same 89% minimum) and never
-fails the build. Patch coverage is advisory.
+coverage on and `--cov-fail-under=89`, the same floor as
+`[tool.coverage.report] fail_under` in `pyproject.toml` — token-free, so it gates
+a fork PR the same way it gates `main`. On pull requests,
+`scripts/coverage_floor.py` refuses a `pyproject.toml` whose `fail_under` is
+lower than the base branch's, so the floor can only ratchet upward. The 3.12 job
+writes per-distribution percentages to the job summary and uploads
+`coverage.xml` to Codecov under the `python` flag; Codecov reports a 90% project
+target with a 1% dip (the same 89% minimum) and is not the gate. Patch coverage
+is advisory.
+
+Measured on 2026-11-21: **89.52%** combined (16,467 statements, 1,726 missed),
+split as:
+
+| Distribution | Coverage |
+|---|---|
+| `agentic_odi_cli` | 86.44% |
+| `agentic_odi_connectors` | 93.70% |
+| `agentic_odi_core` | 94.14% |
+| `agentic_odi_mcp_server` | 72.36% |
+| `agentic_odi_studio_api` | 89.07% |
 
 The Studio is gated by Vitest thresholds instead. `npm run test:coverage`
-enforces statements 74, branches 65, functions 75, and lines 74 in
-`apps/studio/vite.config.ts`; measured values are 74.18%, 65.38%, 75.49%, and
-74.33%. It writes `apps/studio/coverage/lcov.info`, uploaded to Codecov under
-the `studio` flag on a non-blocking basis. `scripts/coverage_map.py --check`
-keeps the generated map in `docs/development.md` in sync with the test tree.
+enforces statements 83, branches 75, functions 83, and lines 83 in
+`apps/studio/vite.config.ts`; the values measured on 2026-11-21 are 83.33%,
+75.93%, 83.57%, and 83.38%. It writes `apps/studio/coverage/lcov.info`, uploaded
+to Codecov under the `studio` flag on a non-blocking basis. The Vitest thresholds
+are what gate the merge. `scripts/coverage_map.py --check` keeps the generated
+map in `docs/development.md` in sync with the test tree.
 
 ### Known coverage gaps
 
 Recorded from issue #88 so the holes the coverage map exposes are not hidden.
 None of these are fixed by the coverage work itself; they are the next tests to
-write.
+write. The numbers are from the 2026-11-21 run.
 
 Python:
 
-- `apps/studio-api/.../studio/changelog.py` measures **27.9%**. The markdown
-  parser is only reached through `/api/changelog` with the real `CHANGELOG.md`;
-  category headers, commit-link stripping, scoped items, and the
-  unparseable-file fallback have no tests of their own.
-- `apps/studio-api/.../studio/chat.py` measures **93.0%**. Uncovered: the
-  on-device-model fallback branch, a forced remote tier degrading when the
-  backend is down, the model stopping mid-stream, and the catch-all turn
-  failure handler.
-- `packages/core/src/agentic_odi_core/events.py` (**58%**) leaves
-  `resolve_device_id` uncovered, including creating the device-id file.
-  `intent_store.py` (**68%**) leaves the remote-sync half of the store
-  (`insert_remote`, `mark_synced`) uncovered. The MCP server distribution is
-  the lowest overall at **81.92%**.
+- `apps/studio-api/.../studio/changelog.py` measures **30%**. The markdown
+  parser is reached only through `/api/changelog` against the real
+  `CHANGELOG.md`, and it is the least-covered Python module in the tree.
+- `packages/core/src/agentic_odi_core/intent_store.py` measures **75%**. Its
+  uncovered lines are concentrated in the remote-sync half of the store.
+- `apps/studio-api/.../studio/chat.py` measures **91%**. What remains uncovered
+  is the failure and fallback handling: model errors, a mid-stream stop, and the
+  catch-all turn handler.
+- `agentic_odi_mcp_server` is the lowest distribution at **72.36%**, more than
+  twenty points below `agentic_odi_core`.
 
 Studio:
 
-- `src/state/StudioContext.tsx` now has a test file, but measures **69% lines
-  / 51% branches**. Uncovered SSE dispatcher branches: the `ui` event being
-  re-validated, `canvas_dirty` triggering `refreshCanvas()`, and the
-  mobile-sheet versus desktop-dock lens split — `useMediaQuery` always returns
-  `false` under jsdom, so only one branch runs.
-- The least exercised UI modules are `src/ui/catalog.ts` (38% lines / 10%
-  branches), `src/ui/primitives.tsx` (23%), `src/components/chat/Markdown.tsx`
-  (59%), `src/components/setup/SetupConversation.tsx` (66%), and
-  `src/ui/cards.tsx` (70%).
-- `src/components/chat/OfflineNotice.tsx` and `src/components/Toasts.tsx` have
-  no test of their own. `src/api/schema.d.ts` is generated and imported by
-  nothing.
-- Issue #88 also listed `StudioContext.tsx`, `StudioBar.tsx`,
-  `DirectCapture.tsx`, `EvidenceStream.tsx`, and `OutcomeCard.tsx` as
-  untested; each has gained a dedicated test upstream since.
+- `src/ui/catalog.ts` (**37.93%** lines, **10.34%** branches) and
+  `src/ui/primitives.tsx` (**26.82%** lines) are the least exercised modules.
+- `src/state/StudioContext.tsx` measures **76.82%** lines and **62.7%** branches
+  even with its own test file; `useMediaQuery` returns `false` under jsdom, so
+  the mobile branch never runs.
+- `src/ui/cards.tsx` measures **76.97%** lines.
 
 ## Frontend
 
@@ -357,22 +279,115 @@ sidecar's response shapes, the sidecar's hydration of the canvas, and the
 first-run wizard's ordering relative to the rest of the app.
 
 ```bash
-npm --prefix apps/studio run build      # the sidecar serves apps/studio/dist
-npm --prefix apps/studio run test:e2e
+npm --prefix apps/studio run build            # the sidecar serves apps/studio/dist
+npm --prefix apps/studio run test:e2e         # the product suite, chromium + mcp-backend
+npm --prefix apps/studio run test:e2e:smoke   # the blocking @smoke subset
+npm --prefix apps/studio run test:e2e:visual  # the opt-in screenshot contract
 ```
 
 Playwright's `webServer` array starts the MCP server, the Studio sidecar, and
-a second sidecar on the MCP passthrough backend. Two projects run against
-them: `chromium` for the local backend (the product default) and
-`mcp-backend` for the passthrough.
+a second sidecar on the MCP passthrough backend. `chromium` (the local
+backend, the product default) and `mcp-backend` (the passthrough) make up
+`test:e2e`. `visual` and `screenshots` are opt-in and run by name.
+
+**A spec is collected by exactly one project.** `chromium` ignores
+`mcp-backend.spec.ts`, `visual.spec.ts` and `pr-screenshots.spec.ts`. Before
+#1118 it did not ignore the visual spec, so twelve comparisons ran twice, under
+two snapshot names, and one contract produced two independent verdicts.
 
 Locators bind to what a user perceives — a role, a label, or visible text —
-never to a `data-testid`, of which the application has none.
+never to a `data-testid`, of which the application has none, and never to a CSS
+class. A class-based locator reports "not visible" when a class moves, which
+names the symptom rather than the promise the test was making; a locator that
+asserts an attribute one shell happens to set (`aria-label` on the docked lens,
+which is labelled by `aria-labelledby`) passes at one viewport and fails at the
+other. The two structural handles left are the pre-JavaScript `#boot` shell,
+which has no roles because it paints before any script runs, and the
+`[role=…]` selector that finds banner rows before `banners()` narrows them to
+the one with actions in it — Radix renders each toast twice, as the row a
+person sees and as a hidden announcer with the same role and text.
 
 `first-paint.spec.ts` is the exception to "drives the real sidecar": it aborts
 the module bundle so it can read the pre-JavaScript shell in `index.html`, then
 compares the colour it painted against the `--bg` token for each theme.
 
-CI runs the suite in the `e2e` job. It is deliberately non-blocking: set the
-repository variable `AGENTIC_ODI_E2E` to `false` to skip it, and the
-`continue-on-error` on the job keeps a failure from turning CI red.
+### Isolation: one reset, before every test
+
+`e2e/fixtures.ts` exports the `test` and `expect` every spec imports. Its
+automatic fixture calls `resetStudioState()` before each test: it deletes every
+job (a job takes its steps, outcomes and evidence with it), clears conversation
+memory, and dismisses unread signals. The sidecar, its SQLite stores and the
+MCP server are shared by the whole run — that is the point of the suite — so
+anything a spec leaves behind is state the next spec inherits, and the app
+restores the most recent conversation on boot.
+
+The reset used to be hand-rolled per spec, jobs only, with conversation memory
+cleared by exactly one file. That made the result depend on the order Playwright
+happened to choose, and `/brief` inside a neighbour's thread is what a `brief`
+failure looked like (#1118).
+
+A studio that has just been emptied is a studio that has not met the product
+
+yet: it opens the connector offer over the composer, and a modal hides the
+composer behind it. `waitForStudioReady()` answers that offer the way a person
+would, so a spec that starts from the shared reset reaches the composer without
+its own onboarding code. It belongs in the readiness helper for the same reason
+the reset belongs in a fixture: a spec that has to remember it is a spec that
+will eventually forget (#1118).
+
+### The visual contract is opt-in until it has baselines
+
+`e2e/visual.spec.ts` compares screens with `toHaveScreenshot`, and this
+repository has committed no baselines: `e2e/visual.spec.ts-snapshots/` does not
+exist. A comparison with no baseline cannot pass, so running it in the product
+lane reddened that lane on every push for a reason no test could fix. It is out
+of `test:e2e` until its Linux baselines are committed and reviewed;
+`npm run test:e2e:visual` writes and compares them with `animations:
+"disabled"`, `caret: "hide"` and `scale: "css"` from `playwright.config.ts`.
+
+### The smoke lane blocks a merge; the full suite is signal
+
+CI runs two browser jobs:
+
+- **`e2e-smoke` is required.** It runs the `@smoke`-tagged handful — the settled
+  shell, the first run, canvas hydration, one conversation turn, and one boot on
+  the MCP backend — with `--retries=0`, so a race fails instead of retiring
+  quietly. It has no `continue-on-error` and no repository-variable kill switch:
+  turning it off is a code change and a reviewed one.
+- **`e2e` is advisory.** It runs the whole suite with `--retries=1` and
+  publishes every failure (assertion, locator, call site, attempt count), the
+  tests that passed only on retry, and the traces under `test-results/`. Set the
+  repository variable `AGENTIC_ODI_E2E` to `false` to skip it, or
+  `AGENTIC_ODI_E2E_BLOCKING` to `true` to make it block. It is too broad and too
+  slow to be a merge gate on its own, which is why the narrow lane exists.
+
+A retry is recorded, never concealed: `retries: 1` keeps the first attempt's
+trace, and the summary names every test that needed the second one.
+
+### A flaky spec is fixed or parked, never retried indefinitely
+
+`e2e/quarantine.ts` is the only way to park one. The spec carries
+`// quarantined: #<issue> <YYYY-MM-DD>` in its first twenty lines, and the
+ledger carries the issue, the date, and a reason. `src/test/e2eQuarantine.test.ts`
+fails when a marker has no entry, an entry has no marker, the two disagree, or
+the entry is more than thirty days old. A parked spec still runs, so a fix is
+proven by deleting the entry. The list is empty today.
+
+## Observability
+
+Two record shapes are asserted, and both are asserted on their contents rather
+than on a line existing:
+
+- `apps/studio-api/tests/test_studio_observability.py` checks the per-turn JSON
+  line carries the token counts and the model, that a backend without usage
+  leaves the counts `null` (never estimated), and that no API key, bearer token,
+  or authorization header reaches a record.
+- `apps/studio-api/tests/test_studio_chat_stream.py` drives a usage chunk and a
+  backend that rejects `include_usage`, so the fallback path is exercised.
+- `apps/mcp-server/tests/test_tool_timing.py` captures one log record per tool
+  call and asserts the tool name, the duration key, and — for a failing tool —
+  the envelope code the client already branches on.
+- `packages/core/tests/test_logging.py` checks the shared `configure_logging()`
+  is idempotent: calling it twice does not duplicate a handler.
+
+See [Observability](observability.md) for the two record shapes.

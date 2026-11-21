@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
-import { lens, offlineNotice, openStudio, rail, resetRepository, seedOutcomes } from "./helpers";
+import { lens, offlineNotice, openStudio, rail, seedOutcomes } from "./helpers";
 
 /**
  * The Studio is a single surface with views that open beside the
@@ -14,27 +14,23 @@ const OUTCOME = {
 };
 
 test.describe("the workspace", () => {
-  test.beforeEach(async ({ request }) => {
-    await resetRepository(request);
-  });
-
-  test("opens a view from the workbench rail", async ({ page, request }) => {
+  test("opens a view from the workbench rail", { tag: "@smoke" }, async ({ page, request }) => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
     // The rail only appears once there is something to look at.
-    const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
+    const landscape = rail(page).getByRole("button", { name: /^Where to focus,/ });
     await expect(landscape).toBeVisible();
 
     await landscape.click();
-    await expect(lens(page)).toHaveAttribute("aria-label", "Opportunity landscape");
+    await expect(lens(page, "Where to focus")).toBeVisible();
   });
 
   test("marks the open view as current", async ({ page, request }) => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    const landscape = rail(page).getByRole("button", { name: /^Landscape,/ });
+    const landscape = rail(page).getByRole("button", { name: /^Where to focus,/ });
     await expect(landscape).not.toHaveAttribute("aria-current", "page");
 
     await landscape.click();
@@ -45,22 +41,22 @@ test.describe("the workspace", () => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    await expect(lens(page)).toBeVisible();
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    await expect(lens(page, "Where to focus")).toBeVisible();
 
     await page.getByRole("button", { name: "Close workspace view" }).click();
-    await expect(lens(page)).toBeHidden();
+    await expect(lens(page, "Where to focus")).toBeHidden();
   });
 
   test("closes the open view with Escape", async ({ page, request }) => {
     await seedOutcomes(request, [OUTCOME]);
     await openStudio(page);
 
-    await rail(page).getByRole("button", { name: /^Landscape,/ }).click();
-    await expect(lens(page)).toBeVisible();
+    await rail(page).getByRole("button", { name: /^Where to focus,/ }).click();
+    await expect(lens(page, "Where to focus")).toBeVisible();
 
     await page.keyboard.press("Escape");
-    await expect(lens(page)).toBeHidden();
+    await expect(lens(page, "Where to focus")).toBeHidden();
   });
 
   test("offers a way into the settings", async ({ page }) => {
@@ -68,8 +64,9 @@ test.describe("the workspace", () => {
 
     await page.getByRole("button", { name: "Open settings" }).click();
 
-    await expect(lens(page)).toHaveAttribute("aria-label", "Settings");
-    await expect(lens(page).getByLabel("MCP server URL")).toBeVisible();
+    const settings = lens(page, "Settings");
+    await expect(settings).toBeVisible();
+    await expect(settings.getByLabel("MCP server URL")).toBeVisible();
   });
 
   test("says so when no model is reachable", async ({ page }) => {

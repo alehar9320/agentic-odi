@@ -4,15 +4,39 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
 app = typer.Typer(name="profile", help="Profile management commands")
 
 BASELINE_FILE_NAME = "baseline.json"
+BASELINE_BACKUP_KEEP = 5
+
+
+class ProfileFileError(ValueError):
+    """A profile file could not be read or parsed, with the reason named.
+
+    Subclasses ValueError so existing `except ValueError` handlers keep working.
+    """
+
+
+def _read_json_object(path: Path) -> dict:
+    """Read a JSON object from `path`, naming whether reading or parsing failed."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except OSError as exc:
+        reason = exc.strerror or str(exc)
+        raise ProfileFileError(f"Could not read {path}: {reason}") from exc
+    except json.JSONDecodeError as exc:
+        raise ProfileFileError(
+            f"{path} is not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
+        ) from exc
 
 
 @dataclass
@@ -43,24 +67,40 @@ class Baseline:
             "core_problem": self.core_problem,
             "current_focus": self.current_focus,
             "confidence": self.confidence,
+            "inferred": self.inferred,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> Baseline:
-        kwargs = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}  # type: ignore[attr-defined]
-        return cls(**kwargs)
+        fields = set(cls.__dataclass_fields__)  # type: ignore[attr-defined]
+        unknown = sorted(k for k in d if k not in fields)
+        if unknown:
+            raise ValueError(
+                f"Baseline.from_dict: unknown key(s) {unknown}; valid fields: {sorted(fields)}"
+            )
+        return cls(**{k: v for k, v in d.items() if k in fields})
+
+
+_CLEARABLE_PROFILE_FIELDS = (
+    "product_name",
+    "domain",
+    "primary_user",
+    "business_model",
+    "core_problem",
+    "current_focus",
+)
 
 
 def config_dir() -> Path:
-    """Return the XDG config dir for agentic-odi.
+    """Return the config directory for agentic-odi.
 
-    Uses XDG_CONFIG_HOME if set; otherwise falls back to HOME/agentic-odi.
+    Delegates to :func:`agentic_odi_cli.paths.config_dir` so the CLI has one
+    resolution order: ``XDG_CONFIG_HOME``, then ``~/.config/agentic-odi`` on
+    POSIX, and ``%APPDATA%\\agentic-odi`` on Windows.
     """
-    xdg = os.getenv("XDG_CONFIG_HOME")
-    if xdg:
-        return Path(xdg) / "agentic-odi"
-    home = Path(os.getenv("HOME", ""))
-    return home / "agentic-odi"
+    from agentic_odi_cli.paths import config_dir as resolve_config_dir
+
+    return resolve_config_dir()
 
 
 def baseline_file() -> Path:
@@ -76,16 +116,11 @@ def baseline_exists() -> bool:
 def load_baseline() -> Baseline | None:
     """Load the baseline file, returning None if it does not exist.
 
-    Raises ValueError on unparseable JSON.
+    Raises ProfileFileError naming the path and whether reading or parsing failed.
     """
     if not baseline_exists():
         return None
-    try:
-        with open(baseline_file()) as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to parse baseline file: {e}") from e
-    return Baseline.from_dict(data)
+    return Baseline.from_dict(_read_json_object(baseline_file()))
 
 
 def save_baseline(b: Baseline) -> Path:
@@ -102,10 +137,39 @@ def save_baseline(b: Baseline) -> Path:
     )
     target = baseline_file()
     tmp = target.with_name(target.name + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(b.to_dict()))
     os.replace(tmp, target)
     return target
+
+
+def _backup_timestamp() -> str:
+    """Return the fixed-width UTC stamp used to name baseline backups."""
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def prune_baseline_backups(keep: int = BASELINE_BACKUP_KEEP) -> list[Path]:
+    """Delete all but the newest `keep` baseline backups.
+
+    The stamp is fixed-width ISO, so lexical order is chronological. Returns the
+    removed paths. A failed unlink is skipped rather than raised. `keep <= 0`
+    disables retention and removes nothing.
+    """
+    if keep <= 0:
+        return []
+    backups = sorted(
+        baseline_file().parent.glob(f"{BASELINE_FILE_NAME}.bak-*"),
+        key=lambda p: p.name,
+        reverse=True,
+    )
+    removed: list[Path] = []
+    for stale in backups[keep:]:
+        try:
+            stale.unlink()
+        except OSError:
+            continue
+        removed.append(stale)
+    return removed
 
 
 def backup_baseline() -> Path | None:
@@ -115,12 +179,10 @@ def backup_baseline() -> Path | None:
     """
     if not baseline_exists():
         return None
-    import shutil
-
-    backup_path = baseline_file().with_name(
-        f"baseline.json.bak-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
-    )
+    backup_path = baseline_file().with_name(f"{BASELINE_FILE_NAME}.bak-{_backup_timestamp()}")
     shutil.copy2(baseline_file(), backup_path)
+    if BASELINE_BACKUP_KEEP > 0:
+        prune_baseline_backups()
     return backup_path
 
 
@@ -175,16 +237,11 @@ def llm_profile_exists() -> bool:
 def load_llm_profile() -> LLMProfile | None:
     """Load the LLM profile file, returning None if it does not exist.
 
-    Raises ValueError on unparseable JSON.
+    Raises ProfileFileError naming the path and whether reading or parsing failed.
     """
     if not llm_profile_exists():
         return None
-    try:
-        with open(llm_profile_file()) as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        raise ValueError(f"Failed to parse LLM profile file: {e}") from e
-    return LLMProfile.from_dict(data)
+    return LLMProfile.from_dict(_read_json_object(llm_profile_file()))
 
 
 def load_llm_config_dict() -> dict[str, str]:
@@ -196,6 +253,7 @@ def load_llm_config_dict() -> dict[str, str]:
     try:
         p = load_llm_profile()
     except (ValueError, OSError):
+        # Deliberately silent: this path feeds defaults, not a diagnosis.
         return {}
     if p is None:
         return {}
@@ -222,7 +280,7 @@ def save_llm_profile(p: LLMProfile) -> Path:
     d["updated_at"] = now
     target = llm_profile_file()
     tmp = target.with_name(target.name + ".tmp")
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(d))
     os.replace(tmp, target)
     return target
@@ -233,12 +291,29 @@ def save_llm_profile(p: LLMProfile) -> Path:
 # ---------------------------------------------------------------------------
 
 
+def _profile_display_value(value: str | None) -> str:
+    if value is None:
+        return "—"
+    if value == "":
+        return "(empty)"
+    return value
+
+
+def _load_baseline_for_command() -> Baseline | None:
+    """Load the baseline, reporting a profile-file problem as a sentence and exit 1."""
+    try:
+        return load_baseline()
+    except ProfileFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
 @app.command("show")
 def show_profile(
     as_json: bool = typer.Option(False, "--json", help="Format output as JSON"),
 ) -> None:
     """Show current product baseline profile."""
-    b = load_baseline()
+    b = _load_baseline_for_command()
     if b is None:
         if as_json:
             typer.echo(json.dumps({}))
@@ -248,14 +323,14 @@ def show_profile(
     if as_json:
         typer.echo(json.dumps(b.to_dict(), indent=2))
         return
-    typer.echo(f"Product Name: {b.product_name or ''}")
-    typer.echo(f"Product URL:  {b.product_url or ''}")
-    typer.echo(f"Domain:       {b.domain or ''}")
-    typer.echo(f"Primary User: {b.primary_user or ''}")
-    typer.echo(f"Business:     {b.business_model or ''}")
-    typer.echo(f"Core Problem: {b.core_problem or ''}")
-    typer.echo(f"Focus:        {b.current_focus or ''}")
-    typer.echo(f"Confidence:   {b.confidence or ''}")
+    typer.echo(f"Product Name: {_profile_display_value(b.product_name)}")
+    typer.echo(f"Product URL:  {_profile_display_value(b.product_url)}")
+    typer.echo(f"Domain:       {_profile_display_value(b.domain)}")
+    typer.echo(f"Primary User: {_profile_display_value(b.primary_user)}")
+    typer.echo(f"Business:     {_profile_display_value(b.business_model)}")
+    typer.echo(f"Core Problem: {_profile_display_value(b.core_problem)}")
+    typer.echo(f"Focus:        {_profile_display_value(b.current_focus)}")
+    typer.echo(f"Confidence:   {b.confidence if b.confidence is not None else '—'}")
 
 
 @app.command("path")
@@ -272,9 +347,29 @@ def set_profile(
     business_model: str | None = typer.Option(None, help="Business model"),
     core_problem: str | None = typer.Option(None, help="Core problem solved"),
     current_focus: str | None = typer.Option(None, help="Current focus"),
+    clear: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--clear",
+            help=(
+                "Field to unset (repeatable): product_name, domain, primary_user, "
+                "business_model, core_problem, current_focus"
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Set profile values non-interactively."""
-    b = load_baseline() or Baseline(schema_version=1, source="cli")
+    clear_fields = clear or []
+    valid_clear_fields = _CLEARABLE_PROFILE_FIELDS
+    for name in clear_fields:
+        if name not in valid_clear_fields:
+            typer.echo(
+                f"Unknown field to clear: {name}. Valid names: {', '.join(valid_clear_fields)}",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+
+    b = _load_baseline_for_command() or Baseline(schema_version=1, source="cli")
     if product_name is not None:
         b.product_name = product_name
     if domain is not None:
@@ -287,6 +382,9 @@ def set_profile(
         b.core_problem = core_problem
     if current_focus is not None:
         b.current_focus = current_focus
+    # Apply --clear after set-options so `--core-problem x --clear core_problem` ends unset.
+    for name in clear_fields:
+        setattr(b, name, None)
     p = save_baseline(b)
     typer.echo(f"Profile saved to {p}")
 
@@ -295,7 +393,7 @@ def setup_wizard() -> None:
     """Run interactive baseline setup wizard."""
     typer.echo("Agentic ODI — Product Baseline Setup Wizard")
     typer.echo("==========================================")
-    existing = load_baseline() or Baseline()
+    existing = _load_baseline_for_command() or Baseline()
 
     p_name = typer.prompt("Product Name", default=existing.product_name or "")
     domain = typer.prompt("Domain", default=existing.domain or "")

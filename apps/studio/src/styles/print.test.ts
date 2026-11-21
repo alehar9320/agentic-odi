@@ -20,6 +20,17 @@ describe("print stylesheet", () => {
     expect(printCss).toContain("break-inside: avoid");
   });
 
+  // The records lens is the surface a person takes to a meeting: its headings and tables
+  // print, its controls and its row-cap notice do not, and a long table repeats its header
+  // on every sheet rather than leaving page two unlabeled.
+  it("prints the records lens as tables and hides what a reader cannot press on paper", () => {
+    for (const selector of [".records__heading", ".records__table"]) {
+      expect(printCss).toContain(selector);
+    }
+    expect(printCss).toMatch(/\.records__export,\s*\.records__cap\s*\{\s*display:\s*none/);
+    expect(printCss).toMatch(/thead\s*\{[^}]*display:\s*table-header-group/);
+  });
+
   it("is loaded by the studio theme", () => {
     expect(themeCss).toContain('@import "./print.css"');
   });
