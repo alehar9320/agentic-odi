@@ -79,11 +79,14 @@ service.
 
 - **Typed entity links in the core domain model.** `Link` and `RelationshipType`
   in `packages/core` describe typed, AI-native relationships between ODI
-  entities (such as `evidence` serving an `outcome`, `blocked_by`, or
-  `external_jira`/`external_github` references) with optional external
-  identifiers and cached previews. Both repositories now persist them: a link
-  survives a restart, filters by its endpoints, and rejects a duplicate
-  relationship. The MCP and CLI surfaces are still to come.
+  entities over a closed vocabulary (`evidence_for`, `outcome_of`, `blocked_by`,
+  `duplicates`, `relates_to`), with `EntityType` naming the six entity kinds and
+  `ExternalSystem` plus `external_id` pointing at a Jira, Linear, JPD, GitHub, or
+  Notion target. A link validates its own pair against `LINK_PAIR_RULES`, rejects
+  a self-link, and rejects a one-sided external reference; cached previews ride
+  along. Both repositories persist them: a link survives a restart, filters by
+  its endpoints, and rejects a duplicate relationship. The MCP tools create, list
+  and remove links; the CLI surface is still to come.
 - **One artifact you can hand over.** A read-only link opens a single artifact
   and its evidence on its own page — no rail, no composer, no way into the rest
   of the workspace — and states when the link expires. The link is a capability,

@@ -30,11 +30,11 @@ from agentic_odi_core.repository import InMemoryRepository, rank_outcomes
 def _link(
     link_id: str | None = None,
     *,
-    source_type: str = "outcome",
-    source_id: str = "outcome-1",
-    target_type: str = "evidence",
-    target_id: str = "evidence-1",
-    relationship: RelationshipType = RelationshipType.evidence_for,
+    source_type: str = "evidence",
+    source_id: str = "evidence-1",
+    target_type: str = "outcome",
+    target_id: str = "outcome-1",
+    relationship: RelationshipType = RelationshipType.EVIDENCE_FOR,
 ) -> Link:
     return Link(
         id=link_id or str(uuid.uuid4()),
@@ -405,9 +405,33 @@ def test_add_and_get_link() -> None:
 
 def test_list_links_filters_by_source_and_target() -> None:
     repo = InMemoryRepository()
-    repo.add_link(_link(source_type="job", source_id="j1", target_type="outcome", target_id="o1"))
-    repo.add_link(_link(source_type="job", source_id="j1", target_type="evidence", target_id="e1"))
-    repo.add_link(_link(source_type="outcome", source_id="o1", target_type="job", target_id="j1"))
+    repo.add_link(
+        _link(
+            source_type="job",
+            source_id="j1",
+            target_type="outcome",
+            target_id="o1",
+            relationship=RelationshipType.RELATES_TO,
+        )
+    )
+    repo.add_link(
+        _link(
+            source_type="job",
+            source_id="j1",
+            target_type="evidence",
+            target_id="e1",
+            relationship=RelationshipType.RELATES_TO,
+        )
+    )
+    repo.add_link(
+        _link(
+            source_type="outcome",
+            source_id="o1",
+            target_type="job",
+            target_id="j1",
+            relationship=RelationshipType.RELATES_TO,
+        )
+    )
 
     by_source = [link.id for link in repo.list_links(source_type="job", source_id="j1")]
     assert len(by_source) == 2

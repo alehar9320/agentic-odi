@@ -2761,40 +2761,50 @@ field, because a filesystem/BLOB store would be a second record of truth.\
             },
             "Link": {
                 "$defs": {
+                    "EntityType": {
+                        "description": """\
+The kinds of ODI entity a link can point at.
+
+Closed on purpose: an open string lets one writer say ``serves`` and
+another ``implements`` for the same meaning, and the graph stops being
+queryable. There is no ``candidate`` member — no such model exists.\
+""",
+                        "enum": ["evidence", "job", "outcome", "segment", "step", "strategy"],
+                        "title": "EntityType",
+                        "type": "string",
+                    },
+                    "ExternalSystem": {
+                        "description": "A system outside Agentic ODI that a link can point at.",
+                        "enum": ["github", "jira", "jpd", "linear", "notion"],
+                        "title": "ExternalSystem",
+                        "type": "string",
+                    },
                     "RelationshipType": {
                         "description": """\
-Typed relationship between two domain entities.
+The closed vocabulary of typed edges between two ODI entities.
 
-Mirrors Jira-style issue links but is AI-native: links carry structured
-metadata that LLMs can traverse without guessing.\
+Five values, no more. An external target (a Jira ticket, a Linear issue)
+is ``relates_to`` plus ``external_system`` and ``external_id``, not a
+relationship value of its own.\
 """,
                         "enum": [
                             "blocked_by",
-                            "blocking",
                             "duplicates",
                             "evidence_for",
-                            "external_github",
-                            "external_jira",
-                            "external_jpd",
-                            "external_linear",
-                            "external_notion",
-                            "implements",
                             "outcome_of",
-                            "references",
                             "relates_to",
-                            "serves",
-                            "validates",
                         ],
                         "title": "RelationshipType",
                         "type": "string",
-                    }
+                    },
                 },
                 "description": """\
-A first-class typed link between two agentic-odi entities.
+A first-class typed edge between two ODI entities.
 
-Links connect jobs, steps, outcomes, evidence, candidates, segments, and
-strategies without changing ODI scoring or segmentation logic. A human
-must approve each link before it is written (human-in-the-loop).\
+A link says "this evidence supports that outcome" or "this outcome is a
+step of that job" as structured data a query can answer, instead of prose
+a reader has to interpret. A human approves each link before it is
+written; this model owns only the invariants it can check alone.\
 """,
                 "properties": {
                     "created_at": {
@@ -2806,14 +2816,13 @@ must approve each link before it is written (human-in-the-loop).\
                     "external_id": {
                         "anyOf": [{"type": "null"}, {"type": "string"}],
                         "default": None,
-                        "description": "External ID in the origin system, if any",
+                        "description": "Target ID inside that external system",
                         "title": "External Id",
                     },
                     "external_system": {
-                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "anyOf": [{"$ref": "#/$defs/ExternalSystem"}, {"type": "null"}],
                         "default": None,
-                        "description": "External system that originated the link, if any",
-                        "title": "External System",
+                        "description": "External system the target lives in, if any",
                     },
                     "id": {"title": "Id", "type": "string"},
                     "preview": {
@@ -2835,9 +2844,8 @@ must approve each link before it is written (human-in-the-loop).\
                         "type": "string",
                     },
                     "source_type": {
+                        "$ref": "#/$defs/EntityType",
                         "description": "The type of the source entity",
-                        "title": "Source Type",
-                        "type": "string",
                     },
                     "target_id": {
                         "description": "The ID of the target entity",
@@ -2845,9 +2853,8 @@ must approve each link before it is written (human-in-the-loop).\
                         "type": "string",
                     },
                     "target_type": {
+                        "$ref": "#/$defs/EntityType",
                         "description": "The type of the target entity",
-                        "title": "Target Type",
-                        "type": "string",
                     },
                 },
                 "required": [

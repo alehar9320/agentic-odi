@@ -809,16 +809,16 @@ def test_last_event_id_is_the_rowid_of_the_event_just_appended(tmp_path) -> None
 def _link(
     link_id: str = "link-1",
     *,
-    source_id: str = "outcome-1",
-    target_id: str = "evidence-1",
+    source_id: str = "evidence-1",
+    target_id: str = "outcome-1",
 ) -> Link:
     return Link(
         id=link_id,
-        source_type="outcome",
+        source_type="evidence",
         source_id=source_id,
-        target_type="evidence",
+        target_type="outcome",
         target_id=target_id,
-        relationship_type=RelationshipType.evidence_for,
+        relationship_type=RelationshipType.EVIDENCE_FOR,
     )
 
 
@@ -828,7 +828,7 @@ def test_add_get_and_list_a_link_round_trips(tmp_path) -> None:
 
     assert repo.add_link(link) == link
     assert repo.get_link("link-1") == link
-    assert [item.id for item in repo.list_links(source_id="outcome-1")] == ["link-1"]
+    assert [item.id for item in repo.list_links(source_id="evidence-1")] == ["link-1"]
     repo.close()
 
 
