@@ -508,6 +508,53 @@ describe("StudioContext memory and resume", () => {
     expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-9" });
   });
 
+  it("opens the subject a shared address names, not only its lens", () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        schema_version: SESSION_SCHEMA_VERSION,
+        job_id: null,
+        step_id: null,
+        outcome_id: "O-9",
+      }),
+    );
+    window.history.replaceState({}, "", "/t/c-1/landscape/outcome/O-12");
+
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+
+    // The address wins over the stored session: the link names O-12.
+    expect(result.current.focusedSubject).toEqual({ kind: "outcome", id: "O-12" });
+    expect(JSON.parse(localStorage.getItem(SESSION_KEY) ?? "{}")).toMatchObject({
+      outcome_id: "O-12",
+    });
+  });
+
+  it("restores an evidence subject on back/forward", () => {
+    const { result } = renderHook(
+      () => {
+        const studio = useStudio();
+        const toasts = useToasts();
+        return { ...studio, toasts };
+      },
+      { wrapper: StudioProvider },
+    );
+
+    act(() => {
+      window.history.replaceState({}, "", "/t/c-1/evidence/evidence/ev-7");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(result.current.focusedSubject).toEqual({ kind: "evidence", id: "ev-7" });
+    expect(result.current.focusedEvidenceId).toBe("ev-7");
+  });
+
   it("remembers the subject the user navigates to", () => {
     const { result } = renderHook(
       () => {

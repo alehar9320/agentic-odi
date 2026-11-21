@@ -283,6 +283,7 @@ isolation, and coverage rules stay in
 | `apps/studio/src/lib/onlineStatus.test.tsx` | jsdom's `navigator.onLine` is a plain property; redefine it per test and put |
 | `apps/studio/src/lib/records.test.ts` | — |
 | `apps/studio/src/lib/relativeTime.test.ts` | — |
+| `apps/studio/src/lib/routes.test.ts` | — |
 | `apps/studio/src/lib/sampleLoop.test.ts` | Bundled sample data, never the person's live canvas. |
 | `apps/studio/src/lib/scoreVocabulary.test.ts` | — |
 | `apps/studio/src/lib/session.test.ts` | — |

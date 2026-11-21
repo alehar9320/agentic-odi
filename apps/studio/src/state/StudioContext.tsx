@@ -86,7 +86,14 @@ import {
   type ProbeBreaker,
   type ProbeOutcome,
 } from "./probeBreaker";
-import { clearSession, loadSession, saveSession, SESSION_SCHEMA_VERSION, type StudioSession } from "../lib/session";
+import {
+  clearSession,
+  loadSession,
+  saveSession,
+  SESSION_SCHEMA_VERSION,
+  type StudioSession,
+} from "../lib/session";
+import { parseRoute, routeToPath, type Route, withSearch } from "../lib/routes";
 import type {
   AddConnectorPayload,
   AddOutcomePayload,
@@ -282,6 +289,17 @@ const DISPLAY_NAME_KEY = "studio.displayName";
 const BRIEF_KEY = "studio.brief";
 const THESES_KEY = "studio.theses";
 
+/**
+ * The current browser path, honoring the file/protocol split: http(s) uses
+ * the pathname; anything else (Tauri's asset protocol) uses the hash.
+ */
+function currentPath(): string {
+  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    return window.location.pathname;
+  }
+  return window.location.hash.replace(/^#/, "") || "/";
+}
+
 /** How often a focused window re-reads the signal inbox from the store. */
 const SIGNAL_POLL_INTERVAL_MS = 60_000;
 
@@ -438,6 +456,12 @@ export interface StudioContextValue {
    */
   startNewThread: (options?: { stop?: boolean }) => NewThreadHandle | null;
   conversationId: string | null;
+  /**
+   * Move to another address without a reload: the URL is the source of truth
+   * for the thread, the open panel and its subject. `replace` keeps the entry
+   * out of history, for redirects that correct a stale address.
+   */
+  navigateTo: (route: Route, replace?: boolean) => void;
   /** The recent threads, newest first, as the history list shows them. */
   conversations: ConversationSummary[];
   /** Re-read the history list; called when it opens and after a turn persists. */
@@ -766,6 +790,14 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [mcpReachable, setMcpReachable] = useState(false);
   const [sidecarReachable, setSidecarReachable] = useState<boolean | null>(null);
   const [bootError, setBootError] = useState<StudioError | null>(null);
+
+  // The URL is the single source of truth for what is on screen. The route is
+  // parsed from the address bar on boot and updated on every navigation; the
+  // conversation, active panel, and customize-open state are derived from it.
+  // Read once: the boot route is a starting value, not something to recompute
+  // on every render.
+  const [initialRoute] = useState<Route>(() => parseRoute(currentPath(), window.location.search));
+  const [currentRoute, setCurrentRoute] = useState<Route>(initialRoute);
   /** The legacy key captured at startup, held in memory for retry until the
    *  sidecar has accepted it. Never cleared from the browser on failure. */
   const [migrationKey, setMigrationKey] = useState<string | null>(() =>
@@ -773,7 +805,13 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   );
   const [migrationError, setMigrationError] = useState<StudioError | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    currentRoute.name === "thread" ||
+    currentRoute.name === "threadPanel" ||
+    currentRoute.name === "threadPanelSubject"
+      ? currentRoute.threadId
+      : null,
+  );
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [memory, setMemory] = useState<Observation[]>([]);
   const [memoryLoading, setMemoryLoading] = useState(false);
@@ -788,6 +826,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   // The right region holds exactly one detail; its panel id is what the lens
   // renders. Kept derived so no caller can set one without the other.
   const activePanel: WorkspacePanelId | null = regions.detail?.panel ?? null;
+
   const [connectors, setConnectors] = useState<ConnectorListItem[]>([]);
   const [presets, setPresets] = useState<ConnectorPreset[]>([]);
   const [presetError, setPresetError] = useState<StudioError | null>(null);
@@ -805,7 +844,41 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const [segmentsError, setSegmentsError] = useState<StudioError | null>(null);
   const [focusedSubject, setFocusedSubject] = useState<FocusSubject | null>(loadFocusedSubject);
   const [focusedEvidenceId, setFocusedEvidenceId] = useState<string | null>(null);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
+
+  /**
+   * Select a record and persist it, so a reload can resume on the same job,
+   * step, or outcome. Evidence has no session slot.
+   */
+  const adoptSubject = useCallback((kind: SignalSubjectKind, id: string) => {
+    setFocusedSubject({ kind, id });
+    if (kind === "evidence") {
+      return;
+    }
+    saveSession(sessionForSubject(kind, id));
+  }, []);
+
+  /**
+   * Adopt the subject a route names. A shared or reloaded address promises the
+   * record it names, not only the lens that holds it: without this, the subject
+   * segment is written and never read back. Evidence is kept beside the subject,
+   * not in the session.
+   */
+  const adoptRouteSubject = useCallback(
+    (route: Route) => {
+      if (route.name !== "threadPanelSubject") {
+        return;
+      }
+      adoptSubject(route.subjectKind, route.subjectId);
+      if (route.subjectKind === "evidence") {
+        setFocusedEvidenceId(route.subjectId);
+      }
+    },
+    [adoptSubject],
+  );
+
+  const [customizeOpen, setCustomizeOpen] = useState(
+    initialRoute.name === "customize" || initialRoute.name === "customizeListing",
+  );
   const [customizeTarget, setCustomizeTarget] = useState<CustomizeTarget | null>(null);
   const [marketplace, setMarketplace] = useState<MarketplaceSearch | null>(null);
   const [marketplaceError, setMarketplaceError] = useState<StudioError | null>(null);
@@ -849,6 +922,77 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   /** The last written settings, so an edit can be compared without a stale closure. */
   const settingsRef = useRef(settings);
 
+  /**
+   * Navigate to a route: update the browser URL and the derived studio state
+   * (conversation, active panel, customize-open). `replace` controls whether
+   * the navigation pushes a new history entry or replaces the current one.
+   */
+  const navigateTo = useCallback(
+    (route: Route, replace = false) => {
+      const path = withSearch(routeToPath(route), route.search ?? "");
+      setCurrentRoute(route);
+
+      const threadId =
+        route.name === "thread" ||
+        route.name === "threadPanel" ||
+        route.name === "threadPanelSubject"
+          ? route.threadId
+          : null;
+      const panel =
+        route.name === "threadPanel" || route.name === "threadPanelSubject"
+          ? route.panel
+          : null;
+      const customize =
+        route.name === "customize" || route.name === "customizeListing";
+
+      setConversationId(threadId);
+      if (panel === null) {
+        regions.closeDetail();
+      } else {
+        regions.openDetail(panel);
+      }
+      setCustomizeOpen(customize);
+
+      if (replace) {
+        window.history.replaceState({}, "", path);
+      } else {
+        window.history.pushState({}, "", path);
+      }
+    },
+    [regions.closeDetail, regions.openDetail]
+  );
+
+  /**
+   * Restore the route from the address bar: once on boot, and again on every
+   * back/forward. The URL names the thread, the panel and its subject, so all
+   * three come back, never only the lens. The thread itself is opened by the
+   * boot effect below; later navigation goes through `navigateTo`, which writes
+   * the same state and the address bar together.
+   */
+  useEffect(() => {
+    function applyRoute(route: Route) {
+      setCurrentRoute(route);
+      setConversationId(
+        route.name === "thread" || route.name === "threadPanel" || route.name === "threadPanelSubject"
+          ? route.threadId
+          : null
+      );
+      if (route.name === "threadPanel" || route.name === "threadPanelSubject") {
+        regions.openDetail(route.panel);
+      } else {
+        regions.closeDetail();
+      }
+      setCustomizeOpen(route.name === "customize" || route.name === "customizeListing");
+      adoptRouteSubject(route);
+    }
+
+    applyRoute(initialRoute);
+    function onPopState() {
+      applyRoute(parseRoute(currentPath(), window.location.search));
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [adoptRouteSubject, initialRoute, regions.closeDetail, regions.openDetail]);
   const signals = useMemo(
     () => [...serverSignals].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
     [serverSignals],
@@ -1691,7 +1835,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     },
     [settings.mcp_url, pushToast, refreshCanvas],
   );
-  const closePanel = useCallback(() => regions.closeDetail(), [regions.closeDetail]);
+  const closePanel = useCallback(() => {
+    regions.closeDetail();
+    if (conversationId) {
+      navigateTo({ name: "thread", threadId: conversationId }, false);
+    }
+  }, [conversationId, navigateTo, regions.closeDetail]);
 
   const openPanel = useCallback(
     (panel: WorkspacePanelId) => {
@@ -1699,8 +1848,11 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
         closeSetup();
       }
       regions.openDetail(panel);
+      if (conversationId) {
+        navigateTo({ name: "threadPanel", threadId: conversationId, panel }, false);
+      }
     },
-    [setupOpen, closeSetup, regions.openDetail],
+    [conversationId, navigateTo, setupOpen, closeSetup, regions.openDetail],
   );
 
   /**
@@ -1708,12 +1860,15 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
    * the same job, step, or outcome. Evidence has no session slot.
    */
   const focusSubject = useCallback((kind: SignalSubjectKind, id: string) => {
-    setFocusedSubject({ kind, id });
-    if (kind === "evidence") {
-      return;
+    adoptSubject(kind, id);
+    const panel = PANEL_FOR_SUBJECT[kind];
+    if (conversationId && panel) {
+      navigateTo(
+        { name: "threadPanelSubject", threadId: conversationId, panel, subjectKind: kind, subjectId: id },
+        false
+      );
     }
-    saveSession(sessionForSubject(kind, id));
-  }, []);
+  }, [adoptSubject, conversationId, navigateTo]);
 
   /**
    * The one entry to the right region (#735), with a card's detail target
@@ -1765,11 +1920,13 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       }
       focusSubject(kind, id);
       const panel = PANEL_FOR_SUBJECT[kind];
-      if (panel) {
+      // With a thread open, focusSubject already lands on the subject's own
+      // address; only the threadless case still needs the panel opened here.
+      if (panel && !conversationId) {
         openPanel(panel);
       }
     },
-    [markSignalAsRead, openPanel, focusSubject],
+    [markSignalAsRead, conversationId, openPanel, focusSubject],
   );
 
   /**
@@ -1779,9 +1936,16 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
   const focusEvidence = useCallback(
     (evidenceId: string) => {
       setFocusedEvidenceId(evidenceId);
-      openPanel("evidence");
+      if (conversationId) {
+        navigateTo(
+          { name: "threadPanelSubject", threadId: conversationId, panel: "evidence", subjectKind: "evidence", subjectId: evidenceId },
+          false
+        );
+      } else {
+        openPanel("evidence");
+      }
     },
-    [openPanel],
+    [conversationId, navigateTo, openPanel],
   );
 
   /**
@@ -2646,6 +2810,23 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     [refreshConversations],
   );
 
+  // A deep link is a promise: the thread named in the address bar is opened,
+  // not merely named, so a reload lands in the lens the person left. Later
+  // navigations go through `navigateTo`, so this runs once, on boot.
+  useEffect(() => {
+    if (
+      initialRoute.name === "thread" ||
+      initialRoute.name === "threadPanel" ||
+      initialRoute.name === "threadPanelSubject"
+    ) {
+      // Deferred by a microtask so the load never sets state during the effect
+      // that asked for it; the thread still opens before the first paint ends.
+      const threadId = initialRoute.threadId;
+      void Promise.resolve().then(() => openConversation(threadId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /**
    * Remove one thread and its turns, then re-read the history.
    *
@@ -2716,11 +2897,12 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
     setOfflineReplyFor(null);
     setConversationId(null);
     void apiCreateConversation()
-      .then((conversation) =>
-        setConversationId((current) => current ?? conversation.id),
-      )
+      .then((conversation) => {
+        setConversationId((current) => current ?? conversation.id);
+        navigateTo({ name: "thread", threadId: conversation.id }, true);
+      })
       .catch(() => undefined);
-  }, []);
+  }, [navigateTo]);
 
   // First paint shows the person's own work; nothing that nobody asked for gets
   // to declare the studio broken. Boot order, and why nothing on the first
@@ -3180,6 +3362,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      navigateTo,
       detail: regions.detail,
       openDetail,
       closeDetail: regions.closeDetail,
@@ -3300,6 +3483,7 @@ function StudioProviderInner({ children }: { children: ReactNode }) {
       refreshSegments,
       focusedEvidenceId,
       focusEvidence,
+      navigateTo,
       regions.detail,
       openDetail,
       regions.closeDetail,
