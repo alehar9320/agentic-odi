@@ -2593,6 +2593,12 @@ required interview link.\
                         "title": "Quote Id",
                         "type": "string",
                     },
+                    "quote_text": {
+                        "anyOf": [{"type": "null"}, {"type": "string"}],
+                        "default": None,
+                        "description": "The verbatim quote this candidate came from; acceptance writes it as evidence",
+                        "title": "Quote Text",
+                    },
                     "rationale": {
                         "default": "",
                         "description": "Why the extractor proposed it, or the validator's reason when rejected",

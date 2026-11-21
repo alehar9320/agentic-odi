@@ -576,6 +576,12 @@ class ExtractedCandidate(BaseModel):
     status: CandidateStatus = Field(
         CandidateStatus.PROPOSED, description="Where this candidate sits in review"
     )
+    quote_text: str | None = Field(
+        None,
+        description=(
+            "The verbatim quote this candidate came from; acceptance writes it as evidence"
+        ),
+    )
     interview_id: str | None = Field(None, description="The interview record, if known")
     job_id: str | None = Field(
         None, description="The Job this candidate would become an outcome of"

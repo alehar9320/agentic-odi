@@ -180,6 +180,7 @@ async def extract_candidates(
         repo.add_extracted_candidate(
             ExtractedCandidate(
                 quote_id=quote_id,
+                quote_text=quote,
                 interview_id=interview_id,
                 job_id=job_id,
                 step_id=step_id,

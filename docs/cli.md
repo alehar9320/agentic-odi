@@ -335,10 +335,15 @@ agentic-odi candidates reject <candidate-id> --reason "names a solution, not an 
 agentic-odi candidates merge <candidate-id> --merged-into <outcome-id>
 ```
 
-`accept` creates **exactly one** Outcome and links its evidence. An
-already-decided candidate is refused rather than re-accepted, so a retry cannot
-double-write. `reject` requires a reason and keeps it. `merge` folds a
-near-duplicate into an existing Outcome and creates no outcome.
+`accept` creates **exactly one** Outcome and writes the candidate's verbatim
+quote as an `Evidence` row (`source_kind="interview"`, `raw={candidate_id,
+quote_id}`) tied to it, so the number travels with the sentence that produced
+it. If that evidence write fails, the new outcome is rolled back rather than
+left without provenance. An already-decided candidate is refused rather than
+re-accepted, so a retry cannot double-write, and a candidate that lost its
+quote is refused rather than accepted without evidence. `reject` requires a
+reason and keeps it. `merge` folds a near-duplicate into an existing Outcome and
+creates no outcome.
 
 Once an outcome exists, render its decision brief:
 

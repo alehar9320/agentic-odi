@@ -350,6 +350,7 @@ isolation, and coverage rules stay in
 | `packages/connectors/tests/test_sink.py` | — |
 | `packages/core/tests/test_alternatives.py` | What a customer uses today, recorded and asked about honestly (M2-07). |
 | `packages/core/tests/test_alternatives_presentation.py` | Presenting the alternatives inventory to a reader (M2-07.2, ALH-166). |
+| `packages/core/tests/test_candidate_decision.py` | Accepting a candidate keeps the sentence that produced it — ALH-191. |
 | `packages/core/tests/test_capability_manifest.py` | Drift tests for the generated capability manifest. |
 | `packages/core/tests/test_claim_check.py` | A score carries the questions that produced it. |
 | `packages/core/tests/test_claim_interview.py` | Ask first: an interview transcript is judged before its score is believed. |
