@@ -69,10 +69,10 @@ test.describe("the visual harness", () => {
         await emulateTheme(page, theme);
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
-        await openView(page, "Landscape");
+        await openView(page, "Where to focus");
 
         await expect(
-          page.getByRole("complementary", { name: "Opportunity landscape" }),
+          page.getByRole("complementary", { name: "Where to focus" }),
         ).toBeVisible();
 
         await expect(page).toHaveScreenshot(
@@ -96,7 +96,7 @@ test.describe("the visual harness", () => {
           .click();
 
         await expect(
-          page.getByRole("complementary", { name: "Capture by hand" }),
+          page.getByRole("complementary", { name: "Add what you heard" }),
         ).toBeVisible();
 
         await expect(page).toHaveScreenshot(

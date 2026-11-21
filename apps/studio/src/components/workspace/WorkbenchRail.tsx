@@ -54,7 +54,7 @@ export function WorkbenchRail() {
     if (outcomes.length > 0) {
       rail.push({
         id: "landscape",
-        label: "Landscape",
+        label: "Where to focus",
         count: outcomes.length,
         noun: outcomes.length === 1 ? "opportunity" : "opportunities",
         icon: <CompassIcon size={14} />,
@@ -63,7 +63,7 @@ export function WorkbenchRail() {
     if (steps.length > 0) {
       rail.push({
         id: "jobmap",
-        label: "Job map",
+        label: "Steps in the job",
         count: steps.length,
         noun: steps.length === 1 ? "step" : "steps",
         icon: <RouteIcon size={14} />,
@@ -72,7 +72,7 @@ export function WorkbenchRail() {
     if (segments.length > 0) {
       rail.push({
         id: "segments",
-        label: "Segments",
+        label: "Who this is for",
         count: segments.length,
         noun: segments.length === 1 ? "segment" : "segments",
         icon: <ClusterIcon size={14} />,
@@ -81,7 +81,7 @@ export function WorkbenchRail() {
     if (evidence > 0) {
       rail.push({
         id: "evidence",
-        label: "Evidence",
+        label: "What customers said",
         count: evidence,
         noun: evidence === 1 ? "signal" : "signals",
         icon: <SignalIcon size={14} />,

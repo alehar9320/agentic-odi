@@ -76,7 +76,7 @@ describe("SuggestionPills starters", () => {
     renderPills();
 
     const list = screen.getByRole("list");
-    const landscape = screen.getByRole("button", { name: "Opportunity landscape" });
+    const landscape = screen.getByRole("button", { name: "Where to focus" });
     expect(list.contains(landscape)).toBe(false);
   });
 });
