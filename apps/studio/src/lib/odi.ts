@@ -9,6 +9,9 @@ export interface PillDescriptor {
  * fails the moment the two disagree. */
 export const UNDERSERVED_THRESHOLD = 10;
 
+/** The one phrase for a score the store does not hold. */
+export const UNSCORED_LABEL = "Not scored";
+
 export function opportunityScore(importance: number, satisfaction: number): number {
   return importance + Math.max(importance - satisfaction, 0);
 }
@@ -25,16 +28,38 @@ export function hasScore(value: unknown): value is number {
 
 export function formatOpportunityScore(score: number | null | undefined): string {
   if (score == null) {
-    return "N/A";
+    return UNSCORED_LABEL;
   }
   return score.toFixed(1);
+}
+
+/**
+ * True when a stored score no longer matches what its own inputs produce.
+ *
+ * The store recomputes only when both inputs are present and otherwise keeps
+ * whatever it was handed (`packages/core/src/agentic_odi_core/services.py`), so a
+ * disagreement is possible. The rule is a tolerance, not equality: a stored
+ * `12.34` over inputs `8.6 / 4.9` (which produce `12.3`) is a rounding
+ * difference, not a disagreement, so anything within `0.05` is treated as
+ * agreeing. An unscored outcome never mismatches — there is nothing stored to
+ * disagree with.
+ */
+export function scoreMismatch(
+  stored: number | null | undefined,
+  importance: number,
+  satisfaction: number,
+): boolean {
+  if (!hasScore(stored)) {
+    return false;
+  }
+  return Math.abs(stored - opportunityScore(importance, satisfaction)) > 0.05;
 }
 
 export function opportunityPill(score: number | null | undefined): PillDescriptor {
   // A missing score is not "served". Saying so would read as a verdict the
   // store never reached, so it gets a neutral descriptor of its own.
   if (!hasScore(score)) {
-    return { label: "Not scored", variant: "blue" };
+    return { label: UNSCORED_LABEL, variant: "blue" };
   }
   const formatted = formatOpportunityScore(score);
   if (isUnderserved(score)) {
@@ -113,7 +138,7 @@ export function scoredAverage(outcomes: ReadonlyArray<Outcome>): MemberScoreSumm
  */
 export function formatMemberMean(summary: MemberScoreSummary): string {
   if (summary.mean == null) {
-    return "Not scored";
+    return UNSCORED_LABEL;
   }
   const base = `Mean opportunity ${summary.mean.toFixed(1)} across ${summary.scored} scored`;
   return summary.unscored > 0 ? `${base} · ${summary.unscored} not scored` : base;

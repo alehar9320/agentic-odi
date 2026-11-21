@@ -147,8 +147,8 @@ describe("ToolPart approval", () => {
     fireEvent.click(screen.getByRole("button", { name: "Allow" }));
 
     const trace = await screen.findByText("add job");
-    // The focus move happens after the approval promise settles, so wait for it
-    // rather than reading activeElement on the tick the trace appears.
+    // The trace is focused from an effect, so wait for it instead of
+    // sampling the active element in the same tick as the text arriving.
     await waitFor(() => expect(document.activeElement).toBe(trace.closest("p")));
   });
 

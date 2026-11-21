@@ -113,12 +113,25 @@ def map_files_to_targets(files: list[str]) -> dict[str, set[str]]:
             targets["scripts"] = True
             mapped = True
             continue
+        if path.startswith("security/"):
+            # The accepted-advisory ledger is read by tests/scripts/test_audit_ignore.py,
+            # so an edit to it is covered by the same target as the script that parses it.
+            targets["scripts"] = True
+            mapped = True
+            continue
         if path.startswith("tests/"):
             targets["tests_root"] = True
             mapped = True
             continue
         if path.startswith("brand/"):
             targets["brand"] = True
+            mapped = True
+            continue
+        if path.startswith(".qoder/"):
+            # Agent worktree state must never reach the index: a gitlink there
+            # breaks actions/checkout's submodule cleanup. The contract test
+            # that pins the invariant is the target for adding or dropping one.
+            targets["tests_root"] = True
             mapped = True
             continue
 

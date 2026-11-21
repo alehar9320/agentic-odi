@@ -111,6 +111,14 @@ describe("saved copy caption", () => {
   it("never claims a copy from the future is fresh", () => {
     expect(savedCopyCaption(saved("2026-11-01T13:00:00.000Z"), now)).toBe("Saved just now");
   });
+
+  it("never rounds up to a unit it has not reached", () => {
+    expect(savedCopyCaption(saved("2026-11-01T11:00:20.000Z"), now)).toBe("Saved 59 minutes ago");
+    expect(savedCopyCaption(saved("2026-11-01T11:00:00.000Z"), now)).toBe("Saved 1 hour ago");
+    expect(savedCopyCaption(saved("2026-10-31T12:20:00.000Z"), now)).toBe("Saved 23 hours ago");
+    expect(savedCopyCaption(saved("2026-10-31T12:00:00.000Z"), now)).toBe("Saved 1 day ago");
+    expect(savedCopyCaption(saved("2026-10-25T16:00:00.000Z"), now)).toBe("Saved 6 days ago");
+  });
 });
 
 describe("kept by this browser caption", () => {

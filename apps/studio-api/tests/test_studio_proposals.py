@@ -88,7 +88,9 @@ def test_editing_on_approval_validates_the_statement() -> None:
         },
     )
     assert approved.status_code == 200
-    assert approved.json()["result"]["importance"] == 9.0
+    #: The source record is claimed by default, so its inputs are discounted
+    #: before the shared scorer runs; the edit path still validates first.
+    assert approved.json()["result"]["importance"] == 4.5
 
 
 def test_rejecting_a_proposal_writes_nothing() -> None:

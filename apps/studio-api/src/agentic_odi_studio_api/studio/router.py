@@ -1310,6 +1310,22 @@ def conversation_tree(conversation_id: str, request: Request) -> ConversationTre
     )
 
 
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: str, request: Request) -> dict:
+    """Remove one thread and its turns; an unknown id is a 404, not a no-op."""
+    try:
+        _memory(request).delete_conversation(conversation_id)
+    except ConversationNotFoundError as exc:
+        raise StudioHTTPError(
+            StudioError(
+                code=StudioErrorCode.NOT_FOUND,
+                message=f"Conversation {conversation_id} not found",
+                suggestion="Refresh the history and try again.",
+            )
+        ) from exc
+    return {"ok": True}
+
+
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
 def patch_conversation(
     conversation_id: str, body: UpdateConversationRequest, request: Request

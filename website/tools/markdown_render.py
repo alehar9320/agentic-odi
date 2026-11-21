@@ -33,6 +33,13 @@ _MARKDOWN.enable("strikethrough")
 _STYLE = "monokai"
 _FORMATTER = HtmlFormatter(style=_STYLE, nowrap=True)
 
+_FRONT_MATTER_RE = re.compile(r"^---\n.*?\n---\n?", re.DOTALL)
+
+
+def strip_front_matter(md: str) -> str:
+    """Remove YAML front matter from markdown if present."""
+    return _FRONT_MATTER_RE.sub("", md, count=1)
+
 
 def _highlight_code(code: str, language: str) -> str:
     """Highlight a fenced code block, falling back to plain text."""
@@ -213,6 +220,7 @@ def render(
     page_path: str | None = None,
 ) -> str:
     """A guide's prose, as HTML, with a link back to its source."""
+    md = strip_front_matter(md)
     html = _MARKDOWN.render(md)
 
     if source_path and link_map is not None and page_path is not None:
@@ -249,8 +257,8 @@ def headings(html: str) -> list[dict[str, str]]:
 
 
 def read_guide(path: Path) -> str:
-    """The raw markdown of a guide."""
-    return path.read_text(encoding="utf-8")
+    """The raw markdown of a guide, with front matter stripped."""
+    return strip_front_matter(path.read_text(encoding="utf-8"))
 
 
 def take_title(md: str) -> tuple[str, str | None]:
