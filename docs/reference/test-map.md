@@ -41,6 +41,7 @@ isolation, and coverage rules stay in
 | `apps/cli/tests/test_data_export.py` | `data-export` writes a restorable snapshot of the local store. |
 | `apps/cli/tests/test_data_path.py` | `odi data path` prints the resolved ODI and Studio database paths. |
 | `apps/cli/tests/test_desired_outcomes_cli.py` | Tests for desired Outcomes CLI commands. |
+| `apps/cli/tests/test_doctor.py` | `odi doctor` explains why the Studio will not start, and never changes the machine. |
 | `apps/cli/tests/test_evidence_cli.py` | Tests for the evidence CLI group. |
 | `apps/cli/tests/test_insight_commands.py` | The insight commands work on the local backend, without an MCP server. |
 | `apps/cli/tests/test_jobs_cli.py` | Tests for the Jobs CLI command group. |

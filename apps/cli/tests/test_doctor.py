@@ -1,3 +1,5 @@
+"""`odi doctor` explains why the Studio will not start, and never changes the machine."""
+
 import json
 import socket
 from pathlib import Path
