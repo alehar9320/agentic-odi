@@ -24,10 +24,14 @@ LLM directly; the sidecar is its only backend.
 - **LLM key.** Resolution order is `AGENTIC_ODI_API_KEY`, then `api_key` in the
   plaintext profile at `~/.config/agentic-odi/llm_profile.json`, then the
   literal `local` for self-hosted models (`apps/cli/src/agentic_odi_cli/chat.py:90-94`).
-  The sidecar resolves the same values and **returns the resolved key** from
-  `GET /api/config` (`studio/probes.py:37-49`) so the browser can display and
-  edit it. The key is stored in the SPA's `localStorage` alongside the rest of
-  the Studio settings.
+  The sidecar resolves the same values and does **not** return the key from
+  `GET /api/config` (`studio/probes.py:37-49`); that route reports only whether a
+  key is set and when, and the browser no longer stores it. A key entered in
+  Settings is written to the sidecar's write-only store
+  (`studio/secrets.py`), a `0600` JSON file the sidecar owns, and every request
+  that would carry an empty key is filled from that store (then the profile
+  default). A key a previous version left in `localStorage` is migrated to the
+  store on first load and deleted.
 - **Connector tokens.** A connector config names the environment variables it
   needs and expands `${VAR}` at call time
   (`packages/connectors/src/agentic_odi_connectors/models.py:56-64`,

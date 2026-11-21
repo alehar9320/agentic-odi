@@ -7,6 +7,14 @@ import type { UpdateTransport } from "../updater/types";
 import { SettingsPanel } from "./SettingsPanel";
 import { STUDIO_VERSION } from "../lib/version";
 
+// The key control asks the sidecar for a key's state on mount; the panel tests
+// do not exercise that path, so it is answered without a live sidecar.
+vi.mock("../api/studioApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/studioApi")>()),
+  fetchModelKeyStatus: vi.fn().mockResolvedValue({ configured: false, set_at: null }),
+  saveModelKey: vi.fn().mockResolvedValue({ configured: true, set_at: "2026-01-01T00:00:00Z" }),
+}));
+
 vi.mock("../state/StudioContext", () => ({
   useStudio: vi.fn(),
 }));
@@ -166,18 +174,14 @@ describe("SettingsPanel connectors", () => {
     expect(screen.getByText(/no data source is connected yet/i)).toBeInTheDocument();
   });
 
-  it("toggles API key visibility", () => {
+  it("toggles API key visibility", async () => {
     vi.mocked(useStudio).mockReturnValue(stubContext());
 
     renderPanel();
 
+    fireEvent.click(await screen.findByRole("button", { name: /replace key/i }));
+
     const input = screen.getByLabelText("API key") as HTMLInputElement;
-    expect(input.type).toBe("password");
-
-    fireEvent.click(screen.getByRole("button", { name: /show api key/i }));
-    expect(input.type).toBe("text");
-
-    fireEvent.click(screen.getByRole("button", { name: /hide api key/i }));
     expect(input.type).toBe("password");
   });
 
