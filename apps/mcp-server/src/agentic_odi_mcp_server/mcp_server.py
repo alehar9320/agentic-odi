@@ -24,6 +24,7 @@ from agentic_odi_core import (
     CandidateNotFoundError,
     CandidateStatus,
     ClaimCheckError,
+    ConflictError,
     CustomerOutcomeNotFoundError,
     EvidenceItemType,
     EvidenceNotFoundError,
@@ -31,6 +32,7 @@ from agentic_odi_core import (
     InvalidOutcomeStatementError,
     JobNotFoundError,
     JobStage,
+    Link,
     OdiError,
     ODIService,
     OutcomeNotFoundError,
@@ -1908,11 +1910,25 @@ def links_add(
     external_id: str | None = None,
     preview: dict | None = None,
 ) -> str:
-    """Create a typed link between two entities. Not yet implemented."""
-    return _fail(
-        NotImplementedError("links_add is not yet implemented"),
-        "Error: links_add is not yet implemented. The Link model and repository are in progress.",
-    )
+    """Create a typed link between two entities."""
+    try:
+        link = Link(
+            source_type=source_type,
+            source_id=source_id,
+            target_type=target_type,
+            target_id=target_id,
+            relationship_type=relationship_type,
+            external_system=external_system,
+            external_id=external_id,
+            preview=preview,
+        )
+    except ValidationError as exc:
+        return _fail(exc)
+    try:
+        created = get_repository().add_link(link)
+    except ConflictError as exc:
+        return _fail(exc, f"Error: {exc}")
+    return created.model_dump_json()
 
 
 @mcp.tool
@@ -1925,20 +1941,24 @@ def links_list(
     limit: int | None = None,
     offset: int | None = None,
 ) -> str:
-    """List links, optionally filtered by source, target, or relationship type. Not yet implemented."""
-    return _fail(
-        NotImplementedError("links_list is not yet implemented"),
-        "Error: links_list is not yet implemented. The Link model and repository are in progress.",
+    """List links, optionally filtered by source, target, or relationship type."""
+    links = get_repository().list_links(
+        source_type=source_type,
+        source_id=source_id,
+        target_type=target_type,
+        target_id=target_id,
+        relationship_type=relationship_type,
+        limit=limit,
+        offset=offset if offset is not None else 0,
     )
+    return json.dumps([link.model_dump(mode="json") for link in links])
 
 
 @mcp.tool
 def links_remove(link_id: str) -> str:
-    """Remove a link by ID. Not yet implemented."""
-    return _fail(
-        NotImplementedError("links_remove is not yet implemented"),
-        "Error: links_remove is not yet implemented. The Link model and repository are in progress.",
-    )
+    """Remove a link by ID."""
+    removed = get_repository().remove_link(link_id)
+    return json.dumps(removed)
 
 
 @mcp.tool
