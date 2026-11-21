@@ -1,8 +1,8 @@
 import { useState } from "react";
 
-import type { ShareLink } from "../types";
-import { CheckIcon, CopyIcon } from "./icons";
 import { Dialog } from "@/components/ui/dialog";
+import type { ShareLink } from "../types";
+import { CheckIcon, CloseIcon, CopyIcon } from "./icons";
 
 /**
  * The one place a read-only link is made.
@@ -33,15 +33,17 @@ export function ShareSheet({ isOpen, onClose, onCreate, onRevoke }: ShareSheetPr
   // The body mounts only while open, so each open starts from fresh state
   // without an effect resetting it after the fact.
   return isOpen ? (
-    <ShareSheetBody onClose={onClose} onCreate={onCreate} onRevoke={onRevoke} />
+    <ShareSheetBody isOpen={isOpen} onClose={onClose} onCreate={onCreate} onRevoke={onRevoke} />
   ) : null;
 }
 
 function ShareSheetBody({
+  isOpen,
   onClose,
   onCreate,
   onRevoke,
 }: {
+  isOpen: boolean;
   onClose: () => void;
   onCreate: (days: number) => Promise<ShareLink>;
   onRevoke?: (id: string) => Promise<void>;
@@ -97,14 +99,9 @@ function ShareSheetBody({
 
   const shareUrl = link ? `${window.location.origin}/shared/${link.token}` : null;
 
-  return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-      title="Share a read-only link"
-    >
+  const children = (
+    <div className="share-sheet__card">
+      <h2 className="share-sheet__title">Share a read-only link</h2>
       <p className="share-sheet__body">
         One artifact, read-only, expiring. The link never carries the workspace, memory,
         conversations, or connector secrets.
@@ -179,6 +176,24 @@ function ShareSheetBody({
           </button>
         </div>
       )}
-    </Dialog>
+    </div>
+  );
+
+  const footer = (
+    <button type="button" className="share-sheet__close" aria-label="Close" onClick={onClose}>
+      <CloseIcon size={15} />
+    </button>
+  );
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="Share a read-only link"
+      children={children}
+      footer={footer}
+    />
   );
 }

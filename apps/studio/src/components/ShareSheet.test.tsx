@@ -41,11 +41,10 @@ describe("ShareSheet", () => {
   });
 
   it("exposes an accessible name through the dialog role", () => {
-    render(<ShareSheet isOpen onClose={() => undefined} onCreate={vi.fn()} />);
+    const onCreate = vi.fn(async () => link());
+    render(<ShareSheet isOpen onClose={() => undefined} onCreate={onCreate} />);
 
-    expect(
-      screen.getByRole("dialog", { name: "Share a read-only link" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Share a read-only link" })).toBeInTheDocument();
   });
 
   it("mints a link for the chosen duration and offers it to copy", async () => {
@@ -122,8 +121,11 @@ describe("ShareSheet", () => {
     const onClose = vi.fn();
     render(<ShareSheet isOpen onClose={onClose} onCreate={vi.fn()} />);
 
-    // The primitive dismisses on a keydown it receives from the document,
-    // which is where a real Escape lands before it bubbles to the window.
+    // Wait for focus to enter the dialog (close button gets focus via Radix onOpenAutoFocus)
+    // The close button in ShareSheet is in the footer, so it gets focus
+    const closeBtn = screen.getByLabelText("Close");
+    closeBtn.focus();
+
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onClose).toHaveBeenCalled();
