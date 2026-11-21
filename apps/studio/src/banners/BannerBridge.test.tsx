@@ -97,13 +97,19 @@ describe("BannerBridge", () => {
   it("raises nothing while the model is healthy", () => {
     studio.llmHealth = { healthy: true, message: "" };
     renderShell();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
   });
 
-  it("raises a working-by-hand strip when no model is reachable", () => {
+  it("raises nothing while reachability is still unknown", () => {
+    studio.llmHealth = { healthy: null, message: "" };
+    renderShell();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
+  });
+
+  it("raises a local-mode strip when no model is reachable", () => {
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+    expect(screen.getByText(/Local mode/i)).toBeInTheDocument();
   });
 
   it("says one line naming what still works when the browser goes offline", () => {
@@ -143,18 +149,18 @@ describe("BannerBridge", () => {
     goOffline();
 
     expect(screen.getByText(/you're offline/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
   });
 
   it("brings back the working-by-hand line once the browser is back online", () => {
     studio.llmHealth = { healthy: false, message: "no model" };
     renderShell();
     goOffline();
-    expect(screen.queryByText(/Working by hand/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local mode/i)).not.toBeInTheDocument();
 
     goOnline();
 
-    expect(screen.getByText(/Working by hand/i)).toBeInTheDocument();
+    expect(screen.getByText(/Local mode/i)).toBeInTheDocument();
   });
 
   it("offers a reload once, never a forced one, when a new build is staged", () => {

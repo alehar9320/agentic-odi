@@ -13,6 +13,7 @@ import { SegmentBoard } from "../canvas/SegmentBoard";
 import { CatchUpFeed } from "../notifications/CatchUpFeed";
 import { RecordsPanel } from "../records/RecordsPanel";
 import { SettingsPanel } from "../SettingsPanel";
+import { WALK_THE_JOB_INTENT } from "../../lib/commands";
 import {
   BellIcon,
   BoltIcon,
@@ -135,7 +136,7 @@ export const WORKSPACE_PANELS: PanelDefinition[] = [
     talk: {
       label: "Walk me through the job",
       intent:
-        "Walk me through the job step by step, and show me where the work breaks down today.",
+        WALK_THE_JOB_INTENT,
     },
   },
   {

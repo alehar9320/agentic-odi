@@ -10,6 +10,14 @@
 export const PRODUCT_NAME = "Living Studio";
 export const COMPANY_NAME = "Agentic ODI";
 
+/**
+ * The one phrase for "no model connected, answering from this device".
+ *
+ * The bar, the composer hint, the banner, and the reply tag all use this
+ * constant so no surface invents a synonym (#698 D35).
+ */
+export const LOCAL_MODE_LABEL = "Local mode";
+
 /** The one document title, used by the shell and the desktop bundle. */
 export function productTitle(): string {
   return PRODUCT_NAME;

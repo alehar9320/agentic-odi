@@ -72,6 +72,18 @@ describe("attachmentRejection", () => {
     );
     expect(rejection).toContain("huge.png");
     expect(rejection).toContain("5 MB");
+    expect(rejection).toContain("PNG");
+  });
+
+  it("rejects a file the studio cannot read with the types and limits that can", () => {
+    const rejection = attachmentRejection(fileOf("deck.pptx", ""));
+
+    expect(rejection).toContain("deck.pptx");
+    expect(rejection).toContain("Markdown");
+    expect(rejection).toContain("20,000 characters");
+    expect(rejection).toContain("5 MB");
+    expect(rejection).toContain("25 MB");
+    expect(rejection).not.toBe("deck.pptx is not supported");
   });
 
   it("accepts a .pdf by name and by the PDF content type", () => {
@@ -89,6 +101,7 @@ describe("attachmentRejection", () => {
     const rejection = attachmentRejection(fileOf("chart.svg", "image/svg+xml"));
     expect(rejection).toContain("chart.svg");
     expect(rejection).toContain("PNG");
+    expect(rejection).toContain("5 MB");
   });
 });
 

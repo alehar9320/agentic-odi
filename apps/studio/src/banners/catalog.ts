@@ -6,6 +6,7 @@
  * source of truth for a banner's severity, life, dock, and default copy.
  */
 
+import { LOCAL_MODE_LABEL } from "../lib/brand";
 import type { Banner, BannerDefaults, BannerKind, BannerSeverity, BannerSpec } from "./types";
 
 /** How long a transient banner lingers before it expires. */
@@ -28,7 +29,7 @@ export const BANNER_CATALOG: Record<BannerKind, BannerDefaults> = {
     severity: "warning",
     life: "persistent",
     dock: "top",
-    title: "Working by hand.",
+    title: `${LOCAL_MODE_LABEL}.`,
     body: "No model is reachable, so the assistant is paused. Every change still writes to your ODI repository.",
     dismissible: false,
     actions: [
